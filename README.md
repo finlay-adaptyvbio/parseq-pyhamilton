@@ -6,6 +6,7 @@ pyhamilton lives in this project as a [git submodule](https://git-scm.com/book/e
 
     git submodule update --recursive
 or
+
     git pull --recurse-submodules
 
 
