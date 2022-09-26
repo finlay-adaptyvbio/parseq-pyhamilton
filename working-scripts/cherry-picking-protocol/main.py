@@ -1,9 +1,11 @@
 import json
 import math
+import os
 import helpers as hp
 from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, tip_pick_up, tip_eject, aspirate, dispense)
 
-
+LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cherry_picking_protocol.lay")
+INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","one_well.csv")
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
 
@@ -11,8 +13,6 @@ state = {
     "treated_src_plates_count": 0, # Number of source plates that have been treated (everything has been extracted from them)
     "treated_tgt_plates_count":0, # Number of target plates that have been treated (they have been filled as much as possible)
     "gripped_plate":{
-        "plate_seq": "Gre_384_0008_0001",
-        "lid_seq": "Gre_384_0008_0001_lid",
         "current_plate": None,
         "current_lid": False
     },
@@ -45,161 +45,161 @@ state = {
     },
     "src_stack_1": [ # Bottom to top
         {
-            "plate_seq": "Gre_384_0001_0001",
-            "lid_seq": "Gre_384_0001_0001_lid",
+            "plate_seq": "Gre_384_Sq_0004_0001",
+            "lid_seq": "Gre_384_Sq_0004_0001_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0001_0002",
-            "lid_seq": "Gre_384_0001_0002_lid",
+            "plate_seq": "Gre_384_Sq_0004_0002",
+            "lid_seq": "Gre_384_Sq_0004_0002_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0001_0003",
-            "lid_seq": "Gre_384_0001_0003_lid",
+            "plate_seq": "Gre_384_Sq_0004_0003",
+            "lid_seq": "Gre_384_Sq_0004_0003_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0001_0004",
-            "lid_seq": "Gre_384_0001_0004_lid",
+            "plate_seq": "Gre_384_Sq_0004_0004",
+            "lid_seq": "Gre_384_Sq_0004_0004_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0001_0005",
-            "lid_seq": "Gre_384_0001_0005_lid",
+            "plate_seq": "Gre_384_Sq_0004_0005",
+            "lid_seq": "Gre_384_Sq_0004_0005_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0001_0006",
-            "lid_seq": "Gre_384_0001_0006_lid",
+            "plate_seq": "Gre_384_Sq_0004_0006",
+            "lid_seq": "Gre_384_Sq_0004_0006_lid",
             "current_plate": None
         },
     ],
     "src_stack_2": [ # Bottom to top
         {
-            "plate_seq": "Gre_384_0002_0001",
-            "lid_seq": "Gre_384_0002_0001_lid",
+            "plate_seq": "Gre_384_Sq_0003_0001",
+            "lid_seq": "Gre_384_Sq_0003_0001_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0002_0002",
-            "lid_seq": "Gre_384_0002_0002_lid",
+            "plate_seq": "Gre_384_Sq_0003_0002",
+            "lid_seq": "Gre_384_Sq_0003_0002_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0002_0003",
-            "lid_seq": "Gre_384_0002_0003_lid",
+            "plate_seq": "Gre_384_Sq_0003_0003",
+            "lid_seq": "Gre_384_Sq_0003_0003_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0002_0004",
-            "lid_seq": "Gre_384_0002_0004_lid",
+            "plate_seq": "Gre_384_Sq_0003_0004",
+            "lid_seq": "Gre_384_Sq_0003_0004_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0002_0005",
-            "lid_seq": "Gre_384_0002_0005_lid",
+            "plate_seq": "Gre_384_Sq_0003_0005",
+            "lid_seq": "Gre_384_Sq_0003_0005_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0002_0006",
-            "lid_seq": "Gre_384_0002_0006_lid",
+            "plate_seq": "Gre_384_Sq_0003_0006",
+            "lid_seq": "Gre_384_Sq_0003_0006_lid",
             "current_plate": None
         },
     ], 
     "src_stack_3": [ # Bottom to top
         {
-            "plate_seq": "Gre_384_0003_0001",
-            "lid_seq": "Gre_384_0003_0001_lid",
+            "plate_seq": "Gre_384_Sq_0002_0001",
+            "lid_seq": "Gre_384_Sq_0002_0001_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0003_0002",
-            "lid_seq": "Gre_384_0003_0002_lid",
+            "plate_seq": "Gre_384_Sq_0002_0002",
+            "lid_seq": "Gre_384_Sq_0002_0002_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0003_0003",
-            "lid_seq": "Gre_384_0003_0003_lid",
+            "plate_seq": "Gre_384_Sq_0002_0003",
+            "lid_seq": "Gre_384_Sq_0002_0003_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0003_0004",
-            "lid_seq": "Gre_384_0003_0004_lid",
+            "plate_seq": "Gre_384_Sq_0002_0004",
+            "lid_seq": "Gre_384_Sq_0002_0004_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0003_0005",
-            "lid_seq": "Gre_384_0003_0005_lid",
+            "plate_seq": "Gre_384_Sq_0002_0005",
+            "lid_seq": "Gre_384_Sq_0002_0005_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0003_0006",
-            "lid_seq": "Gre_384_0003_0006_lid",
+            "plate_seq": "Gre_384_Sq_0002_0006",
+            "lid_seq": "Gre_384_Sq_0002_0006_lid",
             "current_plate": None
         },
     ],
     "tgt_stack_1":[
         {
-            "plate_seq": "Gre_384_0004_0001",
-            "lid_seq": "Gre_384_0004_0001_lid",
+            "plate_seq": "Gre_384_Sq_0005_0001",
+            "lid_seq": "Gre_384_Sq_0005_0001_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0004_0002",
-            "lid_seq": "Gre_384_0004_0002_lid",
+            "plate_seq": "Gre_384_Sq_0005_0002",
+            "lid_seq": "Gre_384_Sq_0005_0002_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0004_0003",
-            "lid_seq": "Gre_384_0004_0003_lid",
+            "plate_seq": "Gre_384_Sq_0005_0003",
+            "lid_seq": "Gre_384_Sq_0005_0003_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0004_0004",
-            "lid_seq": "Gre_384_0004_0004_lid",
+            "plate_seq": "Gre_384_Sq_0005_0004",
+            "lid_seq": "Gre_384_Sq_0005_0004_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0004_0005",
-            "lid_seq": "Gre_384_0004_0005_lid",
+            "plate_seq": "Gre_384_Sq_0005_0005",
+            "lid_seq": "Gre_384_Sq_0005_0005_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0004_0006",
-            "lid_seq": "Gre_384_0004_0006_lid",
+            "plate_seq": "Gre_384_Sq_0005_0006",
+            "lid_seq": "Gre_384_Sq_0005_0006_lid",
             "current_plate": None
         },
     ],
     "tgt_stack_2":[
         {
-            "plate_seq": "Gre_384_0005_0001",
-            "lid_seq": "Gre_384_0005_0001_lid",
+            "plate_seq": "Gre_384_Sq_0001_0001",
+            "lid_seq": "Gre_384_Sq_0001_0001_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0005_0002",
-            "lid_seq": "Gre_384_0005_0002_lid",
+            "plate_seq": "Gre_384_Sq_0001_0002",
+            "lid_seq": "Gre_384_Sq_0001_0002_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0005_0003",
-            "lid_seq": "Gre_384_0005_0003_lid",
+            "plate_seq": "Gre_384_Sq_0001_0003",
+            "lid_seq": "Gre_384_Sq_0001_0003_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0005_0004",
-            "lid_seq": "Gre_384_0005_0004_lid",
+            "plate_seq": "Gre_384_Sq_0001_0004",
+            "lid_seq": "Gre_384_Sq_0001_0004_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0005_0005",
-            "lid_seq": "Gre_384_0005_0005_lid",
+            "plate_seq": "Gre_384_Sq_0001_0005",
+            "lid_seq": "Gre_384_Sq_0001_0005_lid",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_0005_0006",
-            "lid_seq": "Gre_384_0005_0006_lid",
+            "plate_seq": "Gre_384_Sq_0001_0006",
+            "lid_seq": "Gre_384_Sq_0001_0006_lid",
             "current_plate": None
         },
     ]
@@ -212,7 +212,7 @@ state = {
 
 
 # Get the input list of all the wells for each plate
-plates = hp.get_wells_of_interest_from_csv("C:\\Projects\\Adaptyv Bio\\pyhamilton-cherrypicking\\unique_sequences_well_index.csv")
+plates = hp.get_wells_of_interest_from_csv(INPUT_FILE_PATH)
 
 # Get number of interesting samples to be cherry-picked
 src_wells_of_interest_count = 0
@@ -294,11 +294,11 @@ tips_left_count = 96 - next_pipette_tip_index
 # Ask the user to set the plates (in stacks 1 and 2)
 placed_in_stack = 0
 index_in_current_stack = 0
-stack_to_place_in = "3"
+stack_to_place_in = "2"
 for plate in plates:
     # Fill stack 1 and 2, leave stack 3 empty
     if placed_in_stack == 6:
-        stack_to_place_in = "2"
+        stack_to_place_in = "3"
         index_in_current_stack = 0
     if placed_in_stack >= 12:
         print("Reached limit for source plates. Cannot add any more.")
@@ -307,11 +307,11 @@ for plate in plates:
     while user_input_src_plate_add_to_stack != 'yes':
         user_input_src_plate_add_to_stack = input(f"Please place the LIDDED PLATE '{plate}' in source stack {stack_to_place_in}.\nType 'yes' to confirm that the plate has been placed:\n")
         # change state
-        state[f"src_stack_{stack_to_place_in}"][index_in_current_stack]["current_plate"] = plate
+    state[f"src_stack_{stack_to_place_in}"][index_in_current_stack]["current_plate"] = plate
     placed_in_stack += 1 
     index_in_current_stack += 1
 
-json.dump(state, open("./state.json",'w'))
+
 
 # -------------------------
 #        EXECUTION
@@ -336,12 +336,13 @@ def get_next_stacked_src_plate(state:dict):
     upper_most_plate = 0
     for pos in state[stack_name]:
         if pos["current_plate"] == None:
+            upper_most_plate = upper_most_plate - 1
             break
         if upper_most_plate == SRC_STACK_LIMIT:
             break
         upper_most_plate += 1
 
-    index_in_stack = upper_most_plate - 1
+    index_in_stack = upper_most_plate
     return stack_name, index_in_stack
 
 def get_next_stacked_tgt_plate(state:dict):
@@ -456,22 +457,28 @@ def cmd_grip_place_lid(
     cmd_grip_place_plate_with_lid(hamilton_interface,plateSequence,lidSequence,toolSequence)
 
 
-layfile_abs_path = ''
-lmgr = LayoutManager(layfile_abs_path)
+lmgr = LayoutManager(LAYOUT_FILE_PATH)
+
+json.dump(state, open("./00_initial_state.json",'w'))
 
 with HamiltonInterface(simulate=True) as hammy:
+    print("Initializing...")
     hammy.wait_on_response(hammy.send_command(INITIALIZE))
-    print('\nInitialized!')
+    print('Done Initializing.')
 
 
     # Loop over source plates 
     while state["treated_src_plates_count"] < src_plates_count:
-
         # Get new active src
         #   Move plate w lid from src_stack_3 with lid to active_src_pos
         next_src_stack_name, next_src_stack_index = get_next_stacked_src_plate(state)
+        print("next stack source stack name :", next_src_stack_name)
+        print("next stack source stack index:", next_src_stack_index)
+        print("state:", state[next_src_stack_name][next_src_stack_index])
         next_src_plate_seq = state[next_src_stack_name][next_src_stack_index]["plate_seq"]
         next_src_lid_seq = state[next_src_stack_name][next_src_stack_index]["lid_seq"] 
+        str_msg = f"-- Move plate from source to active [Press Enter]"
+        input(str_msg)
         cmd_grip_get_plate_with_lid(
             hammy,
             next_src_plate_seq,
@@ -481,7 +488,7 @@ with HamiltonInterface(simulate=True) as hammy:
         state["gripped_plate"]["current_plate"] = state[next_src_stack_name][next_src_stack_index]["current_plate"]
         state["gripped_plate"]["current_lid"]   = state[next_src_stack_name][next_src_stack_index]["current_plate"]
         state[next_src_stack_name][next_src_stack_index]["current_plate"] = None
-
+        print('gripped plate:',state["gripped_plate"]["current_plate"])
         cmd_grip_place_plate_with_lid(
             hammy, 
             state["active_src"]["plate_seq"],
@@ -491,7 +498,11 @@ with HamiltonInterface(simulate=True) as hammy:
         state["active_src"]["current_plate"] = state["gripped_plate"]["current_plate"]
         state["gripped_plate"]["current_plate"] = None
         state["gripped_plate"]["current_lid"]   = None
-        
+
+        plate_treated_now = state[next_src_stack_name][next_src_stack_index]["current_plate"]
+        str_msg = f"-- Move lid from active src to src lid holder [Press Enter]"
+        input(str_msg)
+
         #   move lid from active_src_pos to src_lid_holder 
         cmd_grip_get_lid(
             hammy,
@@ -509,12 +520,15 @@ with HamiltonInterface(simulate=True) as hammy:
         state["lid_holder_src"]["current_lid"] = state["gripped_plate"]["current_lid"]
         state["gripped_plate"]["current_lid"] = None
 
+
         def get_target_plate():
             # Get new active tgt
             #   Move plate w lid from tgt_stack_2 with lid to active_tgt_pos
             next_tgt_stack_name, next_tgt_stack_index = get_next_stacked_tgt_plate(state)
             next_tgt_plate_seq = state[next_tgt_stack_name][next_tgt_stack_index]["plate_seq"]
             next_tgt_lid_seq = state[next_tgt_stack_name][next_tgt_stack_index]["lid_seq"] 
+            str_msg = f"-- Move plate from target stack to active [Press Enter]"
+            input(str_msg)
             cmd_grip_get_plate_with_lid(
                 hammy, 
                 next_tgt_plate_seq,
@@ -535,6 +549,8 @@ with HamiltonInterface(simulate=True) as hammy:
             state["gripped_plate"]["current_plate"] = None
             state["gripped_plate"]["current_lid"]   = None
             
+            str_msg = f"-- Move lid from active tgt to tgt lid holder [Press Enter]"
+            input(str_msg)
             #   move lid from active_tgt_pos to tgt_lid_holder
             cmd_grip_get_lid(
                 hammy,
@@ -552,8 +568,9 @@ with HamiltonInterface(simulate=True) as hammy:
             state["lid_holder_tgt"]["current_lid"] = state["gripped_plate"]["current_lid"]
             state["gripped_plate"]["current_lid"] = None
 
+        
         get_target_plate()
-
+        json.dump(state, open("./01_before_cherry_picking_state.json",'w'))
         # Cherry Pick!
         active_src_plate_name = state["active_src"]["current_plate"]
         
@@ -565,6 +582,8 @@ with HamiltonInterface(simulate=True) as hammy:
         liquid_class = 'HighVolume_Water_DispenseJet_Part'
 
         for well_to_pick in wells_to_pick:
+            str_msg = f"-- Check if there still are tips [Press Enter]"
+            input(str_msg)
             # Check if there still are tips (state["tips"]["next_tip_index"])
             while state["tips"]["next_tip_index"] >= state["tips"]["max_tips_count"]:
                 print("--------\nAttention: No more tips. Please add a new tips set.\n--------")
@@ -577,7 +596,9 @@ with HamiltonInterface(simulate=True) as hammy:
                 next_pipette_tip_index = get_pipette_tip_next_pos_from_user()
                 state["tips"]["next_tip_index"] = next_pipette_tip_index
 
-
+            
+            str_msg = f"-- Check if active target plate is full [Press Enter]"
+            input(str_msg)
             # Check if still places in tgt plate
             if state["active_tgt"]["next_well_id"] >= state["active_tgt"]["well_count"]:
                 print("[Notice] active target plate is full. Replacing it...")
@@ -635,6 +656,8 @@ with HamiltonInterface(simulate=True) as hammy:
                 # Get new target plate and remove its lid
                 get_target_plate()
             
+            str_msg = f"-- Pick well {well_to_pick} [Press Enter]"
+            input(str_msg)
             # Run cherry-picking for one well
             tip_resource = lmgr.assign_unused_resource(ResourceType(Tip96, state["tips"]["seq"]))
             tip_pos = (tip_resource, state["tips"]["next_tip_index"])
@@ -663,6 +686,8 @@ with HamiltonInterface(simulate=True) as hammy:
             remaining_wells_of_interest -= 1
             print(f"Progress: {remaining_wells_of_interest}/{src_wells_of_interest_count}", )
         
+            str_msg = f"-- Done picking well '{well_to_pick}' [Press Enter]"
+            input(str_msg)
 
         # Store active src (assuming it is done)
         #   move lid from src_lid_holder to active_src_pos
