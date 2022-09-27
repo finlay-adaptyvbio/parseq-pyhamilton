@@ -17,13 +17,13 @@ state = {
         "current_lid": False
     },
     "active_src": {
-        "plate_seq": "cp_active_src_plate",
-        "lid_seq": "cp_active_src_lid",
+        "plate_seq": "Gre_384_Sq_0006",
+        "lid_seq": "Gre_384_Sq_0006_lid",
         "current_plate": None
     },
     "active_tgt": {
-        "plate_seq": "cp_active_tgt_plate",
-        "lid_seq": "cp_active_tgt_lid",
+        "plate_seq": "Gre_384_Sq_0007",
+        "lid_seq": "Gre_384_Sq_0007_lid",
         "current_plate": None,
         "next_well_id": 0,
         "well_count": 384
@@ -41,7 +41,7 @@ state = {
     "tips": {
         "next_tip_index": 0,
         "max_tips_count": 96,
-        "seq": "MlStar1000ulHighVolumeTip"
+        "seq": "HT_L_0002"
     },
     "src_stack_1": [ # Bottom to top
         {
@@ -407,6 +407,7 @@ def cmd_grip_get_plate_with_lid(
         lidSequence:str, 
         toolSequence:str = 'COREGripTool_OnWaste_1000ul_0001',
         gripForce:float = 3,
+        transportMode:int = 2
     ):
     cmd_id = hamilton_interface.send_command(GRIP_GET, 
                                 plateSequence      = plateSequence,
@@ -414,8 +415,8 @@ def cmd_grip_get_plate_with_lid(
                                 toolSequence       = toolSequence,
                                 gripForce          = gripForce,
                                 gripperToolChannel = 2,
-                                gripHeight         = 11.0,
-                                transportMode      = 1 )
+                                gripHeight         = 10.0,
+                                transportMode      = transportMode )
     print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
 
 def cmd_grip_place_plate_with_lid(
@@ -423,12 +424,13 @@ def cmd_grip_place_plate_with_lid(
         plateSequence:str, 
         lidSequence:str, 
         toolSequence:str = 'COREGripTool_OnWaste_1000ul_0001',
+        transportMode:int = 2,
     ):
     cmd_id = hamilton_interface.send_command(GRIP_PLACE,
                                 plateSequence = plateSequence,
                                 lidSequence   = lidSequence,
                                 toolSequence  = toolSequence,
-                                transportMode = 1 )
+                                transportMode = transportMode )
     print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
 
 def cmd_grip_get_lid(
@@ -437,15 +439,16 @@ def cmd_grip_get_lid(
         lidSequence:str, 
         toolSequence:str = 'COREGripTool_OnWaste_1000ul_0001',
         gripForce:float = 3,
+        transportMode:int = 1
     ):
     cmd_id = hamilton_interface.send_command(GRIP_GET, 
-                                plateSequence      = plateSequence,
+                                #plateSequence      = plateSequence,
                                 lidSequence        = lidSequence,
                                 toolSequence       = toolSequence,
                                 gripForce          = gripForce,
                                 gripperToolChannel = 2,
                                 gripHeight         = 3.0,
-                                transportMode      = 1 )
+                                transportMode      = transportMode )
     print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
 
 def cmd_grip_place_lid(
@@ -453,8 +456,9 @@ def cmd_grip_place_lid(
         plateSequence:str,
         lidSequence:str,
         toolSequence:str = 'COREGripTool_OnWaste_1000ul_0001',
+        transportMode:int = 1
     ):
-    cmd_grip_place_plate_with_lid(hamilton_interface,plateSequence,lidSequence,toolSequence)
+    cmd_grip_place_plate_with_lid(hamilton_interface,plateSequence,lidSequence,toolSequence, transportMode=transportMode)
 
 
 lmgr = LayoutManager(LAYOUT_FILE_PATH)
@@ -482,7 +486,8 @@ with HamiltonInterface(simulate=True) as hammy:
         cmd_grip_get_plate_with_lid(
             hammy,
             next_src_plate_seq,
-            next_src_lid_seq
+            next_src_lid_seq,
+            transportMode=2
         )
         # Update state
         state["gripped_plate"]["current_plate"] = state[next_src_stack_name][next_src_stack_index]["current_plate"]
@@ -492,7 +497,8 @@ with HamiltonInterface(simulate=True) as hammy:
         cmd_grip_place_plate_with_lid(
             hammy, 
             state["active_src"]["plate_seq"],
-            state["active_src"]["lid_seq"]
+            state["active_src"]["lid_seq"],
+            transportMode=2
         )
         # Update state
         state["active_src"]["current_plate"] = state["gripped_plate"]["current_plate"]
@@ -507,14 +513,16 @@ with HamiltonInterface(simulate=True) as hammy:
         cmd_grip_get_lid(
             hammy,
             state["active_src"]["plate_seq"],
-            state["active_src"]["lid_seq"]
+            state["active_src"]["lid_seq"],
+            transportMode = 1,
         )
         state["gripped_plate"]["current_lid"] = state["active_src"]["current_plate"]
 
         cmd_grip_place_lid(
             hammy,
             state["lid_holder_src"]["plate_seq"],
-            state["lid_holder_src"]["lid_seq"]
+            state["lid_holder_src"]["lid_seq"],
+            transportMode = 1,
         )
         # Update state
         state["lid_holder_src"]["current_lid"] = state["gripped_plate"]["current_lid"]
@@ -532,7 +540,8 @@ with HamiltonInterface(simulate=True) as hammy:
             cmd_grip_get_plate_with_lid(
                 hammy, 
                 next_tgt_plate_seq,
-                next_tgt_lid_seq
+                next_tgt_lid_seq,
+                transportMode = 2,
             )
             # Update state
             state["gripped_plate"]["current_plate"] = state[next_tgt_stack_name][next_tgt_stack_index]["current_plate"]
@@ -542,7 +551,8 @@ with HamiltonInterface(simulate=True) as hammy:
             cmd_grip_place_plate_with_lid(
                 hammy, 
                 state["active_tgt"]["plate_seq"], 
-                state["active_tgt"]["lid_seq"]
+                state["active_tgt"]["lid_seq"],
+                transportMode = 2,
             )
             # Update state
             state["active_tgt"]["current_plate"] = state["gripped_plate"]["current_plate"]
@@ -555,14 +565,16 @@ with HamiltonInterface(simulate=True) as hammy:
             cmd_grip_get_lid(
                 hammy,
                 state["active_tgt"]["plate_seq"],
-                state["active_tgt"]["lid_seq"]
+                state["active_tgt"]["lid_seq"],
+                transportMode = 1
             )
             state["gripped_plate"]["current_lid"] = state["active_tgt"]["current_plate"]
 
             cmd_grip_place_lid(
                 hammy,
                 state["lid_holder_tgt"]["plate_seq"],
-                state["lid_holder_tgt"]["lid_seq"]
+                state["lid_holder_tgt"]["lid_seq"],
+                transportMode = 1,
             )
             # Update state
             state["lid_holder_tgt"]["current_lid"] = state["gripped_plate"]["current_lid"]
@@ -606,7 +618,8 @@ with HamiltonInterface(simulate=True) as hammy:
                 cmd_grip_get_lid(
                     hammy,
                     state["lid_holder_tgt"]["plate_seq"],
-                    state["lid_holder_tgt"]["lid_seq"]
+                    state["lid_holder_tgt"]["lid_seq"],
+                    transportMode = 1,
                 )
                 # Update state
                 state["gripped_plate"]["current_lid"] = state["lid_holder_tgt"]["current_lid"]
@@ -615,7 +628,8 @@ with HamiltonInterface(simulate=True) as hammy:
                 cmd_grip_place_lid(
                     hammy,
                     state["active_tgt"]["plate_seq"],
-                    state["active_tgt"]["lid_seq"]
+                    state["active_tgt"]["lid_seq"],
+                    transportMode = 1,
                 )
                 # Update state
                 state["lid_holder_tgt"]["current_lid"] = None
@@ -625,7 +639,8 @@ with HamiltonInterface(simulate=True) as hammy:
                     cmd_grip_get_plate_with_lid(
                         hammy, 
                         state["active_tgt"]["plate_seq"], 
-                        state["active_tgt"]["lid_seq"]
+                        state["active_tgt"]["lid_seq"],
+                        transportMode = 2,
                     )
                     # Update state
                     state["gripped_plate"]["current_plate"] = state["gripped_plate"]["current_plate"]
@@ -639,7 +654,8 @@ with HamiltonInterface(simulate=True) as hammy:
                     cmd_grip_place_plate_with_lid(
                         hammy, 
                         next_done_tgt_plate_seq,
-                        next_done_tgt_lid_seq
+                        next_done_tgt_lid_seq,
+                        transportMode = 2,
                     )
                     # Update state
                     state[next_done_tgt_stack_name][next_done_tgt_stack_index]["current_plate"] = state["gripped_plate"]["current_plate"]
@@ -659,16 +675,20 @@ with HamiltonInterface(simulate=True) as hammy:
             str_msg = f"-- Pick well {well_to_pick} [Press Enter]"
             input(str_msg)
             # Run cherry-picking for one well
-            tip_resource = lmgr.assign_unused_resource(ResourceType(Tip96, state["tips"]["seq"]))
+            tips_type = ResourceType(Tip96, state["tips"]["seq"])
+            # print("tip seq        :", state["tips"]["seq"])
+            tip_resource = lmgr.assign_unused_resource(tips_type)
+            # print("tip next index :",state["tips"]["next_tip_index"])
             tip_pos = (tip_resource, state["tips"]["next_tip_index"])
+            # print("tip pos        :", tip_pos)
             # Update next tip position in state
             state["tips"]["next_tip_index"] += 1
 
-            src_plate_type = ResourceType(Plate384, state["active_src"]["plate_seq"])
+            src_plate_type = ResourceType(Plate384,  state["active_src"]["plate_seq"])
             src_plate_resource = lmgr.assign_unused_resource(src_plate_type)
             well_pos_in_src_plate = (src_plate_resource, well_to_pick)
 
-            tgt_plate_type = ResourceType(Plate384, state["active_tgt"]["plate_seq"])
+            tgt_plate_type = ResourceType(Plate384,  state["active_tgt"]["plate_seq"])
             tgt_plate_resource = lmgr.assign_unused_resource(tgt_plate_type)
             well_pos_in_tgt_plate = (tgt_plate_resource, state["active_tgt"]["next_well_id"])
             # Update next target well position in state
@@ -694,7 +714,8 @@ with HamiltonInterface(simulate=True) as hammy:
         cmd_grip_get_lid(
             hammy,
             state["lid_holder_src"]["plate_seq"],
-            state["lid_holder_src"]["lid_seq"]
+            state["lid_holder_src"]["lid_seq"],
+            transportMode = 1,
         )
         # Update state
         state["gripped_plate"]["current_lid"] = state["lid_holder_src"]["current_lid"]
@@ -703,7 +724,8 @@ with HamiltonInterface(simulate=True) as hammy:
         cmd_grip_place_lid(
             hammy,
             state["active_src"]["plate_seq"],
-            state["active_src"]["lid_seq"]
+            state["active_src"]["lid_seq"],
+            transportMode = 1,
         )
         # Update state
         state["lid_holder_src"]["current_lid"] = None
@@ -712,7 +734,8 @@ with HamiltonInterface(simulate=True) as hammy:
         cmd_grip_get_plate_with_lid(
             hammy, 
             state["active_src"]["plate_seq"], 
-            state["active_src"]["lid_seq"]
+            state["active_src"]["lid_seq"],
+            transportMode = 2,
         )
         # Update state
         state["gripped_plate"]["current_plate"] = state["active_src"]["current_plate"]
@@ -725,7 +748,8 @@ with HamiltonInterface(simulate=True) as hammy:
         cmd_grip_place_plate_with_lid(
             hammy,
             next_done_src_plate_seq,
-            next_done_src_lid_seq
+            next_done_src_lid_seq,
+            transportMode = 2,
         )
         # Update state
         state[next_done_src_stack_name][next_done_src_stack_index]["current_plate"] = state["gripped_plate"]["current_plate"]
