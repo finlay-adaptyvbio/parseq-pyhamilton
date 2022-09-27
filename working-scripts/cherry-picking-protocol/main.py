@@ -377,10 +377,12 @@ def get_next_done_src_plate_pos(state:dict):
         if pos["current_plate"] == None:
             break
         if upper_most_plate == SRC_STACK_LIMIT:
+            input(f"Error. There are no more places available in 'src done stack' (src_stack_{stack_nb}). Abort [Press Enter]")
+            raise ""
             break
         upper_most_plate += 1
     
-    index_in_stack = upper_most_plate - 1
+    index_in_stack = upper_most_plate
     return stack_name, index_in_stack
 
 def get_next_done_tgt_plate_pos(state:dict):
@@ -394,10 +396,12 @@ def get_next_done_tgt_plate_pos(state:dict):
         if pos["current_plate"] == None:
             break
         if upper_most_plate == TGT_STACK_LIMIT:
+            input(f"Error. There are no more places available in 'tgt done stack' ({stack_name}). Abort [Press Enter]")
+            raise ""
             break
         upper_most_plate += 1
     
-    index_in_stack = upper_most_plate - 1
+    index_in_stack = upper_most_plate
     return stack_name, index_in_stack
     
 
