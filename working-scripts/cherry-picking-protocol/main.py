@@ -631,8 +631,9 @@ with HamiltonInterface(simulate=True) as hammy:
             state["lid_holder_tgt"]["current_lid"] = state["gripped_plate"]["current_lid"]
             state["gripped_plate"]["current_lid"] = None
 
-                
-        get_target_plate()
+        if state["active_tgt"]["current_plate"] == None:
+            get_target_plate()
+        
         json.dump(state, open("./01_before_cherry_picking_state.json",'w'))
         # Cherry Pick!
         active_src_plate_name = state["active_src"]["current_plate"]
