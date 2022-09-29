@@ -2,10 +2,10 @@ import json
 import math
 import os
 import helpers as hp
-from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, tip_pick_up, tip_eject, aspirate, dispense)
+from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, GRIP_MOVE, tip_pick_up, tip_eject, aspirate, dispense)
 
 LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cherry_picking_protocol.lay")
-INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","one_well.csv")
+INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","2w_2p.csv")
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
 
@@ -211,6 +211,17 @@ state = {
 # -------------------------
 
 
+lmgr = LayoutManager(LAYOUT_FILE_PATH)
+
+tips_type = ResourceType(Tip96, state["tips"]["seq"])
+# print("tip seq        :", state["tips"]["seq"])
+tip_resource = lmgr.assign_unused_resource(tips_type)
+
+src_plate_type = ResourceType(Plate384,  state["active_src"]["plate_seq"])
+src_plate_resource = lmgr.assign_unused_resource(src_plate_type)
+tgt_plate_type = ResourceType(Plate384,  state["active_tgt"]["plate_seq"])
+tgt_plate_resource = lmgr.assign_unused_resource(tgt_plate_type)
+
 # Get the input list of all the wells for each plate
 plates = hp.get_wells_of_interest_from_csv(INPUT_FILE_PATH)
 
@@ -323,6 +334,35 @@ for plate in plates:
 #   [X] get the next done src plate position from the state - returns the potential position (stack and index to know how high it is)
 #   [X] get the next done tgt plate position from the state - returns the potential position (stack and index to know how high it is)
 
+def put_tgt_plate_in_done_tgt_stack(ejectToolWhenFinish:int = 1):
+    # Put plate in done target stack
+    cmd_grip_get_plate_with_lid(
+        hammy, 
+        state["active_tgt"]["plate_seq"], 
+        state["active_tgt"]["lid_seq"],
+        transportMode = 2
+    )
+    # Update state
+    state["gripped_plate"]["current_plate"] = state["gripped_plate"]["current_plate"]
+    state["gripped_plate"]["current_lid"]   = state["gripped_plate"]["current_plate"]
+    state["active_tgt"]["current_plate"]    = None
+
+
+    next_done_tgt_stack_name, next_done_tgt_stack_index = get_next_done_tgt_plate_pos(state)
+    next_done_tgt_plate_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["plate_seq"]
+    next_done_tgt_lid_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["lid_seq"] 
+    cmd_grip_place_plate_with_lid(
+        hammy, 
+        next_done_tgt_plate_seq,
+        next_done_tgt_lid_seq,
+        transportMode = 2,
+        ejectToolWhenFinish = ejectToolWhenFinish
+    )
+    # Update state
+    state[next_done_tgt_stack_name][next_done_tgt_stack_index]["current_plate"] = state["gripped_plate"]["current_plate"]
+    state["gripped_plate"]["current_plate"] = None
+    state["gripped_plate"]["current_lid"]   = None
+
 def get_next_stacked_src_plate(state:dict):
     treated_src_plates_count = state["treated_src_plates_count"]
     stack_nb = "2"
@@ -429,13 +469,16 @@ def cmd_grip_place_plate_with_lid(
         lidSequence:str, 
         toolSequence:str = 'COREGripTool_OnWaste_1000ul_0001',
         transportMode:int = 2,
+        ejectToolWhenFinish:int = 1,
     ):
     cmd_id = hamilton_interface.send_command(GRIP_PLACE,
-                                plateSequence = plateSequence,
-                                lidSequence   = lidSequence,
-                                toolSequence  = toolSequence,
-                                transportMode = transportMode )
+                                plateSequence       = plateSequence,
+                                lidSequence         = lidSequence,
+                                toolSequence        = toolSequence,
+                                transportMode       = transportMode,
+                                ejectToolWhenFinish = ejectToolWhenFinish)
     print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
+
 
 def cmd_grip_get_lid(
         hamilton_interface:HamiltonInterface, 
@@ -460,12 +503,12 @@ def cmd_grip_place_lid(
         plateSequence:str,
         lidSequence:str,
         toolSequence:str = 'COREGripTool_OnWaste_1000ul_0001',
-        transportMode:int = 1
+        transportMode:int = 1,
+        ejectToolWhenFinish:int = 1,
     ):
-    cmd_grip_place_plate_with_lid(hamilton_interface,plateSequence,lidSequence,toolSequence, transportMode=transportMode)
+    cmd_grip_place_plate_with_lid(hamilton_interface,plateSequence,lidSequence,toolSequence, transportMode=transportMode,ejectToolWhenFinish=ejectToolWhenFinish)
 
 
-lmgr = LayoutManager(LAYOUT_FILE_PATH)
 
 json.dump(state, open("./00_initial_state.json",'w'))
 
@@ -498,11 +541,12 @@ with HamiltonInterface(simulate=True) as hammy:
         state["gripped_plate"]["current_lid"]   = state[next_src_stack_name][next_src_stack_index]["current_plate"]
         state[next_src_stack_name][next_src_stack_index]["current_plate"] = None
         print('gripped plate:',state["gripped_plate"]["current_plate"])
-        cmd_grip_place_plate_with_lid(
+        cmd_grip_place_plate_with_lid( #cmd_grip_place_plate_with_lid(
             hammy, 
             state["active_src"]["plate_seq"],
             state["active_src"]["lid_seq"],
-            transportMode=2
+            transportMode=2,
+            ejectToolWhenFinish=0
         )
         # Update state
         state["active_src"]["current_plate"] = state["gripped_plate"]["current_plate"]
@@ -527,13 +571,14 @@ with HamiltonInterface(simulate=True) as hammy:
             state["lid_holder_src"]["plate_seq"],
             state["lid_holder_src"]["lid_seq"],
             transportMode = 1,
+            ejectToolWhenFinish = 0
         )
         # Update state
         state["lid_holder_src"]["current_lid"] = state["gripped_plate"]["current_lid"]
         state["gripped_plate"]["current_lid"] = None
 
 
-        def get_target_plate():
+        def get_target_plate(ejectToolWhenFinish:bool = True):
             # Get new active tgt
             #   Move plate w lid from tgt_stack_2 with lid to active_tgt_pos
             next_tgt_stack_name, next_tgt_stack_index = get_next_stacked_tgt_plate(state)
@@ -557,6 +602,7 @@ with HamiltonInterface(simulate=True) as hammy:
                 state["active_tgt"]["plate_seq"], 
                 state["active_tgt"]["lid_seq"],
                 transportMode = 2,
+                ejectToolWhenFinish=0
             )
             # Update state
             state["active_tgt"]["current_plate"] = state["gripped_plate"]["current_plate"]
@@ -573,18 +619,19 @@ with HamiltonInterface(simulate=True) as hammy:
                 transportMode = 1
             )
             state["gripped_plate"]["current_lid"] = state["active_tgt"]["current_plate"]
-
+            
             cmd_grip_place_lid(
                 hammy,
                 state["lid_holder_tgt"]["plate_seq"],
                 state["lid_holder_tgt"]["lid_seq"],
                 transportMode = 1,
+                ejectToolWhenFinish = ejectToolWhenFinish
             )
             # Update state
             state["lid_holder_tgt"]["current_lid"] = state["gripped_plate"]["current_lid"]
             state["gripped_plate"]["current_lid"] = None
 
-        
+                
         get_target_plate()
         json.dump(state, open("./01_before_cherry_picking_state.json",'w'))
         # Cherry Pick!
@@ -638,33 +685,7 @@ with HamiltonInterface(simulate=True) as hammy:
                 # Update state
                 state["lid_holder_tgt"]["current_lid"] = None
 
-                def put_tgt_plate_in_done_tgt_stack():
-                    # Put plate in done target stack
-                    cmd_grip_get_plate_with_lid(
-                        hammy, 
-                        state["active_tgt"]["plate_seq"], 
-                        state["active_tgt"]["lid_seq"],
-                        transportMode = 2,
-                    )
-                    # Update state
-                    state["gripped_plate"]["current_plate"] = state["gripped_plate"]["current_plate"]
-                    state["gripped_plate"]["current_lid"]   = state["gripped_plate"]["current_plate"]
-                    state["active_tgt"]["current_plate"]    = None
-
-
-                    next_done_tgt_stack_name, next_done_tgt_stack_index = get_next_done_tgt_plate_pos(state)
-                    next_done_tgt_plate_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["plate_seq"]
-                    next_done_tgt_lid_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["lid_seq"] 
-                    cmd_grip_place_plate_with_lid(
-                        hammy, 
-                        next_done_tgt_plate_seq,
-                        next_done_tgt_lid_seq,
-                        transportMode = 2,
-                    )
-                    # Update state
-                    state[next_done_tgt_stack_name][next_done_tgt_stack_index]["current_plate"] = state["gripped_plate"]["current_plate"]
-                    state["gripped_plate"]["current_plate"] = None
-                    state["gripped_plate"]["current_lid"]   = None
+                
 
                 state["treated_tgt_plates_count"] += 1
 
@@ -679,21 +700,13 @@ with HamiltonInterface(simulate=True) as hammy:
             str_msg = f"-- Pick well {well_to_pick} [Press Enter]"
             input(str_msg)
             # Run cherry-picking for one well
-            tips_type = ResourceType(Tip96, state["tips"]["seq"])
-            # print("tip seq        :", state["tips"]["seq"])
-            tip_resource = lmgr.assign_unused_resource(tips_type)
-            # print("tip next index :",state["tips"]["next_tip_index"])
             tip_pos = (tip_resource, state["tips"]["next_tip_index"])
             # print("tip pos        :", tip_pos)
             # Update next tip position in state
             state["tips"]["next_tip_index"] += 1
 
-            src_plate_type = ResourceType(Plate384,  state["active_src"]["plate_seq"])
-            src_plate_resource = lmgr.assign_unused_resource(src_plate_type)
             well_pos_in_src_plate = (src_plate_resource, well_to_pick)
 
-            tgt_plate_type = ResourceType(Plate384,  state["active_tgt"]["plate_seq"])
-            tgt_plate_resource = lmgr.assign_unused_resource(tgt_plate_type)
             well_pos_in_tgt_plate = (tgt_plate_resource, state["active_tgt"]["next_well_id"])
             # Update next target well position in state
             state["active_tgt"]["next_well_id"] += 1
@@ -765,6 +778,6 @@ with HamiltonInterface(simulate=True) as hammy:
         state["treated_src_plates_count"] += 1
 
     # Check if there is a plate on the active tgt site. if so, put it back.
-    if state["treated_src_plates_count"] < tgt_plate_count:
+    if state["active_tgt"]["current_plate"] != None:
         put_tgt_plate_in_done_tgt_stack()
     print("\n-----\nCherry-picking Protocol Done\n-----\n")
