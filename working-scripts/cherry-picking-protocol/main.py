@@ -366,7 +366,7 @@ def put_tgt_plate_in_done_tgt_stack(ejectToolWhenFinish:int = 1):
 def get_next_stacked_src_plate(state:dict):
     treated_src_plates_count = state["treated_src_plates_count"]
     stack_nb = "2"
-    if not(treated_src_plates_count < 12):
+    if treated_src_plates_count >= 12:
         return None, None
     
     if (treated_src_plates_count > SRC_STACK_LIMIT): # Assuming we only have 2 stacks
@@ -374,16 +374,29 @@ def get_next_stacked_src_plate(state:dict):
 
     stack_name = f'src_stack_{stack_nb}'
     upper_most_plate = 0
-    for pos in state[stack_name]:
+    for i in range(SRC_STACK_LIMIT):
+        pos = state[stack_name][i] 
+        if pos["current_plate"] == None:
+            upper_most_plate = i - 1
+            break
+        if i == ( SRC_STACK_LIMIT - 1 ):
+            upper_most_plate = i
+            break
+    index_in_stack = upper_most_plate
+    return stack_name, index_in_stack
+    
+
+
+    """ for pos in state[stack_name]:
         if pos["current_plate"] == None:
             upper_most_plate = upper_most_plate - 1
             break
-        if upper_most_plate == SRC_STACK_LIMIT:
+        if upper_most_plate == SRC_STACK_LIMIT - 1:
             break
         upper_most_plate += 1
 
     index_in_stack = upper_most_plate
-    return stack_name, index_in_stack
+    return stack_name, index_in_stack """
 
 def get_next_stacked_tgt_plate(state:dict):
     treated_tgt_plates_count = state["treated_tgt_plates_count"]
