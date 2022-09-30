@@ -687,7 +687,33 @@ with HamiltonInterface(simulate=True) as hammy:
                 # Update state
                 state["lid_holder_tgt"]["current_lid"] = None
 
-                
+                # Put target plate back
+                #   Move plate w lid from active_tgt_pos to tgt_stack_1 (or 2 if 1 is full) - essentially to next done tgt position
+                cmd_grip_get_plate_with_lid(
+                    hammy, 
+                    state["active_tgt"]["plate_seq"], 
+                    state["active_tgt"]["lid_seq"],
+                    transportMode = 2,
+                )
+                # Update state
+                state["gripped_plate"]["current_plate"] = state["active_tgt"]["current_plate"]
+                state["gripped_plate"]["current_lid"]   = state["active_tgt"]["current_plate"]
+                state["active_tgt"]["current_plate"] = None
+
+                next_done_tgt_stack_name, next_done_tgt_stack_index = get_next_done_tgt_plate_pos(state)
+                next_done_tgt_plate_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["plate_seq"]
+                next_done_tgt_lid_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["lid_seq"] 
+                cmd_grip_place_plate_with_lid(
+                    hammy,
+                    next_done_tgt_plate_seq,
+                    next_done_tgt_lid_seq,
+                    transportMode = 2,
+                )
+                # Update state
+                state[next_done_tgt_stack_name][next_done_tgt_stack_index]["current_plate"] = state["gripped_plate"]["current_plate"]
+                state["gripped_plate"]["current_plate"] = None
+                state["gripped_plate"]["current_lid"]   = None
+
 
                 state["treated_tgt_plates_count"] += 1
 
