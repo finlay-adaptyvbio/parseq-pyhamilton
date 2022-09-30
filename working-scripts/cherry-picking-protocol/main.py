@@ -5,7 +5,7 @@ import helpers as hp
 from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, GRIP_MOVE, tip_pick_up, tip_eject, aspirate, dispense)
 
 LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cherry_picking_protocol.lay")
-INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","2w_2p.csv")
+INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","7sp_1tp.csv")
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
 
@@ -25,7 +25,7 @@ state = {
         "plate_seq": "Gre_384_Sq_0007",
         "lid_seq": "Gre_384_Sq_0007_lid",
         "current_plate": None,
-        "next_well_id": 0,
+        "next_well_id": 382,
         "well_count": 384
     },
     "lid_holder_src": {
@@ -529,7 +529,7 @@ with HamiltonInterface(simulate=True) as hammy:
         next_src_plate_seq = state[next_src_stack_name][next_src_stack_index]["plate_seq"]
         next_src_lid_seq = state[next_src_stack_name][next_src_stack_index]["lid_seq"] 
         str_msg = f"-- Move plate from source to active [Press Enter]"
-        input(str_msg)
+        #input(str_msg)
         cmd_grip_get_plate_with_lid(
             hammy,
             next_src_plate_seq,
@@ -555,7 +555,7 @@ with HamiltonInterface(simulate=True) as hammy:
 
         plate_treated_now = state[next_src_stack_name][next_src_stack_index]["current_plate"]
         str_msg = f"-- Move lid from active src to src lid holder [Press Enter]"
-        input(str_msg)
+        #input(str_msg)
 
         #   move lid from active_src_pos to src_lid_holder 
         cmd_grip_get_lid(
@@ -585,7 +585,7 @@ with HamiltonInterface(simulate=True) as hammy:
             next_tgt_plate_seq = state[next_tgt_stack_name][next_tgt_stack_index]["plate_seq"]
             next_tgt_lid_seq = state[next_tgt_stack_name][next_tgt_stack_index]["lid_seq"] 
             str_msg = f"-- Move plate from target stack to active [Press Enter]"
-            input(str_msg)
+            #input(str_msg)
             cmd_grip_get_plate_with_lid(
                 hammy, 
                 next_tgt_plate_seq,
@@ -610,7 +610,7 @@ with HamiltonInterface(simulate=True) as hammy:
             state["gripped_plate"]["current_lid"]   = None
             
             str_msg = f"-- Move lid from active tgt to tgt lid holder [Press Enter]"
-            input(str_msg)
+            #input(str_msg)
             #   move lid from active_tgt_pos to tgt_lid_holder
             cmd_grip_get_lid(
                 hammy,
@@ -647,7 +647,7 @@ with HamiltonInterface(simulate=True) as hammy:
 
         for well_to_pick in wells_to_pick:
             str_msg = f"-- Check if there still are tips [Press Enter]"
-            input(str_msg)
+            #input(str_msg)
             # Check if there still are tips (state["tips"]["next_tip_index"])
             while state["tips"]["next_tip_index"] >= state["tips"]["max_tips_count"]:
                 print("--------\nAttention: No more tips. Please add a new tips set.\n--------")
@@ -662,7 +662,7 @@ with HamiltonInterface(simulate=True) as hammy:
 
             
             str_msg = f"-- Check if active target plate is full [Press Enter]"
-            input(str_msg)
+            #input(str_msg)
             # Check if still places in tgt plate
             if state["active_tgt"]["next_well_id"] >= state["active_tgt"]["well_count"]:
                 print("[Notice] active target plate is full. Replacing it...")
@@ -682,6 +682,7 @@ with HamiltonInterface(simulate=True) as hammy:
                     state["active_tgt"]["plate_seq"],
                     state["active_tgt"]["lid_seq"],
                     transportMode = 1,
+                    ejectToolWhenFinish=0
                 )
                 # Update state
                 state["lid_holder_tgt"]["current_lid"] = None
@@ -697,9 +698,10 @@ with HamiltonInterface(simulate=True) as hammy:
                 
                 # Get new target plate and remove its lid
                 get_target_plate()
+                state["active_tgt"]["next_well_id"] = 0
             
             str_msg = f"-- Pick well {well_to_pick} [Press Enter]"
-            input(str_msg)
+            #input(str_msg)
             # Run cherry-picking for one well
             tip_pos = (tip_resource, state["tips"]["next_tip_index"])
             # print("tip pos        :", tip_pos)
@@ -722,10 +724,10 @@ with HamiltonInterface(simulate=True) as hammy:
             
             # Print Progress to user
             remaining_wells_of_interest -= 1
-            print(f"Progress: {remaining_wells_of_interest}/{src_wells_of_interest_count}", )
+            print(f"Progress: {src_wells_of_interest_count - remaining_wells_of_interest}/{src_wells_of_interest_count}", )
         
             str_msg = f"-- Done picking well '{well_to_pick}' [Press Enter]"
-            input(str_msg)
+            #input(str_msg)
 
         # Store active src (assuming it is done)
         #   move lid from src_lid_holder to active_src_pos
@@ -744,6 +746,7 @@ with HamiltonInterface(simulate=True) as hammy:
             state["active_src"]["plate_seq"],
             state["active_src"]["lid_seq"],
             transportMode = 1,
+            ejectToolWhenFinish=0
         )
         # Update state
         state["lid_holder_src"]["current_lid"] = None
