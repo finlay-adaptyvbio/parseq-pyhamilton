@@ -5,7 +5,7 @@ import helpers as hp
 from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, GRIP_MOVE, tip_pick_up, tip_eject, aspirate, dispense)
 
 LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cherry_picking_protocol.lay")
-INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","7sp_1tp.csv")
+INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","two_wells.csv")
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
 
@@ -335,6 +335,25 @@ for plate in plates:
 #   [X] get the next done tgt plate position from the state - returns the potential position (stack and index to know how high it is)
 
 def put_tgt_plate_in_done_tgt_stack(ejectToolWhenFinish:int = 1):
+    cmd_grip_get_lid(
+        hammy,
+        state["lid_holder_tgt"]["plate_seq"],
+        state["lid_holder_tgt"]["lid_seq"],
+        transportMode = 1,
+    )
+    # Update state
+    state["gripped_plate"]["current_lid"] = state["lid_holder_tgt"]["current_lid"]
+    state["lid_holder_tgt"]["current_lid"] = None
+
+    cmd_grip_place_lid(
+        hammy,
+        state["active_tgt"]["plate_seq"],
+        state["active_tgt"]["lid_seq"],
+        transportMode = 1,
+        ejectToolWhenFinish=0
+    )
+    # Update state
+    state["lid_holder_tgt"]["current_lid"] = None
     # Put plate in done target stack
     cmd_grip_get_plate_with_lid(
         hammy, 
