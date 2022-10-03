@@ -363,7 +363,7 @@ def put_tgt_plate_in_done_tgt_stack(ejectToolWhenFinish:int = 1):
     state["gripped_plate"]["current_plate"] = None
     state["gripped_plate"]["current_lid"]   = None
 
-def get_next_stacked_src_plate(state:dict):
+""" def get_next_stacked_src_plate(state:dict):
     treated_src_plates_count = state["treated_src_plates_count"]
     stack_nb = "2"
     if treated_src_plates_count >= 12:
@@ -383,22 +383,22 @@ def get_next_stacked_src_plate(state:dict):
             upper_most_plate = i
             break
     index_in_stack = upper_most_plate
-    return stack_name, index_in_stack
+    return stack_name, index_in_stack """
     
 
 
-    """ for pos in state[stack_name]:
-        if pos["current_plate"] == None:
-            upper_most_plate = upper_most_plate - 1
-            break
-        if upper_most_plate == SRC_STACK_LIMIT - 1:
-            break
-        upper_most_plate += 1
+""" for pos in state[stack_name]:
+    if pos["current_plate"] == None:
+        upper_most_plate = upper_most_plate - 1
+        break
+    if upper_most_plate == SRC_STACK_LIMIT - 1:
+        break
+    upper_most_plate += 1
 
-    index_in_stack = upper_most_plate
-    return stack_name, index_in_stack """
+index_in_stack = upper_most_plate
+return stack_name, index_in_stack """
 
-def get_next_stacked_tgt_plate(state:dict):
+""" def get_next_stacked_tgt_plate(state:dict):
     treated_tgt_plates_count = state["treated_tgt_plates_count"]
     if not(treated_tgt_plates_count < TGT_STACK_LIMIT):
         return None, None
@@ -413,7 +413,7 @@ def get_next_stacked_tgt_plate(state:dict):
         upper_most_plate += 1
     
     index_in_stack = upper_most_plate - 1
-    return stack_name, index_in_stack
+    return stack_name, index_in_stack """
 
 def get_next_done_src_plate_pos(state:dict):
     treated_src_plates_count = state["treated_src_plates_count"]
@@ -535,7 +535,7 @@ with HamiltonInterface(simulate=True) as hammy:
     while state["treated_src_plates_count"] < src_plates_count:
         # Get new active src
         #   Move plate w lid from src_stack_3 with lid to active_src_pos
-        next_src_stack_name, next_src_stack_index = get_next_stacked_src_plate(state)
+        next_src_stack_name, next_src_stack_index = hp.get_next_stacked_plate(state, SRC_STACK_LIMIT, "src")#get_next_stacked_src_plate(state)
         print("next stack source stack name :", next_src_stack_name)
         print("next stack source stack index:", next_src_stack_index)
         print("state:", state[next_src_stack_name][next_src_stack_index])
@@ -594,7 +594,7 @@ with HamiltonInterface(simulate=True) as hammy:
         def get_target_plate(ejectToolWhenFinish:bool = True):
             # Get new active tgt
             #   Move plate w lid from tgt_stack_2 with lid to active_tgt_pos
-            next_tgt_stack_name, next_tgt_stack_index = get_next_stacked_tgt_plate(state)
+            next_tgt_stack_name, next_tgt_stack_index = hp.get_next_stacked_plate(state, SRC_STACK_LIMIT, "tgt")
             next_tgt_plate_seq = state[next_tgt_stack_name][next_tgt_stack_index]["plate_seq"]
             next_tgt_lid_seq = state[next_tgt_stack_name][next_tgt_stack_index]["lid_seq"] 
             str_msg = f"-- Move plate from target stack to active [Press Enter]"
@@ -819,6 +819,8 @@ with HamiltonInterface(simulate=True) as hammy:
 
         # state update: Add one plate as already treated
         state["treated_src_plates_count"] += 1
+        to_print = state["treated_src_plates_count"]
+        print(f"Plates Processed: {to_print}/{src_plates_count}")
 
     # Check if there is a plate on the active tgt site. if so, put it back.
     if state["active_tgt"]["current_plate"] != None:
