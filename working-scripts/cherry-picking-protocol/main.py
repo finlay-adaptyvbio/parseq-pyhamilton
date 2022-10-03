@@ -348,7 +348,7 @@ def put_tgt_plate_in_done_tgt_stack(ejectToolWhenFinish:int = 1):
     state["active_tgt"]["current_plate"]    = None
 
 
-    next_done_tgt_stack_name, next_done_tgt_stack_index = get_next_done_tgt_plate_pos(state)
+    next_done_tgt_stack_name, next_done_tgt_stack_index = hp.get_next_done_stacked_plate(state,SRC_STACK_LIMIT,"tgt")#get_next_done_tgt_plate_pos(state)
     next_done_tgt_plate_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["plate_seq"]
     next_done_tgt_lid_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["lid_seq"] 
     cmd_grip_place_plate_with_lid(
@@ -362,58 +362,6 @@ def put_tgt_plate_in_done_tgt_stack(ejectToolWhenFinish:int = 1):
     state[next_done_tgt_stack_name][next_done_tgt_stack_index]["current_plate"] = state["gripped_plate"]["current_plate"]
     state["gripped_plate"]["current_plate"] = None
     state["gripped_plate"]["current_lid"]   = None
-
-""" def get_next_stacked_src_plate(state:dict):
-    treated_src_plates_count = state["treated_src_plates_count"]
-    stack_nb = "2"
-    if treated_src_plates_count >= 12:
-        return None, None
-    
-    if (treated_src_plates_count > SRC_STACK_LIMIT): # Assuming we only have 2 stacks
-        stack_nb = "3"
-
-    stack_name = f'src_stack_{stack_nb}'
-    upper_most_plate = 0
-    for i in range(SRC_STACK_LIMIT):
-        pos = state[stack_name][i] 
-        if pos["current_plate"] == None:
-            upper_most_plate = i - 1
-            break
-        if i == ( SRC_STACK_LIMIT - 1 ):
-            upper_most_plate = i
-            break
-    index_in_stack = upper_most_plate
-    return stack_name, index_in_stack """
-    
-
-
-""" for pos in state[stack_name]:
-    if pos["current_plate"] == None:
-        upper_most_plate = upper_most_plate - 1
-        break
-    if upper_most_plate == SRC_STACK_LIMIT - 1:
-        break
-    upper_most_plate += 1
-
-index_in_stack = upper_most_plate
-return stack_name, index_in_stack """
-
-""" def get_next_stacked_tgt_plate(state:dict):
-    treated_tgt_plates_count = state["treated_tgt_plates_count"]
-    if not(treated_tgt_plates_count < TGT_STACK_LIMIT):
-        return None, None
-    
-    stack_name = f'tgt_stack_2'
-    upper_most_plate = 0
-    for pos in state[stack_name]:
-        if pos["current_plate"] == None:
-            break
-        if upper_most_plate == TGT_STACK_LIMIT:
-            break
-        upper_most_plate += 1
-    
-    index_in_stack = upper_most_plate - 1
-    return stack_name, index_in_stack """
 
 def get_next_done_src_plate_pos(state:dict):
     treated_src_plates_count = state["treated_src_plates_count"]
@@ -713,7 +661,7 @@ with HamiltonInterface(simulate=True) as hammy:
                 state["gripped_plate"]["current_lid"]   = state["active_tgt"]["current_plate"]
                 state["active_tgt"]["current_plate"] = None
 
-                next_done_tgt_stack_name, next_done_tgt_stack_index = get_next_done_tgt_plate_pos(state)
+                next_done_tgt_stack_name, next_done_tgt_stack_index = hp.get_next_done_stacked_plate(state,SRC_STACK_LIMIT,"tgt")#get_next_done_tgt_plate_pos(state)
                 next_done_tgt_plate_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["plate_seq"]
                 next_done_tgt_lid_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["lid_seq"] 
                 cmd_grip_place_plate_with_lid(
@@ -802,7 +750,7 @@ with HamiltonInterface(simulate=True) as hammy:
         state["gripped_plate"]["current_lid"]   = state["active_src"]["current_plate"]
         state["active_src"]["current_plate"] = None
 
-        next_done_src_stack_name, next_done_src_stack_index = get_next_done_src_plate_pos(state)
+        next_done_src_stack_name, next_done_src_stack_index = hp.get_next_done_stacked_plate(state,SRC_STACK_LIMIT,"src")#get_next_done_src_plate_pos(state)
         next_done_src_plate_seq = state[next_done_src_stack_name][next_done_src_stack_index]["plate_seq"]
         next_done_src_lid_seq = state[next_done_src_stack_name][next_done_src_stack_index]["lid_seq"] 
         cmd_grip_place_plate_with_lid(
