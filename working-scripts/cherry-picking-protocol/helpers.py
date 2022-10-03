@@ -62,6 +62,32 @@ def get_wells_of_interest_from_csv(csv_absolute_path:string) -> dict:
 
     return plates
 
+def get_next_stacked_plate_noooooooo(state:dict, stack_limit:int, src_or_tgt:str):
+    """
+    Identify the next stacked plate that can be picked up by the Hamilton. 
+    Arguments:
+        state: dict of the current state of the machine.
+        stack_limit: int maximum number of plates that can be placed on a stack.
+        src_or_tgt: string either "src" or "tgt" to know which type of plate to look for in the state.
+    Returns:
+        Two strings that represent the position of the next plate to be taken and the stack it is in.
+    """
+    treated_plates_count = state[f"treated_{src_or_tgt}_plates_count"]
+    #print("# treated plates: ", treated_plates_count)
+
+    # Find which stack to take from
+    stack_to_take_from_nb = int(treated_plates_count/stack_limit) + 2
+    stack_to_take_from = f"{src_or_tgt}_stack_{str(stack_to_take_from_nb)}"
+    #print("will start treatment of: ", treated_plates_count + 1, "th plate")
+    #print("stack to take from: ", stack_to_take_from)
+
+    # figure out the plate level to take (bottom = 0, top = 5)
+    stacks_full = int(treated_plates_count/stack_limit)
+    #print("Full stacks: ", stacks_full)
+    plate_index = treated_plates_count - stacks_full * stack_limit
+    #print("plate index: ", plate_index)
+    return stack_to_take_from, plate_index
+
 def get_next_stacked_plate(state:dict, stack_limit:int, src_or_tgt:str):
     """
     Identify the next stacked plate that can be picked up by the Hamilton. 
@@ -76,14 +102,19 @@ def get_next_stacked_plate(state:dict, stack_limit:int, src_or_tgt:str):
     #print("# treated plates: ", treated_plates_count)
 
     # Find which stack to take from
-    stack_to_take_from = int(treated_plates_count/stack_limit) + 2
-
+    stack_to_take_from_nb = int(treated_plates_count/stack_limit) + 2
+    stack_to_take_from = f"{src_or_tgt}_stack_{str(stack_to_take_from_nb)}"
     #print("will start treatment of: ", treated_plates_count + 1, "th plate")
     #print("stack to take from: ", stack_to_take_from)
 
-    # figure out the plate level to take (bottom = 0, top = 5)
     stacks_full = int(treated_plates_count/stack_limit)
     #print("Full stacks: ", stacks_full)
-    plate_index = treated_plates_count - stacks_full * stack_limit
+    
+    # figure out the plate level to take (bottom = 0, top = 5)
+    plate_index = 5
+    for pos in reversed(state[stack_to_take_from]):
+        if pos["current_plate"] != None:
+            break
+        plate_index -= 1
     #print("plate index: ", plate_index)
     return stack_to_take_from, plate_index

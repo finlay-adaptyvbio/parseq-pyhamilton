@@ -25,7 +25,7 @@ state = {
         "plate_seq": "Gre_384_Sq_0007",
         "lid_seq": "Gre_384_Sq_0007_lid",
         "current_plate": None,
-        "next_well_id": 382,
+        "next_well_id": 0,
         "well_count": 384
     },
     "lid_holder_src": {
