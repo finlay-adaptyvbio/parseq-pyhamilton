@@ -9,6 +9,8 @@ INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
 
+new_mapping = {} # New well: Old well
+
 state = {
     "treated_src_plates_count": 0, # Number of source plates that have been treated (everything has been extracted from them)
     "treated_tgt_plates_count":0, # Number of target plates that have been treated (they have been filled as much as possible)
@@ -41,7 +43,7 @@ state = {
     "tips": {
         "next_tip_index": 0,
         "max_tips_count": 96,
-        "seq": "HT_L_0002"
+        "seq": "HT_L_0002"#"TIP_50ul_L_NE_stack_0002"
     },
     "src_stack_1": [ # Bottom to top
         {
@@ -497,6 +499,7 @@ with HamiltonInterface(simulate=True) as hammy:
     hammy.wait_on_response(hammy.send_command(INITIALIZE))
     print('Done Initializing.')
 
+    remaining_wells_of_interest = src_wells_of_interest_count
 
     # Loop over source plates 
     while state["treated_src_plates_count"] < src_plates_count:
@@ -620,10 +623,10 @@ with HamiltonInterface(simulate=True) as hammy:
         
         wells_to_pick = hp.convertPlatePositionsToIndeces( plates[active_src_plate_name] )
 
-        remaining_wells_of_interest = src_wells_of_interest_count
+        
 
         # Settings for cherry-picking procedures
-        liquid_class = 'HighVolume_Water_DispenseJet_Part'
+        liquid_class = 'HighVolume_Water_DispenseJet_Part' #'Tip_50ul_96COREHead_Water_DispenseJet_Empty'
 
         for well_to_pick in wells_to_pick:
             str_msg = f"-- Check if there still are tips [Press Enter]"
@@ -717,18 +720,22 @@ with HamiltonInterface(simulate=True) as hammy:
             well_pos_in_src_plate = (src_plate_resource, well_to_pick)
 
             well_pos_in_tgt_plate = (tgt_plate_resource, state["active_tgt"]["next_well_id"])
+            try:
+                new_mapping[str(state["active_tgt"]["current_plate"]) + "_" + str(state["active_tgt"]["next_well_id"])] = str(state["active_src"]["current_plate"]) + "_" + str(well_to_pick)
+            except:
+                print('somthing went wrong with the mapping ')
             # Update next target well position in state
             state["active_tgt"]["next_well_id"] += 1
-
+            
             # Aspirate from well of interest
             tip_pick_up(hammy, [tip_pos])
-            aspirate(hammy, [well_pos_in_src_plate], [.001], liquidClass = liquid_class)
+            aspirate(hammy, [well_pos_in_src_plate], [10], liquidClass = liquid_class)
 
             # Dispense into target well
-            dispense(hammy, [well_pos_in_tgt_plate], [.001], liquidClass = liquid_class)
-            tip_eject(hammy, [tip_pos])
-            
-            # Print Progress to user
+            dispense(hammy, [well_pos_in_tgt_plate], [10], liquidClass = liquid_class)
+            tip_eject(hammy, wasteSequence="Waste")# [tip_pos])
+            json.dump(new_mapping, open("./L_mapping.json",'w'))
+            # Print Progress to user    
             remaining_wells_of_interest -= 1
             print(f"Progress: {src_wells_of_interest_count - remaining_wells_of_interest}/{src_wells_of_interest_count}", )
         
@@ -792,4 +799,5 @@ with HamiltonInterface(simulate=True) as hammy:
     # Check if there is a plate on the active tgt site. if so, put it back.
     if state["active_tgt"]["current_plate"] != None:
         put_tgt_plate_in_done_tgt_stack()
+    json.dump(new_mapping, open("./FINAL_mapping.json",'w'))
     print("\n-----\nCherry-picking Protocol Done\n-----\n")
