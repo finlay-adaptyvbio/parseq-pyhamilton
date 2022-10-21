@@ -4,7 +4,7 @@ import os
 import helpers as hp
 from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, GRIP_MOVE, tip_pick_up, tip_eject, aspirate, dispense)
 
-LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cherry_picking_protocol.lay")
+LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cherry_picking_protocol_stacked_tips.lay")
 INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","two_wells.csv")
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
@@ -38,10 +38,11 @@ state = {
         "lid_seq": "cp_tgt_lid_holder_lid",
         "current_lid": None
     },
-    "tips": {
+    "active_tips": {
         "next_tip_index": 0,
         "max_tips_count": 96,
-        "seq": "TIP_50ul_L_NE_stack_0001"#"HT_L_0002"
+        "seq": "TIP_50ul_L_NE_stack_0002",
+        "seq_for_moving": "TIP_50ul_L_NE_stack_0005"
     },
     "src_stack_1": [ # Bottom to top
         {
@@ -655,7 +656,7 @@ with HamiltonInterface(simulate=True) as hammy:
         remaining_wells_of_interest = src_wells_of_interest_count
 
         # Settings for cherry-picking procedures
-        liquid_class = 'HighVolume_Water_DispenseJet_Part'
+        liquid_class = 'Tip_50ul_96COREHead_Water_DispenseJet_Empty'
 
         for well_to_pick in wells_to_pick:
             str_msg = f"-- Check if there still are tips [Press Enter]"
