@@ -236,6 +236,78 @@ state = {
             "current_plate": None
         },
     ],
+    "tip_stack_1":[
+        {
+            "seq": "TIP_50ul_L_NE_stack_0001_0001",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0001_0002",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0001_0003",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0001_0004",
+            "current": False
+        },
+    ],
+    "tip_stack_2":[
+        {
+            "seq": "TIP_50ul_L_NE_stack_0002_0001",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0002_0002",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0002_0003",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0002_0004",
+            "current": False
+        },
+    ],
+    "tip_stack_3":[
+        {
+            "seq": "TIP_50ul_L_NE_stack_0003_0001",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0003_0002",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0003_0003",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0003_0004",
+            "current": False
+        },
+    ],
+    "tip_stack_4":[
+        {
+            "seq": "TIP_50ul_L_NE_stack_0004_0001",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0004_0002",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0004_0003",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0004_0004",
+            "current": False
+        },
+    ],
 }
 
 
