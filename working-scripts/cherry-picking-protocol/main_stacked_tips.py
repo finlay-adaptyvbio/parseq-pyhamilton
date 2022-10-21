@@ -41,8 +41,8 @@ state = {
     "active_tips": {
         "next_tip_index": 0,
         "max_tips_count": 96,
-        "seq": "TIP_50ul_L_NE_stack_0002",
-        "seq_for_moving": "TIP_50ul_L_NE_stack_0005"
+        "seq": "TIP_50ul_L_NE_stack_0002", # Used for pipetting and throwing in waste
+        "seq_for_moving_from_to_stack": "TIP_50ul_L_NE_stack_0005" # NOT for throwing in waste 
     },
     "src_stack_1": [ # Bottom to top
         {
@@ -238,42 +238,6 @@ state = {
     ],
     "tip_stack_1":[
         {
-            "seq": "TIP_50ul_L_NE_stack_0001_0001",
-            "current": False
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0001_0002",
-            "current": False
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0001_0003",
-            "current": False
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0001_0004",
-            "current": False
-        },
-    ],
-    "tip_stack_2":[
-        {
-            "seq": "TIP_50ul_L_NE_stack_0002_0001",
-            "current": False
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0002_0002",
-            "current": False
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0002_0003",
-            "current": False
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0002_0004",
-            "current": False
-        },
-    ],
-    "tip_stack_3":[
-        {
             "seq": "TIP_50ul_L_NE_stack_0003_0001",
             "current": False
         },
@@ -290,7 +254,7 @@ state = {
             "current": False
         },
     ],
-    "tip_stack_4":[
+    "tip_stack_2":[
         {
             "seq": "TIP_50ul_L_NE_stack_0004_0001",
             "current": False
@@ -305,6 +269,42 @@ state = {
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0004_0004",
+            "current": False
+        },
+    ],
+    "tip_stack_3":[
+        {
+            "seq": "TIP_50ul_L_NE_stack_0006_0001",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0006_0002",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0006_0003",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0006_0004",
+            "current": False
+        },
+    ],
+    "tip_stack_4":[
+        {
+            "seq": "TIP_50ul_L_NE_stack_0007_0001",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0007_0002",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0007_0003",
+            "current": False
+        },
+        {
+            "seq": "TIP_50ul_L_NE_stack_0007_0004",
             "current": False
         },
     ],
