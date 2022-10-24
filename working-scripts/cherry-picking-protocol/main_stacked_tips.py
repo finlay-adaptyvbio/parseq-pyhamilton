@@ -298,19 +298,19 @@ state = {
     "tip_stack_4":[
         {
             "seq": "TIP_50ul_L_NE_stack_0007_0001",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0007_0002",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0007_0003",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0007_0004",
-            "current": False
+            "current": None
         },
     ],
 }
@@ -382,7 +382,13 @@ user_input_src_lid_holder_pos = False
 while user_input_src_lid_holder_pos != 'yes':
     user_input_src_lid_holder_pos = input(f"Please place an empty plate (with no lid) in the SOURCE lid holder position.\nType 'yes' to confirm that the plate has been placed:\n")
 
-# TODO: Add first rack
+# Add first rack
+user_input_first_rack_active = False
+while user_input_first_rack_active != 'yes':
+    user_input_first_rack_active = input(f"Please place a 96 tip rack on the active_tip position.\nType 'yes' to confirm that the tip rack has been placed:\n")
+
+state["tips"]["current"] = "tip_rack"
+
 # Manage pipette tips, ask where are we in terms of pipette tips
 def get_pipette_tip_next_pos_from_user():
     user_input_pipette_tip_column = 0
@@ -416,6 +422,7 @@ tips_left_count = 96 - next_pipette_tip_index
 # TODO: ----------------------- MODIFIED 
 # Get number of stacks left:
 tip_racks_to_stack_count = math.ceil( (src_wells_of_interest_count - tips_left_count ) / 96)
+input(f"racks stacked [Any Key]: {str(tip_racks_to_stack_count)}")
 if tip_racks_to_stack_count > 16:
     raise "Tip Stacks required are > 16. Aborting..."
 
@@ -437,6 +444,7 @@ def get_tip_stacks_disposition(tip_racks_to_stack_count:int, stack_limit:int):
 
 tip_racks_in_stacks_counts = get_tip_stacks_disposition(tip_racks_to_stack_count, TIP_STACK_LIMIT) # -1 because one stack will be on the active tips site from the beginning
 
+input(f"Tip Racks Stacks disposition [Any Key]: {str(tip_racks_in_stacks_counts)}")
 # TODO: Put on stacks
 tip_stack_names = ["tip_stack_1", "tip_stack_2", "tip_stack_3", "tip_stack_4"]
 for i in range(len(tip_stack_names)): 
@@ -449,8 +457,8 @@ for i in range(len(tip_stack_names)):
     while tip_rack_added_input != 'yes':
         tip_rack_added_input = input(f"Type 'yes' to confirm that a stack of ({str(tip_rack_count)}) tip racks have been placed in {current_tip_stack} :\n")
     
-    for index_in_stack in range(len(state[current_tip_stack])):
-        state[current_tip_stack][index_in_stack] = "tip_stack"
+    for index_in_stack in range(tip_rack_count):
+        state[current_tip_stack][index_in_stack]["current"] = "tip_stack"
 # TODO: ----------------------- MODIFIED 
 
 # Ask the user to set the plates (in stacks 1 and 2)
@@ -825,7 +833,7 @@ with HamiltonInterface(simulate=True) as hammy:
             #input(str_msg)
             # Check if there still are tips (state["tips"]["next_tip_index"])
             while state["tips"]["next_tip_index"] >= state["tips"]["max_tips_count"]:
-                print("--------\nAttention: No more tips. Please add a new tips set.\n--------")
+                """                 print("--------\nAttention: No more tips. Please add a new tips set.\n--------")
                 # Confirm with user the that the active src and tgt sites are empty (there are no plates)
                 user_input_new_tips_added = False
                 while user_input_new_tips_added != 'yes':
@@ -834,16 +842,17 @@ with HamiltonInterface(simulate=True) as hammy:
                 # Get new next_tip_position
                 next_pipette_tip_index = get_pipette_tip_next_pos_from_user()
                 state["tips"]["next_tip_index"] = next_pipette_tip_index
-
+        	    """
                 throw_active_tip_rack_into_waste(state)
                 # NEW
-                state["treated_tip_racks_count"] += 1
+                state["treated_tip_racks_count"] += 1 
+                state["tips"]["next_tip_index"] = 0
 
                 # TODO: ----------------------- START MODIFIED 
                 # Get New Tips
                 #   Move plate w lid from src_stack_3 with lid to active_src_pos
-                next_tip_rack_stack_name, next_tip_rack_stack_index = hp.get_next_stacked_tip_rack(state, TIP_STACK_LIMIT) # FIXME: get next stacked tip rack
-                next_tip_rack_seq = state[next_tip_rack_stack_name][next_tip_rack_stack_index]["seq"] # FIXME: 
+                next_tip_rack_stack_name, next_tip_rack_stack_index = hp.get_next_stacked_tip_rack(state, TIP_STACK_LIMIT)
+                next_tip_rack_seq = state[next_tip_rack_stack_name][next_tip_rack_stack_index]["seq"]
                 str_msg = f"-- Move tip rack from {next_tip_rack_stack_name}-{str(next_tip_rack_stack_index)} to active [Press Enter]"
                 #input(str_msg)
                 cmd_grip_get_tip_rack(
