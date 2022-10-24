@@ -8,10 +8,13 @@ LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "che
 INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data","two_wells.csv")
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
+TIP_STACK_LIMIT = 4
+WASTE_SEQUENCE = "Waste"
 
 state = {
     "treated_src_plates_count": 0, # Number of source plates that have been treated (everything has been extracted from them)
     "treated_tgt_plates_count":0, # Number of target plates that have been treated (they have been filled as much as possible)
+    "treated_tip_racks_count":-1, # -1 because we start with an additional tip rack on the active tips position 
     "gripped_plate":{
         "current_plate": None,
         "current_lid": False
@@ -38,11 +41,13 @@ state = {
         "lid_seq": "cp_tgt_lid_holder_lid",
         "current_lid": None
     },
-    "active_tips": {
+    "tips": {
         "next_tip_index": 0,
         "max_tips_count": 96,
         "seq": "TIP_50ul_L_NE_stack_0002", # Used for pipetting and throwing in waste
-        "seq_for_moving_from_to_stack": "TIP_50ul_L_NE_stack_0005" # NOT for throwing in waste 
+        "seq_for_moving_from_to_stack": "TIP_50ul_L_NE_stack_0005", # NOT for throwing in waste 
+        "seq_waste": "TIP_50ul_L_NE_stack_0008",
+        "current": False
     },
     "src_stack_1": [ # Bottom to top
         {
@@ -239,55 +244,55 @@ state = {
     "tip_stack_1":[
         {
             "seq": "TIP_50ul_L_NE_stack_0003_0001",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0003_0002",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0003_0003",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0003_0004",
-            "current": False
+            "current": None
         },
     ],
     "tip_stack_2":[
         {
             "seq": "TIP_50ul_L_NE_stack_0004_0001",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0004_0002",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0004_0003",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0004_0004",
-            "current": False
+            "current": None
         },
     ],
     "tip_stack_3":[
         {
             "seq": "TIP_50ul_L_NE_stack_0006_0001",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0006_0002",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0006_0003",
-            "current": False
+            "current": None
         },
         {
             "seq": "TIP_50ul_L_NE_stack_0006_0004",
-            "current": False
+            "current": None
         },
     ],
     "tip_stack_4":[
@@ -377,6 +382,7 @@ user_input_src_lid_holder_pos = False
 while user_input_src_lid_holder_pos != 'yes':
     user_input_src_lid_holder_pos = input(f"Please place an empty plate (with no lid) in the SOURCE lid holder position.\nType 'yes' to confirm that the plate has been placed:\n")
 
+# TODO: Add first rack
 # Manage pipette tips, ask where are we in terms of pipette tips
 def get_pipette_tip_next_pos_from_user():
     user_input_pipette_tip_column = 0
@@ -406,6 +412,46 @@ state["tips"]["next_tip_index"] = next_pipette_tip_index
 
 # calculate amount of tips left
 tips_left_count = 96 - next_pipette_tip_index
+
+# TODO: ----------------------- MODIFIED 
+# Get number of stacks left:
+tip_racks_to_stack_count = math.ceil( (src_wells_of_interest_count - tips_left_count ) / 96)
+if tip_racks_to_stack_count > 16:
+    raise "Tip Stacks required are > 16. Aborting..."
+
+
+# Before asking user about current pipette position - guide them through positioning the tips in the correct stacks (e.g. "place 4 full stacks in stack_1 and 2 in stack_2")
+def get_tip_stacks_disposition(tip_racks_to_stack_count:int, stack_limit:int): 
+    racks_in_stack_count = [0, 0, 0, 0] # ["tip_stack_1", "tip_stack_2", "tip_stack_3", "tip_stack_4"]
+    stacks_needed_count = math.ceil( (tip_racks_to_stack_count)  / stack_limit) 
+    added_racks = 0
+    for i in range(stacks_needed_count):
+        to_add_in_current_stack = tip_racks_to_stack_count - added_racks
+        if to_add_in_current_stack > stack_limit:
+            to_add_in_current_stack = 4
+
+        racks_in_stack_count[i] = to_add_in_current_stack
+        added_racks += to_add_in_current_stack
+
+    return racks_in_stack_count
+
+tip_racks_in_stacks_counts = get_tip_stacks_disposition(tip_racks_to_stack_count, TIP_STACK_LIMIT) # -1 because one stack will be on the active tips site from the beginning
+
+# TODO: Put on stacks
+tip_stack_names = ["tip_stack_1", "tip_stack_2", "tip_stack_3", "tip_stack_4"]
+for i in range(len(tip_stack_names)): 
+    tip_rack_count = tip_racks_in_stacks_counts[i]
+    current_tip_stack = tip_stack_names[i]
+    if tip_rack_count == 0:
+        break
+    
+    tip_rack_added_input = False
+    while tip_rack_added_input != 'yes':
+        tip_rack_added_input = input(f"Type 'yes' to confirm that a stack of ({str(tip_rack_count)}) tip racks have been placed in {current_tip_stack} :\n")
+    
+    for index_in_stack in range(len(state[current_tip_stack])):
+        state[current_tip_stack][index_in_stack] = "tip_stack"
+# TODO: ----------------------- MODIFIED 
 
 # Ask the user to set the plates (in stacks 1 and 2)
 placed_in_stack = 0
@@ -529,6 +575,34 @@ def get_next_done_tgt_plate_pos(state:dict):
     index_in_stack = upper_most_plate
     return stack_name, index_in_stack
     
+# TODO: ----------------------- MODIFIED 
+def cmd_grip_get_tip_rack (
+        hamilton_interface:HamiltonInterface, 
+        plateSequence:str, 
+        toolSequence:str = 'COREGripTool_OnWaste_1000ul_0001',
+    ):
+    cmd_id = hamilton_interface.send_command(GRIP_GET, 
+                                plateSequence      = plateSequence,
+                                toolSequence       = toolSequence,
+                                gripForce          = 9,
+                                gripperToolChannel = 2,
+                                gripHeight         = 26.5,
+                                transportMode      = 0 )
+    print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
+
+def cmd_grip_place_tip_rack (
+        hamilton_interface:HamiltonInterface, 
+        plateSequence:str, 
+        toolSequence:str = 'COREGripTool_OnWaste_1000ul_0001',
+        ejectToolWhenFinish:int = 1,
+    ):
+    cmd_id = hamilton_interface.send_command(GRIP_PLACE, 
+                                plateSequence      = plateSequence,
+                                toolSequence       = toolSequence,
+                                transportMode      = 0,
+                                ejectToolWhenFinish = ejectToolWhenFinish)
+    print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
+# TODO: ----------------------- MODIFIED 
 
 def cmd_grip_get_plate_with_lid(
         hamilton_interface:HamiltonInterface, 
@@ -593,7 +667,23 @@ def cmd_grip_place_lid(
     ):
     cmd_grip_place_plate_with_lid(hamilton_interface,plateSequence,lidSequence,toolSequence, transportMode=transportMode,ejectToolWhenFinish=ejectToolWhenFinish)
 
+# TODO: ----------------------- MODIFIED 
+def throw_active_tip_rack_into_waste(state:dict):
+    # Throw Tips in Trash
+    cmd_grip_get_tip_rack(
+        hammy, 
+        state["tips"]["seq"]
+    )
+    # Update state
+    state["tips"]["current"] = None
+    state["gripped_plate"]["current_plate"] = "tip_rack"
 
+    cmd_grip_place_tip_rack(
+        hammy,
+        state["tips"]["seq_waste"]
+    )
+    state["gripped_plate"]["current_plate"] = None
+# TODO: ----------------------- MODIFIED  
 
 json.dump(state, open("./00_initial_state.json",'w'))
 
@@ -723,7 +813,7 @@ with HamiltonInterface(simulate=True) as hammy:
         # Cherry Pick!
         active_src_plate_name = state["active_src"]["current_plate"]
         
-        wells_to_pick = hp.convertPlatePositionsToIndeces( plates[active_src_plate_name] )
+        wells_to_pick = hp.convertPlatePositionsToIndices( plates[active_src_plate_name] )
 
         remaining_wells_of_interest = src_wells_of_interest_count
 
@@ -744,6 +834,34 @@ with HamiltonInterface(simulate=True) as hammy:
                 # Get new next_tip_position
                 next_pipette_tip_index = get_pipette_tip_next_pos_from_user()
                 state["tips"]["next_tip_index"] = next_pipette_tip_index
+
+                throw_active_tip_rack_into_waste(state)
+                # NEW
+                state["treated_tip_racks_count"] += 1
+
+                # TODO: ----------------------- START MODIFIED 
+                # Get New Tips
+                #   Move plate w lid from src_stack_3 with lid to active_src_pos
+                next_tip_rack_stack_name, next_tip_rack_stack_index = hp.get_next_stacked_tip_rack(state, TIP_STACK_LIMIT) # FIXME: get next stacked tip rack
+                next_tip_rack_seq = state[next_tip_rack_stack_name][next_tip_rack_stack_index]["seq"] # FIXME: 
+                str_msg = f"-- Move tip rack from {next_tip_rack_stack_name}-{str(next_tip_rack_stack_index)} to active [Press Enter]"
+                #input(str_msg)
+                cmd_grip_get_tip_rack(
+                    hammy,
+                    next_tip_rack_seq,
+                )
+                # Update state
+                state["gripped_plate"]["current_plate"] = "tip_rack"
+                state[next_tip_rack_stack_name][next_tip_rack_stack_index]["current"] = False
+                print('gripped plate:',state["gripped_plate"]["current_plate"])
+                cmd_grip_place_tip_rack( #cmd_grip_place_plate_with_lid(
+                    hammy, 
+                    state["tips"]["seq_for_moving_from_to_stack"], 
+                )
+                # Update state
+                state["tips"]["current"] = state["gripped_plate"]["current_plate"]
+                state["gripped_plate"]["current_plate"] = None
+                # TODO: ----------------------- START MODIFIED 
 
             
             str_msg = f"-- Check if active target plate is full [Press Enter]"

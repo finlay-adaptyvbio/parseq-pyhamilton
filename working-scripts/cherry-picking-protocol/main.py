@@ -621,7 +621,7 @@ with HamiltonInterface(simulate=True) as hammy:
         # Cherry Pick!
         active_src_plate_name = state["active_src"]["current_plate"]
         
-        wells_to_pick = hp.convertPlatePositionsToIndeces( plates[active_src_plate_name] )
+        wells_to_pick = hp.convertPlatePositionsToIndices( plates[active_src_plate_name] )
 
         
 
