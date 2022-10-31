@@ -7,8 +7,8 @@ import actions as act
 
 from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, GRIP_MOVE, tip_pick_up, tip_eject, aspirate, dispense)
 
-LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cherry_picking_protocol_stacked_tips.lay")
-INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "new_mapping_3.csv")#"test_data","2p_more_than_2_tgt_p.csv")
+LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../cherry_picking_protocol_stacked_tips.lay")
+INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../new_mapping_3.csv")#"test_data","2p_more_than_2_tgt_p.csv")
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
 TIP_STACK_LIMIT = 4
@@ -608,6 +608,6 @@ with HamiltonInterface(simulate=True) as hammy:
 
     # Check if there is a plate on the active tgt site. if so, put it back.
     if state["active_tgt"]["current_plate"] != None:
-        act.put_tgt_plate_in_done_tgt_stack(state, hammy)
+        act.put_tgt_plate_in_done_tgt_stack(state, hammy, SRC_STACK_LIMIT)
     json.dump(new_mapping, open("./FINAL_mapping.json",'w'))
     print("\n-----\nCherry-picking Protocol Done\n-----\n")

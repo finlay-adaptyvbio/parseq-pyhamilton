@@ -71,7 +71,7 @@ def throw_active_tip_rack_into_waste(state:dict, hamilton_interface:HamiltonInte
     )
     state["gripped_plate"]["current_plate"] = None
 
-def put_tgt_plate_in_done_tgt_stack(state:dict,hamilton_interface:HamiltonInterface,ejectToolWhenFinish:int = 1):
+def put_tgt_plate_in_done_tgt_stack(state:dict,hamilton_interface:HamiltonInterface, src_stack_limit:int, ejectToolWhenFinish:int = 1):
     cmdw.grip_get_lid(
         hamilton_interface,
         state["lid_holder_tgt"]["plate_seq"],
@@ -104,7 +104,7 @@ def put_tgt_plate_in_done_tgt_stack(state:dict,hamilton_interface:HamiltonInterf
     state["active_tgt"]["current_plate"]    = None
 
 
-    next_done_tgt_stack_name, next_done_tgt_stack_index = hp.get_next_done_stacked_plate(state,SRC_STACK_LIMIT,"tgt")#get_next_done_tgt_plate_pos(state)
+    next_done_tgt_stack_name, next_done_tgt_stack_index = hp.get_next_done_stacked_plate(state,src_stack_limit,"tgt")#get_next_done_tgt_plate_pos(state)
     next_done_tgt_plate_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["plate_seq"]
     next_done_tgt_lid_seq = state[next_done_tgt_stack_name][next_done_tgt_stack_index]["lid_seq"] 
     cmdw.grip_place_plate_with_lid(
