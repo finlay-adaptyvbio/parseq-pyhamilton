@@ -2,6 +2,42 @@ from inspect import stack
 import string
 import pandas as pd
 
+def convertPlatePositionToIndex(plate_position:str, plate_type:str = 'Plate384') -> list :
+    """
+    Converts a strings representing the wells in columns as a number and the rows as letters ['A01', 'C12']
+    Arguments:
+        plate_position: strings
+    Returns:
+        integer representing the index in a default plate sequence (readable by PyHamilton scripts) 
+    """
+    alphabet = string.ascii_lowercase
+
+    col_count = 24
+    row_count = 16
+    if plate_type == "Plate384":
+        col_count = 24
+        row_count = 16
+    elif plate_type == "Plate96":
+        col_count = 12
+        row_count = 8
+    else:
+        raise ValueError(f"The plate_type provided '{plate_type}' is not supported.")
+
+
+    
+    row:int = alphabet.find(plate_position[0].lower())
+    if row >= row_count: 
+        raise ValueError(f"Row provided exceeds the number of rows on the plate_type provided") 
+    col:int = int(plate_position[1:]) - 1
+    if col >= col_count: 
+        raise ValueError(f"Column provided exceeds the number of rows on the plate_type provided") 
+
+    index:int = row_count * col + row
+
+    print(plate_position, row, col, index)
+    
+    return index
+
 def convertPlatePositionsToIndices(plate_positions_to_pick:list, plate_type:str = 'Plate384') -> list :
     """
     Converts a list of strings representing the wells in columns as a number and the rows as letters ['A01', 'C12']
