@@ -2,13 +2,16 @@ import json
 import math
 import os
 import helpers as hp
-import cmd_wrappers as cmdw
+import load
 import actions as act
+import datetime
 
 from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, GRIP_MOVE, tip_pick_up, tip_eject, aspirate, dispense)
 
 LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../cherry_picking_protocol_stacked_tips.lay")
-INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../new_mapping_3.csv")#"test_data","2p_more_than_2_tgt_p.csv")
+#INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../new_mapping_3.csv")#"test_data","2p_more_than_2_tgt_p.csv")
+TMP_DIR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
+OUT_DIR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
 TIP_STACK_LIMIT = 4
@@ -34,7 +37,7 @@ state = {
         "plate_seq": "Gre_384_Sq_0007",
         "lid_seq": "Gre_384_Sq_0007_lid",
         "current_plate": None,
-        "next_well_id": 46, #0,
+        "next_well_id": 0, #0,
         "well_count": 384
     },
     "lid_holder_src": {
@@ -338,8 +341,72 @@ src_plate_resource = lmgr.assign_unused_resource(src_plate_type)
 tgt_plate_type = ResourceType(Plate384,  state["active_tgt"]["plate_seq"])
 tgt_plate_resource = lmgr.assign_unused_resource(tgt_plate_type)
 
+input_file_path = ""
+current_tgt_plate = None
+current_next_well_id = None
+# TODO: Check if there is something to be loaded
+# Check if there is a dir in tmp, if yes, ask if load it? (delete if not?)
+existing_runs = os.listdir(TMP_DIR_PATH)
+if len(existing_runs) > 0:
+    print("--- ATTENTION ---")
+    print("There are existing runs:")
+
+    user_input_is_continue_prev = input("Do you wish to load one of them? (yes/no)\n")
+    while user_input_is_continue_prev != "yes" or user_input_is_continue_prev != "no":
+        user_input_is_continue_prev = input("Please type 'yes' if you would like to load")
+    
+    if user_input_is_continue_prev == "yes":
+        print("Here are the unfinished runs: ")
+        for i in len(existing_runs):
+            run = existing_runs[i]
+            print(f"[{str(i)}] -", run)
+            exp_to_continue_idx = input("Please type the number between [ ] of the run you would like to continue:\n")
+            selected_run = existing_runs[exp_to_continue_idx]
+            selected_run_tmp_path = os.path.join(TMP_DIR_PATH, selected_run)
+            # TODO: Load 
+
+            # TODO: Get latest instance of run
+            existing_instances = os.listdir(selected_run_tmp_path)
+            existing_instances = [int(x) for x in existing_instances] 
+            existing_instances.sort()
+            prev_instance_dir = existing_instances[-1]
+            new_instance_dir = prev_instance_dir + 1
+
+            # TODO: make the new csv
+            prev_instance_mapping_file_path = os.path.join(selected_run_tmp_path,str(prev_instance_dir), "map.json")
+            prev_instance_input_csv_file_path = os.path.join(selected_run_tmp_path,str(prev_instance_dir), "input.csv")
+
+            new_instance_input_csv_file_path = os.path.join(selected_run_tmp_path,str(new_instance_dir), "input.csv")
+            load.remove_done_wells_from_csv(prev_instance_input_csv_file_path, prev_instance_mapping_file_path, new_instance_input_csv_file_path)
+
+            # TODO: get the last well used and get the new nb of target plates
+            current_tgt_plate, current_next_well_id = load.get_next_tgt_well_used_in_current_plate(os.path.join(selected_run_tmp_path,str(prev_instance_dir), "state_after_dispensing.csv"))
+
+    else:
+        # START NEW RUN
+
+        # Give name to this cherry-picking run
+        user_input_run_name = input(f"Please give a name to this run:\n")
+
+        # Create folder in tmp for this run
+        run_tmp_dir_path = os.path.join(TMP_DIR_PATH, f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')}_{user_input_run_name}")
+        run_out_dir_path = os.path.join(OUT_DIR_PATH, f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')}_{user_input_run_name}")
+
+        # tmp files
+        if not os.path.exists(run_tmp_dir_path):
+            os.makedirs(run_tmp_dir_path)
+        
+        original_input_file_path = input(f"Please provide a path to the input csv file:\n")
+        while not os.path.isfile(original_input_file_path):
+            original_input_file_path = input(f"Please provide a path to the input csv file:\n")
+
+        instance_of_run_path = os.path.join(run_tmp_dir_path, "0")
+        os.makedirs(instance_of_run_path)
+
+        
+
 # Get the input list of all the wells for each plate
-plates = hp.get_wells_of_interest_from_csv(INPUT_FILE_PATH)
+plates = hp.get_wells_of_interest_from_csv(input_file_path)
 
 # Get number of interesting samples to be cherry-picked
 src_wells_of_interest_count = 0
@@ -352,23 +419,38 @@ if src_plates_count > 12:
     raise "Attention!! Cannot have more than 12 plates"
 
 # Calculate how many target plates will be needed based on the nb of wells to cherrypick from src plates
-tgt_plate_count = math.ceil(src_wells_of_interest_count / 384)
+src_wells_of_interest_count_without_available_loaded_tgt = src_wells_of_interest_count
+if current_tgt_plate: # Check if user is loading to continue previous run
+    available_wells_in_current_tgt_plate = 384 - current_next_well_id
+    src_wells_of_interest_count_without_available_loaded_tgt = src_wells_of_interest_count - available_wells_in_current_tgt_plate
+
+tgt_plate_count = math.ceil(src_wells_of_interest_count_without_available_loaded_tgt / 384)
 
 # Confirm with user the number and placement of the target plates
 print("We will now put empty plates that will contain the cherry-picked samples.")
 user_input_put_empty_plates = False
 while user_input_put_empty_plates != 'yes':
     user_input_put_empty_plates = input(f"Please label {tgt_plate_count} target empty plates (with their lids) - These will contain the cherry-picked samples.\nType 'yes' when {tgt_plate_count} plates have been labelled:\n")
+    if current_tgt_plate:
+        print(f"Do not label the plate: {current_tgt_plate}. It has to be added at the top")
 
 # Confirm with user the names of the target plates
+
 previous_labels = []
+if current_tgt_plate:
+    previous_labels.append(current_tgt_plate)
+last_index_tgt_plate = 0
 for i in range(tgt_plate_count):
+    last_index_tgt_plate = i
     plate_label = input(f"Please place plate #{i+1} in target stack 2.\nType the label given to this plate:\n")
     while plate_label in previous_labels or plate_label == "":
         plate_label = input(f"Plate Labels should be unique and not null\nPlease place plate #{i+1} in target stack 2.\nType the label given to this plate:\n")
     previous_labels.append(plate_label)
     state[f"tgt_stack_2"][i]["current_plate"] = plate_label
 
+# Add the last tgt plate on top
+state[f"tgt_stack_2"][last_index_tgt_plate + 1]["current_plate"] = current_tgt_plate
+state["active_tgt"]["next_well_id"] = int(current_next_well_id)
 
 # Confirm with user the that the active src and tgt sites are empty (there are no plates)
 user_input_active_tgt_pos = False
@@ -499,7 +581,7 @@ for plate in plates:
 #   [X] get the next done tgt plate position from the state - returns the potential position (stack and index to know how high it is)
 
 json.dump(state, open("./00_initial_state.json",'w'))
-
+remaining_wells_of_interest = src_wells_of_interest_count
 with HamiltonInterface(simulate=True) as hammy:
     print("Initializing...")
     hammy.wait_on_response(hammy.send_command(INITIALIZE))
@@ -523,7 +605,7 @@ with HamiltonInterface(simulate=True) as hammy:
         # Cherry Pick!
         wells_to_pick = hp.convertPlatePositionsToIndices(plates[state["active_src"]["current_plate"]])
 
-        remaining_wells_of_interest = src_wells_of_interest_count
+        
 
         # Settings for cherry-picking procedures
         liquid_class = LIQUID_CLASS #'Tip_50ul_Water_DispenseJet_Empty' #'Tip_50ul_96COREHead_Water_DispenseJet_Empty'
@@ -589,7 +671,8 @@ with HamiltonInterface(simulate=True) as hammy:
             # Dispense into target well
             dispense(hammy, [well_pos_in_tgt_plate], [0.1], liquidClass = liquid_class)
             tip_eject(hammy, wasteSequence="Waste")
-            json.dump(new_mapping, open("./L_mapping.json",'w'))
+            json.dump(new_mapping, open(os.path.join(instance_of_run_path, "map.json"),'w'))
+            json.dump(state, open(os.path.join(instance_of_run_path, "state_after_dispensing.json"),'w'))
             # Print Progress to user
             remaining_wells_of_interest -= 1
             print(f"Progress: {src_wells_of_interest_count - remaining_wells_of_interest}/{src_wells_of_interest_count}", )
@@ -609,5 +692,8 @@ with HamiltonInterface(simulate=True) as hammy:
     # Check if there is a plate on the active tgt site. if so, put it back.
     if state["active_tgt"]["current_plate"] != None:
         act.put_tgt_plate_in_done_tgt_stack(state, hammy, SRC_STACK_LIMIT)
-    json.dump(new_mapping, open("./FINAL_mapping.json",'w'))
+    json.dump(new_mapping, open(os.path.join(run_out_dir_path, "map.json"),'w'))
+    
+    # Archive intermediate data
+
     print("\n-----\nCherry-picking Protocol Done\n-----\n")
