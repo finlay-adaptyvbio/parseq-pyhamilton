@@ -13,11 +13,11 @@ def remove_done_wells_from_csv(prev_csv_absolute_path:str, done_map_file_path:st
     Returns:
         Dictionary with keys as plate names and values are lists that contain all the positions (as strings) of the wells of interest 
     """
-    done_map = open(done_map_file_path,'r')
+    done_map = json.load(open(done_map_file_path,'r'))
     dataframe = pd.read_csv(prev_csv_absolute_path, header=None)
     unique_well_poss = dataframe[1].to_list()
     idx_of_done = []
-    print(unique_well_poss)
+    
     
     #for i in range(len(unique_well_poss)):
     for i in range(len(unique_well_poss)):     
@@ -35,7 +35,7 @@ def remove_done_wells_from_csv(prev_csv_absolute_path:str, done_map_file_path:st
                 idx_of_done.append(i)
                 #print("removed", pos_to_check)
                 break
-    print(idx_of_done)
+    
     idx_of_done.sort(reverse=True)
     for i in range(len(idx_of_done)):
         
@@ -67,7 +67,7 @@ def get_last_tgt_well_used_in_current_plate(map_file_path:str, new_input_csv_fil
             # get the last well done
 
 
-        well_idx = hp.convertPlatePositionToIndex(well_pos)
+        well_idx = hp.convertPlatePositionToIndex(filtered_unique_well_poss)
 
     
     return plate, last_well_id
@@ -78,5 +78,6 @@ def get_next_tgt_well_used_in_current_plate(state_saved_file_path:str):
     plate = state["active_tgt"]["current_plate"]
     next_well_id = state["active_tgt"]["next_well_id"]
 
-    
+    print("current plate:", plate)
+    print("next well id:", next_well_id)
     return plate, next_well_id
