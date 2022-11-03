@@ -438,7 +438,7 @@ tgt_plate_count = math.ceil(src_wells_of_interest_count_without_available_loaded
 # Confirm with user the number and placement of the target plates
 print("We will now put empty plates that will contain the cherry-picked samples.")
 user_input_put_empty_plates = False
-while user_input_put_empty_plates != 'yes': # FIXME: 
+while user_input_put_empty_plates != 'yes': 
     user_input_put_empty_plates = input(f"Please label {tgt_plate_count} target empty plates (with their lids) - These will contain the cherry-picked samples.\nType 'yes' when {tgt_plate_count} plates have been labelled:\n")
     if current_tgt_plate:
         print(f"Do not label the plate: {current_tgt_plate}. It has to be added at the top")
