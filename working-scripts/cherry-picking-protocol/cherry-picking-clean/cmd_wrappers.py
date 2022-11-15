@@ -21,7 +21,7 @@ def grip_get_plate_with_lid(
                                 gripperToolChannel = gripperToolChannel,
                                 gripHeight         = gripHeight,
                                 transportMode      = transportMode )
-    print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
+    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
 
 def grip_place_plate_with_lid(
         hamilton_interface:HamiltonInterface,
@@ -37,7 +37,7 @@ def grip_place_plate_with_lid(
                                 toolSequence        = toolSequence,
                                 transportMode       = transportMode,
                                 ejectToolWhenFinish = ejectToolWhenFinish)
-    print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
+    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
 
 
 def grip_get_lid(
@@ -58,7 +58,7 @@ def grip_get_lid(
                                 gripperToolChannel = gripperToolChannel,
                                 gripHeight         = gripHeight,
                                 transportMode      = transportMode )
-    print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
+    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
 
 def grip_place_lid(
         hamilton_interface:HamiltonInterface,
@@ -82,7 +82,7 @@ def grip_get_96_tip_rack ( # With these settings can pickup from the side and fr
                                 gripperToolChannel = 2,
                                 gripHeight         = 26.5,
                                 transportMode      = 0 )
-    print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
+    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
 
 def grip_place_96_tip_rack (
         hamilton_interface:HamiltonInterface, 
@@ -95,4 +95,4 @@ def grip_place_96_tip_rack (
                                 toolSequence       = toolSequence,
                                 transportMode      = 0,
                                 ejectToolWhenFinish = ejectToolWhenFinish)
-    print(hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True))
+    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)

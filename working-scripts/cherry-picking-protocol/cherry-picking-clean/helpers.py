@@ -33,7 +33,7 @@ def convertPlatePositionToIndex(plate_position:str, plate_type:str = 'Plate384')
 
     index:int = row_count * col + row
 
-    print(plate_position, row, col, index)
+    # print(plate_position, row, col, index)
     
     return index
 
@@ -69,7 +69,7 @@ def convertPlatePositionsToIndices(plate_positions_to_pick:list, plate_type:str 
 
         index:int = row_count * col + row
         plate_indeces.append(index)
-        print(plate_pos, row, col, index)
+        # print(plate_pos, row, col, index)
     
     return plate_indeces
 
@@ -178,7 +178,7 @@ def get_next_stacked_tip_rack(state:dict, stack_limit:int):
     # Find which stack to take from
 
     stacks_fully_done = int(treated_tip_racks_count/stack_limit)
-    print("stacks_fully_done", stacks_fully_done)
+    # print("stacks_fully_done", stacks_fully_done)
     stack_to_take_from_nb = stacks[stacks_fully_done]
     stack_to_take_from = f"tip_stack_{str(stack_to_take_from_nb)}"
     #print("will start treatment of: ", treated_plates_count + 1, "th plate")

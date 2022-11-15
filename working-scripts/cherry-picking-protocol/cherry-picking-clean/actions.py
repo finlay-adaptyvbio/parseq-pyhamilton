@@ -125,7 +125,7 @@ def move_next_src_plate_from_stack_to_active_position(state:dict, hamilton_inter
     next_src_stack_name, next_src_stack_index = hp.get_next_stacked_plate(state, src_stack_limit, "src")
     print("next stack source stack name :", next_src_stack_name)
     print("next stack source stack index:", next_src_stack_index)
-    print("state:", state[next_src_stack_name][next_src_stack_index])
+    # print("state:", state[next_src_stack_name][next_src_stack_index])
     next_src_plate_seq = state[next_src_stack_name][next_src_stack_index]["plate_seq"]
     next_src_lid_seq = state[next_src_stack_name][next_src_stack_index]["lid_seq"] 
     str_msg = f"-- Move plate from source to active [Press Enter]"
@@ -141,7 +141,7 @@ def move_next_src_plate_from_stack_to_active_position(state:dict, hamilton_inter
     state["gripped_plate"]["current_lid"]   = state[next_src_stack_name][next_src_stack_index]["current_plate"]
     state[next_src_stack_name][next_src_stack_index]["current_plate"] = None
     
-    print('gripped plate:',state["gripped_plate"]["current_plate"])
+    #print('gripped plate:',state["gripped_plate"]["current_plate"])
     cmdw.grip_place_plate_with_lid (
         hamilton_interface, 
         state["active_src"]["plate_seq"],
