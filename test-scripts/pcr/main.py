@@ -8,7 +8,7 @@ import datetime
 import shutil
 from pyhamilton import (HamiltonInterface, LayoutManager, ResourceType, Plate384, Tip96, INITIALIZE, GRIP_GET, GRIP_PLACE, GRIP_MOVE, tip_pick_up, tip_eject, aspirate, dispense)
 
-LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../cherry_picking_protocol_stacked_tips.lay")
+LAYOUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pcr.lay")
 #INPUT_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../new_mapping_3.csv")#"test_data","2p_more_than_2_tgt_p.csv")
 TMP_DIR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/tmp")
 OUT_DIR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/out")
@@ -16,40 +16,56 @@ SRC_STACK_LIMIT = 6
 TGT_STACK_LIMIT = 6
 TIP_STACK_LIMIT = 4
 WASTE_SEQUENCE = "Waste"
-LIQUID_CLASS = "Tip_50ul_96COREHead1000ul_Water_DispenseJet_PartEmpty"
+LIQUID_CLASS_50_384H = "50ulTip_conductive_384COREHead_Water_DispenseJet_Empty"
+LIQUID_CLASS_50_2C = "Tip_50ul_Water_DispenseJet_Empty"
+LIQUID_CLASS_300_2C = "StandardVolume_Water_DispenseJet_Empty"
 
-new_mapping = {} # New well: Old well
+# new_mapping = {} # New well: Old well
 
 state = {
     "treated_src_plates_count": 0, # Number of source plates that have been treated (everything has been extracted from them)
-    "treated_tgt_plates_count":0, # Number of target plates that have been treated (they have been filled as much as possible)
-    "treated_tip_racks_count":-1, # -1 because we start with an additional tip rack on the active tips position 
+    # "treated_tgt_plates_count":0, # Number of target plates that have been treated (they have been filled as much as possible)
+    "treated_tip_racks_count":0, # -1 because we start with an additional tip rack on the active tips position 
     "gripped_plate":{
         "current_plate": None,
         "current_lid": False
     },
-    "active_src": {
-        "plate_seq": "Gre_384_Sq_0006",
-        "lid_seq": "Gre_384_Sq_0006_lid",
+    "active_bact": [
+    {   
+        "plate_seq": "E5_Bact_Plate",
+        "lid_seq": "E5_Bact_Lid",
         "current_plate": None
     },
-    "active_tgt": {
-        "plate_seq": "Gre_384_Sq_0007",
-        "lid_seq": "Gre_384_Sq_0007_lid",
-        "current_plate": None,
-        "next_well_id": 0, #0,
-        "well_count": 384
+    {   
+        "plate_seq": "E4_Bact_Plate",
+        "lid_seq": "E4_Bact_Lid",
+        "current_plate": None
+    }
+    ],
+    "active_pcr": [
+    {   
+        "plate_seq": "C4_PCR_Plate",
+        "lid_seq": "C4_PCR_Lid",
+        "current_plate": None
     },
-    "lid_holder_src": {
-        "plate_seq": "cp_src_lid_holder_plate",
-        "lid_seq": "cp_src_lid_holder_lid",
-        "current_lid": None
+    {   
+        "plate_seq": "C3_PCR_Plate",
+        "lid_seq": "C3_PCR_Lid",
+        "current_plate": None
+    }
+    ],
+    "tmp_bact_lids": [
+    {   
+        "plate_seq": None,
+        "lid_seq": "E3_Bact_Lid_1",
+        "current_plate": None
     },
-    "lid_holder_tgt": {
-        "plate_seq": "cp_tgt_lid_holder_plate",
-        "lid_seq": "cp_tgt_lid_holder_lid",
-        "current_lid": None
-    },
+    {   
+        "plate_seq": None,
+        "lid_seq": "E3_Bact_Lid_2",
+        "current_plate": None
+    }
+    ],
     "tips": {
         "next_tip_index": 0,
         "max_tips_count": 96,
@@ -58,267 +74,217 @@ state = {
         "seq_waste": "TIP_50ul_L_NE_stack_0008",
         "current": False
     },
-    "src_stack_1": [ # Bottom to top
+    "src_stack_bact": [ # Bottom to top
         {
-            "plate_seq": "Gre_384_Sq_0004_0001",
-            "lid_seq": "Gre_384_Sq_0004_0001_lid",
+            "plate_seq": "F4_Bact_Plate_1",
+            "lid_seq": "F4_Bact_Lid_1",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0004_0002",
-            "lid_seq": "Gre_384_Sq_0004_0002_lid",
+            "plate_seq": "F4_Bact_Plate_2",
+            "lid_seq": "F4_Bact_Lid_2",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0004_0003",
-            "lid_seq": "Gre_384_Sq_0004_0003_lid",
+            "plate_seq": "F4_Bact_Plate_3",
+            "lid_seq": "F4_Bact_Lid_3",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0004_0004",
-            "lid_seq": "Gre_384_Sq_0004_0004_lid",
+            "plate_seq": "F4_Bact_Plate_4",
+            "lid_seq": "F4_Bact_Lid_4",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0004_0005",
-            "lid_seq": "Gre_384_Sq_0004_0005_lid",
+            "plate_seq": "F4_Bact_Plate_5",
+            "lid_seq": "F4_Bact_Lid_5",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0004_0006",
-            "lid_seq": "Gre_384_Sq_0004_0006_lid",
+            "plate_seq": "F4_Bact_Plate_6",
+            "lid_seq": "F4_Bact_Lid_6",
             "current_plate": None
         },
     ],
-    "src_stack_2": [ # Bottom to top
+    "src_stack_pcr_plates": [ # Bottom to top
         {
-            "plate_seq": "Gre_384_Sq_0003_0001",
-            "lid_seq": "Gre_384_Sq_0003_0001_lid",
+            "plate_seq": "F2_PCR_Plate_1",
+            "lid_seq": None,
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0003_0002",
-            "lid_seq": "Gre_384_Sq_0003_0002_lid",
+            "plate_seq": "F2_PCR_Plate_2",
+            "lid_seq": None,
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0003_0003",
-            "lid_seq": "Gre_384_Sq_0003_0003_lid",
+            "plate_seq": "F2_PCR_Plate_3",
+            "lid_seq": None,
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0003_0004",
-            "lid_seq": "Gre_384_Sq_0003_0004_lid",
+            "plate_seq": "F2_PCR_Plate_4",
+            "lid_seq": None,
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0003_0005",
-            "lid_seq": "Gre_384_Sq_0003_0005_lid",
+            "plate_seq": "F2_PCR_Plate_5",
+            "lid_seq": None,
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0003_0006",
-            "lid_seq": "Gre_384_Sq_0003_0006_lid",
+            "plate_seq": "F2_PCR_Plate_6",
+            "lid_seq": None,
             "current_plate": None
         },
     ], 
-    "src_stack_3": [ # Bottom to top
+    "src_stack_pcr_lids": [ # Bottom to top
         {
-            "plate_seq": "Gre_384_Sq_0002_0001",
-            "lid_seq": "Gre_384_Sq_0002_0001_lid",
+            "plate_seq": None,
+            "lid_seq": "F1_PCR_Lid_1",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0002_0002",
-            "lid_seq": "Gre_384_Sq_0002_0002_lid",
+            "plate_seq": None,
+            "lid_seq": "F1_PCR_Lid_2",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0002_0003",
-            "lid_seq": "Gre_384_Sq_0002_0003_lid",
+            "plate_seq": None,
+            "lid_seq": "F1_PCR_Lid_3",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0002_0004",
-            "lid_seq": "Gre_384_Sq_0002_0004_lid",
+            "plate_seq": None,
+            "lid_seq": "F1_PCR_Lid_4",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0002_0005",
-            "lid_seq": "Gre_384_Sq_0002_0005_lid",
+            "plate_seq": None,
+            "lid_seq": "F1_PCR_Lid_5",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0002_0006",
-            "lid_seq": "Gre_384_Sq_0002_0006_lid",
-            "current_plate": None
-        },
-    ],
-    "src_stack_4": [ # Bottom to top
-        {
-            "plate_seq": "Gre_384_Sq_0010_0001",
-            "lid_seq": "Gre_384_Sq_0010_0001_lid",
-            "current_plate": None
-        },
-        {
-            "plate_seq": "Gre_384_Sq_0010_0002",
-            "lid_seq": "Gre_384_Sq_0010_0002_lid",
-            "current_plate": None
-        },
-        {
-            "plate_seq": "Gre_384_Sq_0010_0003",
-            "lid_seq": "Gre_384_Sq_0010_0003_lid",
-            "current_plate": None
-        },
-        {
-            "plate_seq": "Gre_384_Sq_0010_0004",
-            "lid_seq": "Gre_384_Sq_0010_0004_lid",
-            "current_plate": None
-        },
-        {
-            "plate_seq": "Gre_384_Sq_0010_0005",
-            "lid_seq": "Gre_384_Sq_0010_0005_lid",
-            "current_plate": None
-        },
-        {
-            "plate_seq": "Gre_384_Sq_0010_0006",
-            "lid_seq": "Gre_384_Sq_0010_0006_lid",
+            "plate_seq": None,
+            "lid_seq": "F1_PCR_Lid_6",
             "current_plate": None
         },
     ],
-    "tgt_stack_1":[
+    "tgt_stack_bact":[
         {
-            "plate_seq": "Gre_384_Sq_0005_0001",
-            "lid_seq": "Gre_384_Sq_0005_0001_lid",
+            "plate_seq": "F3_Bact_Plate_1",
+            "lid_seq": "F3_Bact_Lid_1",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0005_0002",
-            "lid_seq": "Gre_384_Sq_0005_0002_lid",
+            "plate_seq": "F3_Bact_Plate_2",
+            "lid_seq": "F3_Bact_Lid_2",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0005_0003",
-            "lid_seq": "Gre_384_Sq_0005_0003_lid",
+            "plate_seq": "F3_Bact_Plate_3",
+            "lid_seq": "F3_Bact_Lid_3",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0005_0004",
-            "lid_seq": "Gre_384_Sq_0005_0004_lid",
+            "plate_seq": "F3_Bact_Plate_4",
+            "lid_seq": "F3_Bact_Lid_4",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0005_0005",
-            "lid_seq": "Gre_384_Sq_0005_0005_lid",
+            "plate_seq": "F3_Bact_Plate_5",
+            "lid_seq": "F3_Bact_Lid_5",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0005_0006",
-            "lid_seq": "Gre_384_Sq_0005_0006_lid",
+            "plate_seq": "F3_Bact_Plate_6",
+            "lid_seq": "F3_Bact_Lid_6",
             "current_plate": None
         },
     ],
-    "tgt_stack_2":[
+    "tgt_stack_pcr":[
         {
-            "plate_seq": "Gre_384_Sq_0001_0001",
-            "lid_seq": "Gre_384_Sq_0001_0001_lid",
+            "plate_seq": "E1_PCR_Plate_1",
+            "lid_seq": "E1_PCR_Lid_1",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0001_0002",
-            "lid_seq": "Gre_384_Sq_0001_0002_lid",
+            "plate_seq": "E1_PCR_Plate_2",
+            "lid_seq": "E1_PCR_Lid_2",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0001_0003",
-            "lid_seq": "Gre_384_Sq_0001_0003_lid",
+            "plate_seq": "E1_PCR_Plate_3",
+            "lid_seq": "E1_PCR_Lid_3",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0001_0004",
-            "lid_seq": "Gre_384_Sq_0001_0004_lid",
+            "plate_seq": "E1_PCR_Plate_4",
+            "lid_seq": "E1_PCR_Lid_4",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0001_0005",
-            "lid_seq": "Gre_384_Sq_0001_0005_lid",
+            "plate_seq": "E1_PCR_Plate_5",
+            "lid_seq": "E1_PCR_Lid_5",
             "current_plate": None
         },
         {
-            "plate_seq": "Gre_384_Sq_0001_0006",
-            "lid_seq": "Gre_384_Sq_0001_0006_lid",
+            "plate_seq": "E1_PCR_Plate_6",
+            "lid_seq": "E1_PCR_Lid_6",
             "current_plate": None
         },
     ],
     "tip_stack_1":[
         {
-            "seq": "TIP_50ul_L_NE_stack_0003_0001",
+            "seq": "B1_Rack_1",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0003_0002",
+            "seq": "B1_Rack_2",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0003_0003",
+            "seq": "B1_Rack_3",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0003_0004",
+            "seq": "B1_Rack_4",
             "current": None
         },
     ],
     "tip_stack_2":[
         {
-            "seq": "TIP_50ul_L_NE_stack_0004_0001",
+            "seq": "B2_Rack_1",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0004_0002",
+            "seq": "B2_Rack_2",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0004_0003",
+            "seq": "B2_Rack_3",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0004_0004",
+            "seq": "B2_Rack_4",
             "current": None
         },
     ],
     "tip_stack_3":[
         {
-            "seq": "TIP_50ul_L_NE_stack_0006_0001",
+            "seq": "B3_Rack_1",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0006_0002",
+            "seq": "B3_Rack_2",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0006_0003",
+            "seq": "B3_Rack_3",
             "current": None
         },
         {
-            "seq": "TIP_50ul_L_NE_stack_0006_0004",
-            "current": None
-        },
-    ],
-    "tip_stack_4":[
-        {
-            "seq": "TIP_50ul_L_NE_stack_0007_0001",
-            "current": None
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0007_0002",
-            "current": None
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0007_0003",
-            "current": None
-        },
-        {
-            "seq": "TIP_50ul_L_NE_stack_0007_0004",
+            "seq": "B3_Rack_4",
             "current": None
         },
     ],
@@ -633,14 +599,14 @@ with HamiltonInterface(simulate=True) as hammy:
 
         
 
-        # Settings for cherry-picking procedures
-        liquid_class = LIQUID_CLASS #'Tip_50ul_Water_DispenseJet_Empty' #'Tip_50ul_96COREHead_Water_DispenseJet_Empty'
+        # Settings for pcr procedures
+        liquid_class = LIQUID_CLASS_50_384H #'Tip_50ul_Water_DispenseJet_Empty' #'Tip_50ul_96COREHead_Water_DispenseJet_Empty'
         for well_to_pick in wells_to_pick:
             str_msg = f"-- Check if there still are tips [Press Enter]"
             #input(str_msg)
             # Check if there still are tips (state["tips"]["next_tip_index"])
             while state["tips"]["next_tip_index"] >= state["tips"]["max_tips_count"]:
-                #input("--------\nAttention: No more tips. Please add a new tips set [Any Key].\n--------")
+                input("--------\nAttention: No more tips. Please add a new tips set [Any Key].\n--------")
         	    
                 json.dump(state, open("./02_before_changing_tips.json",'w'))
                 act.throw_active_tip_rack_into_waste(state,hammy)
@@ -691,14 +657,13 @@ with HamiltonInterface(simulate=True) as hammy:
 
             # Aspirate from well of interest
             tip_pick_up(hammy, [tip_pos])
-            aspirate(hammy, [well_pos_in_src_plate], [2], liquidClass = liquid_class,
+            aspirate(hammy, [well_pos_in_src_plate], [5], liquidClass = liquid_class,
                 mixCycles=3,
-                mixVolume=5.0,
-                liquidHeight=0.5
+                mixVolume=20.0
             )
 
             # Dispense into target well
-            dispense(hammy, [well_pos_in_tgt_plate], [2], liquidClass = liquid_class)
+            dispense(hammy, [well_pos_in_tgt_plate], [5], liquidClass = liquid_class)
             tip_eject(hammy,  wasteSequence="Waste") #[tip_pos]) 
             json.dump(new_mapping, open("./L_mapping.json",'w'))
             # Print Progress to user

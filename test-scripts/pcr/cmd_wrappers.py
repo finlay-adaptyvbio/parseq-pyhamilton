@@ -13,8 +13,83 @@ from pyhamilton import (
     aspirate,
     dispense,
 )
+import logging
+from pyhamilton.oemerr import PositionError
 
-DEFAULT_GRIP_TOOL_SEQUENCE = "COREGripTool_OnWaste_1000ul_0001"
+
+DEFAULT_GRIP_TOOL_SEQUENCE = "CORE_Grip"
+
+
+def labware_pos_str(labware, idx):
+    return labware.layout_name() + ", " + labware.position_id(idx)
+
+
+def move_plate(ham, source_plate, target_plate, gripHeight=8.0):
+    logging.info(
+        "move_plate: Moving plate "
+        + source_plate.layout_name()
+        + " to "
+        + target_plate.layout_name()
+    )
+
+    src_plate_pos = labware_pos_str(source_plate, 0)
+    trgt_plate_pos = labware_pos_str(target_plate, 0)
+    cid = ham.send_command(
+        GRIP_GET,
+        plateLabwarePositions=src_plate_pos,
+        gripHeight=gripHeight,
+        transportMode=0,
+    )
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
+
+    cid = ham.send_command(
+        GRIP_PLACE,
+        plateLabwarePositions=trgt_plate_pos,
+        transportMode=0,
+    )
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
+
+
+def move_lid(ham, source_lid, target_lid, gripHeight=5.0):
+    logging.info(
+        "move_lid: Moving lid "
+        + source_lid.layout_name()
+        + " to "
+        + target_lid.layout_name()
+    )
+
+    src_lid_pos = labware_pos_str(source_lid, 0)
+    trgt_lid_pos = labware_pos_str(target_lid, 0)
+
+    cid = ham.send_command(
+        GRIP_GET,
+        lidLabwarePositions=src_lid_pos,
+        gripHeight=gripHeight,
+        transportMode=1,
+    )
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
+
+    cid = ham.send_command(
+        GRIP_PLACE,
+        lidLabwarePositions=trgt_lid_pos,
+        transportMode=1,
+    )
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
 
 
 def grip_get_plate_with_lid(
@@ -113,7 +188,6 @@ def grip_get_96_tip_rack(  # With these settings can pickup from the side and fr
         gripperToolChannel=2,
         gripHeight=26.5,
         transportMode=0,
-        gripWidth=79.0,
     )
     hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
 

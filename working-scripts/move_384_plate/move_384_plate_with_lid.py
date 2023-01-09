@@ -39,6 +39,7 @@ if __name__ == '__main__':
                                     toolSequence       = 'COREGripTool_OnWaste_1000ul_0001',
                                     gripForce          = 3,
                                     gripperToolChannel = 2,
+                                    gripHeight = 11.0,
                                     transportMode      = 1 )
         print(hammy.wait_on_response(cmd_id, raise_first_exception=True))
 

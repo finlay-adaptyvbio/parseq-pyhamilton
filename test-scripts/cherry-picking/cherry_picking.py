@@ -14,9 +14,11 @@ liquid_class = 'HighVolume_Water_DispenseJet_Part'
 layfile = os.path.abspath(os.path.join(r"C:\\Users\\Adaptyvbio\\Documents\\PyHamilton\\layouts", layout_filename))
 lmgr = LayoutManager(layfile)
 
-tip_name_from_line = lambda line: LayoutManager.layline_first_field(line)
+""" tip_name_from_line = lambda line: LayoutManager.layline_first_field(line)
+print(tip_name_from_line)
 tip_name_condition = lambda line: LayoutManager.field_starts_with(tip_name_from_line(line), 'HT_L_')
-tips_type = ResourceType(Tip96, tip_name_condition, tip_name_from_line)
+print(tip_name_condition) """
+tips_type = ResourceType(Tip96, "HT_L_0002")#tip_name_condition, tip_name_from_line)
 tip_resource = lmgr.assign_unused_resource(tips_type)
 
 tip_starting_pos    = 16
