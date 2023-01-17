@@ -1,8 +1,6 @@
 import string
 import pandas as pd
 
-from pyhamilton import LayoutManager, ResourceType
-
 
 def convertPlatePositionToIndex(
     plate_position: str, plate_type: str = "Plate384"
@@ -106,7 +104,7 @@ def get_wells_of_interest_from_csv(csv_absolute_path: string) -> dict:
     unique_well_poss = dataframe[1].to_list()
 
     for unique_well_pos in unique_well_poss:
-        plate, well_pos = unique_well_pos.split()[0].split(".")
+        plate, well_pos = unique_well_pos.split()
         if not (plate in plates):
             plates[plate] = []
         plates[plate].append(well_pos)
@@ -203,7 +201,7 @@ def get_next_stacked_tip_rack(state: dict, stack_limit: int):
 
     # print("Full stacks: ", stacks_full)
 
-    # figure out the plate level to take (bottom = 0, top = 5)
+    # figure out the plate level to take (bottom = 0, top = 3)
     plate_index = 3
     for pos in reversed(state[stack_to_take_from]):
         if pos["current"] != None:

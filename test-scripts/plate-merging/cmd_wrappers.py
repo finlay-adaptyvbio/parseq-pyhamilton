@@ -216,34 +216,72 @@ def dispense(
         raise IOError
 
 
-def grip_get_96_tip_rack(  # With these settings can pickup from the side and from the middle
-    hamilton_interface: HamiltonInterface,
-    plateSequence: str,
-    toolSequence: str = DEFAULT_GRIP_TOOL_SEQUENCE,
+def grip_get_tip_rack(
+    ham,
+    labware: Union[Tip96, Tip384],
+    **kw_args,
 ):
-    cmd_id = hamilton_interface.send_command(
+
+    labwarePositions = labware_pos_str(labware, 0)
+
+    if isinstance(labware, Tip96):
+        gripHeight = 26.5
+        gripWidth = 78.0
+    elif isinstance(labware, Tip384):
+        gripHeight = 26.5
+        gripWidth = 78.0
+    else:
+        raise TypeError
+
+    cid = ham.send_command(
         GRIP_GET,
-        plateSequence=plateSequence,
-        toolSequence=toolSequence,
-        gripForce=9,
-        gripperToolChannel=2,
-        gripHeight=26.5,
-        transportMode=0,
+        plateLabwarePositions=labwarePositions,
+        gripForce=7,
+        gripHeight=gripHeight,
+        gripWidth=gripWidth,
+        **kw_args,
     )
-    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
 
 
-def grip_place_96_tip_rack(
-    hamilton_interface: HamiltonInterface,
-    plateSequence: str,
-    toolSequence: str = DEFAULT_GRIP_TOOL_SEQUENCE,
-    ejectToolWhenFinish: int = 1,
+def grip_place_tip_rack(
+    ham,
+    labware: Union[Tip96, Tip384],
+    waste: bool = False,
+    eject: bool = False,
+    **kw_args,
 ):
-    cmd_id = hamilton_interface.send_command(
+
+    ejectToolWhenFinish = eject
+
+    if isinstance(labware, Tip96):
+        rack_type = "_tip96"
+    elif isinstance(labware, Tip384):
+        rack_type = "_tip384"
+    else:
+        raise TypeError
+
+    if waste:
+        plateSequence = "Waste" + rack_type
+        labwarePositions = ""
+
+    else:
+        plateSequence = ""
+        labwarePositions = labware_pos_str(labware, 0)
+
+    cid = ham.send_command(
         GRIP_PLACE,
         plateSequence=plateSequence,
-        toolSequence=toolSequence,
-        transportMode=0,
+        plateLabwarePositions=labwarePositions,
         ejectToolWhenFinish=ejectToolWhenFinish,
+        **kw_args,
     )
-    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
