@@ -3,19 +3,19 @@ from pyhamilton import (
     LayoutManager,
     ResourceType,
     Plate384,
+    Plate96,
     Tip96,
+    Tip384,
+    Lid,
     INITIALIZE,
     GRIP_GET,
     GRIP_PLACE,
     GRIP_MOVE,
-    tip_pick_up,
-    tip_eject,
-    aspirate,
-    dispense,
 )
-import logging
+
 from pyhamilton.oemerr import PositionError
 
+import logging
 
 DEFAULT_GRIP_TOOL_SEQUENCE = "CORE_Grip"
 
@@ -25,71 +25,74 @@ def labware_pos_str(labware, idx):
 
 
 def move_plate(ham, source_plate, target_plate, gripHeight=8.0):
-    logging.info(
-        "move_plate: Moving plate "
-        + source_plate.layout_name()
-        + " to "
-        + target_plate.layout_name()
-    )
 
-    src_plate_pos = labware_pos_str(source_plate, 0)
-    trgt_plate_pos = labware_pos_str(target_plate, 0)
-    cid = ham.send_command(
-        GRIP_GET,
-        plateLabwarePositions=src_plate_pos,
-        gripHeight=gripHeight,
-        transportMode=0,
-    )
+    if isinstance(source_plate, (Plate384, Plate96)) and isinstance(
+        target_plate, (Plate384, Plate96)
+    ):
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
-    except PositionError:
-        raise IOError
+        logging.info(
+            f"move_plate: Moving plate {source_plate.layout_name()} to {target_plate.layout_name()}."
+        )
 
-    cid = ham.send_command(
-        GRIP_PLACE,
-        plateLabwarePositions=trgt_plate_pos,
-        transportMode=0,
-    )
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
-    except PositionError:
-        raise IOError
+        src_plate_pos = labware_pos_str(source_plate, 0)
+        trgt_plate_pos = labware_pos_str(target_plate, 0)
+
+        cid = ham.send_command(
+            GRIP_GET,
+            plateLabwarePositions=src_plate_pos,
+            gripHeight=gripHeight,
+            transportMode=0,
+        )
+
+        try:
+            ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        except PositionError:
+            raise IOError
+
+        cid = ham.send_command(
+            GRIP_PLACE,
+            plateLabwarePositions=trgt_plate_pos,
+            transportMode=0,
+        )
+        try:
+            ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        except PositionError:
+            raise IOError
 
 
 def move_lid(ham, source_lid, target_lid, gripHeight=5.0):
-    logging.info(
-        "move_lid: Moving lid "
-        + source_lid.layout_name()
-        + " to "
-        + target_lid.layout_name()
-    )
 
-    src_lid_pos = labware_pos_str(source_lid, 0)
-    trgt_lid_pos = labware_pos_str(target_lid, 0)
+    if isinstance(source_lid, Lid) and isinstance(target_lid, Lid):
 
-    cid = ham.send_command(
-        GRIP_GET,
-        lidLabwarePositions=src_lid_pos,
-        gripHeight=gripHeight,
-        transportMode=1,
-    )
+        logging.info(
+            f"move_plate: Moving plate {source_lid.layout_name()} to {target_lid.layout_name()}."
+        )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
-    except PositionError:
-        raise IOError
+        src_lid_pos = labware_pos_str(source_lid, 0)
+        trgt_lid_pos = labware_pos_str(target_lid, 0)
 
-    cid = ham.send_command(
-        GRIP_PLACE,
-        lidLabwarePositions=trgt_lid_pos,
-        transportMode=1,
-    )
+        cid = ham.send_command(
+            GRIP_GET,
+            lidLabwarePositions=src_lid_pos,
+            gripHeight=gripHeight,
+            transportMode=1,
+        )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
-    except PositionError:
-        raise IOError
+        try:
+            ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        except PositionError:
+            raise IOError
+
+        cid = ham.send_command(
+            GRIP_PLACE,
+            lidLabwarePositions=trgt_lid_pos,
+            transportMode=1,
+        )
+
+        try:
+            ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        except PositionError:
+            raise IOError
 
 
 def grip_get_plate_with_lid(

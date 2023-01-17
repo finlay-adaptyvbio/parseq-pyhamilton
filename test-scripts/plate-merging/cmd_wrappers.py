@@ -3,101 +3,217 @@ from pyhamilton import (
     LayoutManager,
     ResourceType,
     Plate384,
+    Plate96,
     Tip96,
-    INITIALIZE,
+    Tip384,
+    Lid,
     GRIP_GET,
     GRIP_PLACE,
-    GRIP_MOVE,
-    tip_pick_up,
-    tip_eject,
-    aspirate,
-    dispense,
+    PICKUP,
+    EJECT,
+    DISPENSE,
+    ASPIRATE,
 )
 
-DEFAULT_GRIP_TOOL_SEQUENCE = "COREGripTool_OnWaste_1000ul_0001"
+from pyhamilton.oemerr import PositionError
+
+from typing import Union
+
+DEFAULT_GRIP_TOOL_SEQUENCE = "CORE_Grip"
+DEFAULT_LIQUID_CLASS = "StandardVolume_Water_DispenseJet_Empty"
 
 
-def grip_get_plate_with_lid(
-    hamilton_interface: HamiltonInterface,
-    plateSequence: str,
-    lidSequence: str,
-    toolSequence: str = DEFAULT_GRIP_TOOL_SEQUENCE,
-    gripForce: float = 3,
-    transportMode: int = 2,
-    gripperToolChannel: int = 2,
-    gripHeight: float = 10.0,
-):
-    cmd_id = hamilton_interface.send_command(
-        GRIP_GET,
-        plateSequence=plateSequence,
-        lidSequence=lidSequence,
-        toolSequence=toolSequence,
-        gripForce=gripForce,
-        gripperToolChannel=gripperToolChannel,
-        gripHeight=gripHeight,
-        transportMode=transportMode,
+def labware_pos_str(labware, idx):
+    return labware.layout_name() + ", " + labware.position_id(idx)
+
+
+def compound_pos_str(pos_tuples):
+    present_pos_tups = [pt for pt in pos_tuples if pt is not None]
+    return ";".join(
+        (labware_pos_str(labware, idx) for labware, idx in present_pos_tups)
     )
-    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
 
 
-def grip_place_plate_with_lid(
-    hamilton_interface: HamiltonInterface,
-    plateSequence: str,
-    lidSequence: str,
-    toolSequence: str = DEFAULT_GRIP_TOOL_SEQUENCE,
-    transportMode: int = 2,
-    ejectToolWhenFinish: int = 1,
+def grip_get(
+    ham,
+    labware: Union[Plate96, Plate384, Lid],
+    mode: int,
+    **kw_args,
 ):
-    cmd_id = hamilton_interface.send_command(
-        GRIP_PLACE,
-        plateSequence=plateSequence,
-        lidSequence=lidSequence,
-        toolSequence=toolSequence,
-        transportMode=transportMode,
-        ejectToolWhenFinish=ejectToolWhenFinish,
-    )
-    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
+
+    labwarePositions = labware_pos_str(labware, 0)
+    transportMode = mode
+
+    if mode == 0:
+        cid = ham.send_command(
+            GRIP_GET,
+            plateLabwarePositions=labwarePositions,
+            transportMode=transportMode,
+            **kw_args,
+        )
+
+    elif mode == 1:
+        cid = ham.send_command(
+            GRIP_GET,
+            lidLabwarePositions=labwarePositions,
+            transportMode=transportMode,
+            **kw_args,
+        )
+
+    else:
+        raise ValueError
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
 
 
-def grip_get_lid(
-    hamilton_interface: HamiltonInterface,
-    plateSequence: str,
-    lidSequence: str,
-    toolSequence: str = DEFAULT_GRIP_TOOL_SEQUENCE,
-    gripForce: float = 3,
-    transportMode: int = 1,
-    gripperToolChannel: int = 2,
-    gripHeight: float = 3.0,
+def grip_place(
+    ham,
+    labware: Union[Plate96, Plate384, Lid],
+    mode: int,
+    eject: bool = False,
+    **kw_args,
 ):
-    cmd_id = hamilton_interface.send_command(
-        GRIP_GET,
-        # plateSequence      = plateSequence,
-        lidSequence=lidSequence,
-        toolSequence=toolSequence,
-        gripForce=gripForce,
-        gripperToolChannel=gripperToolChannel,
-        gripHeight=gripHeight,
-        transportMode=transportMode,
-    )
-    hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
+
+    labwarePositions = labware_pos_str(labware, 0)
+    transportMode = mode
+    ejectToolWhenFinish = eject
+
+    if mode == 0:
+        cid = ham.send_command(
+            GRIP_PLACE,
+            plateLabwarePositions=labwarePositions,
+            transportMode=transportMode,
+            ejectToolWhenFinish=ejectToolWhenFinish,
+            **kw_args,
+        )
+
+    elif mode == 1:
+        cid = ham.send_command(
+            GRIP_PLACE,
+            lidLabwarePositions=labwarePositions,
+            transportMode=transportMode,
+            ejectToolWhenFinish=ejectToolWhenFinish,
+            **kw_args,
+        )
+
+    else:
+        raise ValueError
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
 
 
-def grip_place_lid(
-    hamilton_interface: HamiltonInterface,
-    plateSequence: str,
-    lidSequence: str,
-    toolSequence: str = DEFAULT_GRIP_TOOL_SEQUENCE,
-    transportMode: int = 1,
-    ejectToolWhenFinish: int = 1,
+def tip_pick_up(
+    ham,
+    positions: list[tuple[Tip96, int]],
+    **kw_args,
 ):
-    grip_place_plate_with_lid(
-        hamilton_interface,
-        plateSequence,
-        lidSequence,
-        toolSequence,
-        transportMode=transportMode,
-        ejectToolWhenFinish=ejectToolWhenFinish,
+
+    labwarePositions = compound_pos_str(positions)
+
+    cid = ham.send_command(
+        PICKUP,
+        labwarePositions=labwarePositions,
+        **kw_args,
     )
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
+
+
+def tip_eject(
+    ham,
+    positions: list[tuple[Tip96, int]],
+    waste: bool = False,
+    **kw_args,
+):
+
+    if waste:
+        useDefaultWaste = int(waste)
+        labwarePositions = ""
+
+    else:
+        useDefaultWaste = int(waste)
+        labwarePositions = compound_pos_str(positions)
+
+    cid = ham.send_command(
+        EJECT,
+        labwarePositions=labwarePositions,
+        useDefaultWaste=useDefaultWaste,
+        **kw_args,
+    )
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
+
+
+def aspirate(
+    ham: HamiltonInterface,
+    positions: list[tuple],
+    volumes: list,
+    **kw_args,
+):
+
+    if len(volumes) < len(positions):
+        volumes.extend([volumes[0] for _ in range(len(volumes), len(positions))])
+    elif len(volumes) > len(positions):
+        raise ValueError
+
+    if "liquidClass" not in kw_args:
+        kw_args.update({"liquidClass": DEFAULT_LIQUID_CLASS})
+
+    labwarePositions = compound_pos_str(positions)
+
+    cid = ham.send_command(
+        ASPIRATE,
+        labwarePositions=labwarePositions,
+        volumes=volumes,
+        **kw_args,
+    )
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
+
+
+def dispense(
+    ham: HamiltonInterface,
+    positions: list[tuple],
+    volumes: list,
+    **kw_args,
+):
+
+    if len(volumes) < len(positions):
+        volumes.extend([volumes[0] for _ in range(len(volumes), len(positions))])
+    elif len(volumes) > len(positions):
+        raise ValueError
+
+    if "liquidClass" not in kw_args:
+        kw_args.update({"liquidClass": DEFAULT_LIQUID_CLASS})
+
+    labwarePositions = compound_pos_str(positions)
+
+    cid = ham.send_command(
+        DISPENSE,
+        labwarePositions=labwarePositions,
+        volumes=volumes,
+        **kw_args,
+    )
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+    except PositionError:
+        raise IOError
 
 
 def grip_get_96_tip_rack(  # With these settings can pickup from the side and from the middle
@@ -113,7 +229,6 @@ def grip_get_96_tip_rack(  # With these settings can pickup from the side and fr
         gripperToolChannel=2,
         gripHeight=26.5,
         transportMode=0,
-        gripWidth=79.0,
     )
     hamilton_interface.wait_on_response(cmd_id, raise_first_exception=True)
 
