@@ -226,7 +226,7 @@ def grip_get_tip_rack(
 
     if isinstance(labware, Tip96):
         gripHeight = 26.5
-        gripWidth = 78.0
+        gripWidth = 77.0
     elif isinstance(labware, Tip384):
         gripHeight = 26.5
         gripWidth = 78.0
@@ -236,7 +236,7 @@ def grip_get_tip_rack(
     cid = ham.send_command(
         GRIP_GET,
         plateLabwarePositions=labwarePositions,
-        gripForce=7,
+        gripForce=9,
         gripHeight=gripHeight,
         gripWidth=gripWidth,
         **kw_args,

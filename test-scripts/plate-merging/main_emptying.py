@@ -127,16 +127,27 @@ dk.print_deck(deck)
 #         SETUP
 # -------------------------
 
-channels = 2
 plates = [
     "P4.2",
     "P4.3",
     "P1.9",
     "P1.8",
+    "P1.12",
+    "P4.7",
+    "P2.4",
+    "P1.13",
+    "P2.2",
+    "P4.5",
+    "P4.4",
+    "P4.1",
 ]
 
+channel_steps = 0
+channels = 2
 channel_1 = "10"
 channel_2 = "01"
+
+current_tip = 0
 
 plates_in_stack = len(plates)
 
@@ -173,9 +184,6 @@ discard = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "plate_merging_emptying.csv"
 )
 
-current_tip = 0
-channel_steps = 0
-
 with open(discard) as f:
     reader = csv.reader(f)
     wells_to_empty = [tuple(row) for row in reader]
@@ -199,13 +207,13 @@ with HamiltonInterface(simulate=True) as hammy:
 
     for i, plate in enumerate(plates):
 
-        raw_wells = [
-            (active_bact_plate, well[1]) for well in wells_to_empty if well[0] == plate
+        raw_wells = [well[1] for well in wells_to_empty if well[0] == plate]
+
+        indexes = dk.sort_384_indexes_2channel(raw_wells)
+
+        wells = [
+            (active_bact_plate, dk.string_to_index_384(index)) for index in indexes
         ]
-
-        indexes = dk.sort_well_indexes(raw_wells)
-
-        wells = [(active_bact_plate, dk.string_to_index(index)) for index in indexes]
 
         print(indexes)
 
@@ -224,136 +232,136 @@ with HamiltonInterface(simulate=True) as hammy:
         cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
         current_tip += channels
 
-        # ### Aspirate media
+        ### Aspirate media
 
-        # for j in range(0, len(wells), 4):
+        for j in range(0, len(wells), 4):
 
-        #     stop = min(4, len(wells[j:]))
+            stop = min(4, len(wells[j:]))
 
-        #     for k in range(0, stop, 2):
+            for k in range(0, stop, 2):
 
-        #         channel_steps += 1
+                channel_steps += 1
 
-        #         if channel_steps % 58 == 0:
-        #             cmdw.tip_eject(
-        #                 hammy, tips[current_tip : current_tip + 2], waste=True
-        #             )
-        #             cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
-        #             current_tip += channels
+                if channel_steps % 58 == 0:
+                    cmdw.tip_eject(
+                        hammy, tips[current_tip : current_tip + 2], waste=True
+                    )
+                    cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
+                    current_tip += channels
 
-        #         if k >= 2:
-        #             aspirateMode = 1
-        #         else:
-        #             aspirateMode = 0
+                if k >= 2:
+                    aspirateMode = 1
+                else:
+                    aspirateMode = 0
 
-        #         if stop - k == 1:
-        #             cmdw.aspirate(
-        #                 hammy,
-        #                 [wells[j + k]],
-        #                 [140],
-        #                 channelVariable=channel_1,
-        #                 aspirateMode=aspirateMode,
-        #                 mixCycles=3,
-        #                 mixVolume=50.0,
-        #                 liquidHeight=0.05,
-        #             )
+                if stop - k == 1:
+                    cmdw.aspirate(
+                        hammy,
+                        [wells[j + k]],
+                        [140],
+                        channelVariable=channel_1,
+                        aspirateMode=aspirateMode,
+                        mixCycles=3,
+                        mixVolume=50.0,
+                        liquidHeight=0.05,
+                    )
 
-        #             dispense_volume = [140 * int((k + channels) / 2), 100 * (k / 2)]
+                    dispense_volume = [140 * int((k + channels) / 2), 100 * (k / 2)]
 
-        #             state.update(
-        #                 {
-        #                     "current_well": dk.index_to_string(wells[j + k][1]),
-        #                     "current_step": "aspirate_media",
-        #                 }
-        #             )
-        #             print(json.dumps(state))
+                    state.update(
+                        {
+                            "current_well": dk.index_to_string_384(wells[j + k][1]),
+                            "current_step": "aspirate_media",
+                        }
+                    )
+                    print(json.dumps(state))
 
-        #         else:
-        #             cmdw.aspirate(
-        #                 hammy,
-        #                 wells[j + k : j + k + 2],
-        #                 [140],
-        #                 aspirateMode=aspirateMode,
-        #                 mixCycles=3,
-        #                 mixVolume=50.0,
-        #                 liquidHeight=0.05,
-        #             )
+                else:
+                    cmdw.aspirate(
+                        hammy,
+                        wells[j + k : j + k + 2],
+                        [140],
+                        aspirateMode=aspirateMode,
+                        mixCycles=3,
+                        mixVolume=50.0,
+                        liquidHeight=0.05,
+                    )
 
-        #             dispense_volume = [140 * int((k + channels) / 2)]
+                    dispense_volume = [140 * int((k + channels) / 2)]
 
-        #             state.update(
-        #                 {
-        #                     "current_well": dk.index_to_string(wells[j + k + 1][1]),
-        #                     "current_step": "aspirate_media",
-        #                 }
-        #             )
-        #             print(json.dumps(state))
+                    state.update(
+                        {
+                            "current_well": dk.index_to_string_384(wells[j + k + 1][1]),
+                            "current_step": "aspirate_media",
+                        }
+                    )
+                    print(json.dumps(state))
 
-        #     cmdw.dispense(hammy, bact_waste, dispense_volume, dispenseMode=9)
+            cmdw.dispense(hammy, bact_waste, dispense_volume, dispenseMode=9)
 
-        #     state.update({"current_step": "dispense_media"})
-        #     print(json.dumps(state))
+            state.update({"current_step": "dispense_media"})
+            print(json.dumps(state))
 
-        # ### Dispense ethanol
+        ### Dispense ethanol
 
-        # for j in range(0, len(wells), 6):
+        for j in range(0, len(wells), 6):
 
-        #     stop = min(6, len(wells[j:]))
+            stop = min(6, len(wells[j:]))
 
-        #     if stop % 2 == 0:
-        #         aspirate_volume = [100 * stop / 2]
+            if stop % 2 == 0:
+                aspirate_volume = [100 * stop / 2]
 
-        #     else:
-        #         aspirate_volume = [100 * (stop + 1) / 2, 100 * (stop - 1) / 2]
+            else:
+                aspirate_volume = [100 * (stop + 1) / 2, 100 * (stop - 1) / 2]
 
-        #     cmdw.aspirate(hammy, ethanol, aspirate_volume, liquidClass=ETHANOL_DISPENSE)
+            cmdw.aspirate(hammy, ethanol, aspirate_volume, liquidClass=ETHANOL_DISPENSE)
 
-        #     state.update({"current_step": "aspirate_ethanol"})
-        #     print(json.dumps(state))
+            state.update({"current_step": "aspirate_ethanol"})
+            print(json.dumps(state))
 
-        #     for k in range(0, stop, 2):
+            for k in range(0, stop, 2):
 
-        #         channel_steps += 1
+                channel_steps += 1
 
-        #         if channel_steps % 58 == 0:
-        #             cmdw.tip_eject(
-        #                 hammy, tips[current_tip : current_tip + 2], waste=True
-        #             )
-        #             cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
-        #             current_tip += channels
+                if channel_steps % 58 == 0:
+                    cmdw.tip_eject(
+                        hammy, tips[current_tip : current_tip + 2], waste=True
+                    )
+                    cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
+                    current_tip += channels
 
-        #         if stop - k == 1:
-        #             cmdw.dispense(
-        #                 hammy,
-        #                 [wells[j + k]],
-        #                 [100],
-        #                 channelVariable=channel_1,
-        #                 liquidClass=ETHANOL_DISPENSE,
-        #             )
+                if stop - k == 1:
+                    cmdw.dispense(
+                        hammy,
+                        [wells[j + k]],
+                        [100],
+                        channelVariable=channel_1,
+                        liquidClass=ETHANOL_DISPENSE,
+                    )
 
-        #             state.update(
-        #                 {
-        #                     "current_well": dk.index_to_string(wells[j + k][1]),
-        #                     "current_step": "dispense_ethanol",
-        #                 }
-        #             )
-        #             print(json.dumps(state))
+                    state.update(
+                        {
+                            "current_well": dk.index_to_string_384(wells[j + k][1]),
+                            "current_step": "dispense_ethanol",
+                        }
+                    )
+                    print(json.dumps(state))
 
-        #         else:
-        #             cmdw.dispense(
-        #                 hammy,
-        #                 wells[j + k : j + k + 2],
-        #                 [100],
-        #                 liquidClass=ETHANOL_DISPENSE,
-        #             )
+                else:
+                    cmdw.dispense(
+                        hammy,
+                        wells[j + k : j + k + 2],
+                        [100],
+                        liquidClass=ETHANOL_DISPENSE,
+                    )
 
-        #             state.update(
-        #                 {
-        #                     "current_well": dk.index_to_string(wells[j + k + 1][1]),
-        #                     "current_step": "dispense_ethanol",
-        #                 }
-        #             )
-        #             print(json.dumps(state))
+                    state.update(
+                        {
+                            "current_well": dk.index_to_string_384(wells[j + k + 1][1]),
+                            "current_step": "dispense_ethanol",
+                        }
+                    )
+                    print(json.dumps(state))
 
         ### Aspirate ethanol
 
@@ -394,7 +402,7 @@ with HamiltonInterface(simulate=True) as hammy:
 
                     state.update(
                         {
-                            "current_well": dk.index_to_string(wells[j + k][1]),
+                            "current_well": dk.index_to_string_384(wells[j + k][1]),
                             "current_step": "aspirate_ethanol",
                         }
                     )
@@ -416,7 +424,7 @@ with HamiltonInterface(simulate=True) as hammy:
 
                     state.update(
                         {
-                            "current_well": dk.index_to_string(wells[j + k + 1][1]),
+                            "current_well": dk.index_to_string_384(wells[j + k + 1][1]),
                             "current_step": "aspirate_ethanol",
                         }
                     )

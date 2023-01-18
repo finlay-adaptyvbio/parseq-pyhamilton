@@ -66,48 +66,104 @@ def pos(position: str) -> tuple:
     return position[0], int(position[1])
 
 
-def string_to_index(position: str) -> int:
+def string_to_index_384(position: str) -> int:
     alphabet = "ABCDEFGHIJKLMNOP"
     return alphabet.index(position[0]) + (int(position[1:]) - 1) * 16
 
 
-def index_to_string(position: int) -> str:
+def index_to_string_384(position: int) -> str:
     alphabet = "ABCDEFGHIJKLMNOP"
     x, y = int(position) // 16, int(position) % 16
     return alphabet[y] + str(x + 1)
 
 
-def sort_well_indexes_col(indexes: list[int], channels: int) -> list:
-    indexes_set = set(indexes)
-
-    pairs = [(x, y) for x in indexes if (y := channels + x) in indexes_set and x < y]
-
-    s = set()
-
-    unique_pairs = [(x, y) for x, y in pairs if not (x in s or s.add(y))]
-
-    sorted_indexes = [w for t in unique_pairs for w in t]
-    unsorted_indexes = [w for w in indexes if w not in sorted_indexes]
-
-    return sorted_indexes + unsorted_indexes
+def string_to_index_96(position: str) -> int:
+    alphabet = "ABCDEFGH"
+    return alphabet.index(position[0]) + (int(position[1:]) - 1) * 8
 
 
-def sort_well_indexes(wells: list[tuple]) -> list:
-    sorted_wells = []
-    alphabet = "ABCDEFGHIJKLMNOP"
+def index_to_string_96(position: int) -> str:
+    alphabet = "ABCDEFGH"
+    x, y = int(position) // 8, int(position) % 8
+    return alphabet[y] + str(x + 1)
 
-    wells = sorted(wells, key=lambda x: int(x[1][-2:]))
+
+def sort_384_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
+
+    sorted_cols = []
+    unsorted_cols = []
+
+    rows = "ABCDEFGHIJKLMNOP"
+
+    unsorted_indexes_set = set(unsorted_indexes)
+    unsorted_indexes_by_col = sorted(unsorted_indexes, key=lambda x: int(x[1:]))
 
     for col in range(1, 25):
-        rows = [well for well in wells if int(well[1][-2:]) == col]
+        col_indexes = [
+            col_index
+            for col_index in unsorted_indexes_by_col
+            if int(col_index[1:]) == col
+        ]
+        row_indexes = [rows.index(row[0]) for row in col_indexes]
+        row_indexes_set = set(row_indexes)
 
-        row_indexes = [alphabet.index(row[1][0]) for row in rows]
+        pairs_set = set()
+        pairs = [
+            (x, y) for x in row_indexes if (y := x + 4) in row_indexes_set and x < y
+        ]
+        unique_pairs = [
+            (x, y) for x, y in pairs if not (x in pairs_set or pairs_set.add(y))
+        ]
 
-        sorted_row_indexes = sort_well_indexes_col(row_indexes, 4)
-        sorted_rows = [alphabet[row] + str(col) for row in sorted_row_indexes]
-        sorted_wells.extend(sorted_rows)
+        sorted_row_indexes = [i for t in unique_pairs for i in t]
+        unsorted_row_indexes = [i for i in row_indexes if i not in sorted_row_indexes]
 
-    return sorted_wells
+        sorted_rows = [rows[row] + str(col) for row in sorted_row_indexes]
+        unsorted_rows = [rows[row] + str(col) for row in unsorted_row_indexes]
+
+        sorted_cols.extend(sorted_rows)
+        unsorted_cols.extend(unsorted_rows)
+
+    return sorted_cols + unsorted_cols
+
+
+def sort_96_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
+
+    sorted_cols = []
+    unsorted_cols = []
+
+    rows = "ABCDEFGH"
+
+    unsorted_indexes_set = set(unsorted_indexes)
+    unsorted_indexes_by_col = sorted(unsorted_indexes, key=lambda x: int(x[1:]))
+
+    for col in range(1, 13):
+        col_indexes = [
+            col_index
+            for col_index in unsorted_indexes_by_col
+            if int(col_index[1:]) == col
+        ]
+        row_indexes = [rows.index(row[0]) for row in col_indexes]
+        row_indexes_set = set(row_indexes)
+
+        pairs_set = set()
+        pairs = [
+            (x, y) for x in row_indexes if (y := x + 2) in row_indexes_set and x < y
+        ]
+        unique_pairs = [
+            (x, y) for x, y in pairs if not (x in pairs_set or pairs_set.add(y))
+        ]
+
+        sorted_row_indexes = [i for t in unique_pairs for i in t]
+        unsorted_row_indexes = [i for i in row_indexes if i not in sorted_row_indexes]
+
+        sorted_rows = [rows[row] + str(col) for row in sorted_row_indexes]
+        unsorted_rows = [rows[row] + str(col) for row in unsorted_row_indexes]
+
+        sorted_cols.extend(sorted_rows)
+        unsorted_cols.extend(unsorted_rows)
+
+    return sorted_cols + unsorted_cols
 
 
 def get_labware_list(
@@ -158,24 +214,6 @@ def get_labware(deck: dict, labware):
             for level, r in enumerate(d["labware"]):
                 if labware == r:
                     return col, row, level
-
-
-def update_deck(deck: dict, source, target):
-
-    source_col, source_row, source_level = get_labware(deck, source)
-    target_col, target_row, target_level = get_labware(deck, target)
-
-    source_name = deck[source_col][source_row]["state"][source_level]
-    target_name = deck[target_col][target_row]["state"][target_level]
-
-    deck[source_col][source_row]["state"][source_level][0] = target_name
-    deck[target_col][target_row]["state"][target_level][0] = source_name
-
-    deck[source_col][source_row]["state"][source_level][0] = target_name
-    deck[target_col][target_row]["state"][target_level][0] = source_name
-
-    deck[source_col][source_row]["level"][0] += 1
-    deck[target_col][target_row]["level"][0] += 1
 
 
 def extract_resource_from_field(field, resource, position):
