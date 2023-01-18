@@ -1,36 +1,21 @@
-import json
-import math
-import os
-import helpers as hp
-import load
-import actions as act
-import cmd_wrappers as cmdw
+import os, csv, requests, atexit
+
+import commands as cmd
 import deck as dk
-import datetime
-import shutil
-import csv
-import atexit
-import requests
+import state as st
 
 from pyhamilton import (
     HamiltonInterface,
     LayoutManager,
-    ResourceType,
-    DeckResource,
     Plate96,
     Plate384,
     Lid,
     Tip96,
     Tip384,
     Reservoir300,
-    INITIALIZE,
 )
 
-from pyhamilton.oemerr import ResourceUnavailableError
-
-# -------------------------
-#         NOTIFICATIONS
-# -------------------------
+# Notification settings for Slack on script exit
 
 slack_token = "xoxb-4612406885399-4627932099202-REL8YycwsJbdBKYkGJ7qeq75"
 slack_channel = "#main"
@@ -38,7 +23,7 @@ slack_icon_emoji = ":see_no_evil:"
 slack_user_name = "pyhamilton"
 
 
-def rip(text):
+def notify(text):
     return requests.post(
         "https://slack.com/api/chat.postMessage",
         {
@@ -52,13 +37,9 @@ def rip(text):
     ).json()
 
 
-atexit.register(rip, "Script complete or error.")
+atexit.register(notify, "Script complete or error.")
 
-
-# -------------------------
-#         DECK
-# -------------------------
-
+# Empty deck dictionary
 
 deck = {
     "A": [
@@ -103,8 +84,10 @@ deck = {
     ],
 }
 
+# Define layout file and parse it
+
 LAYOUT_FILE_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "plate-merging.lay"
+    os.path.dirname(os.path.abspath(__file__)), "plate-merging-emptying.lay"
 )
 
 lmgr = LayoutManager(LAYOUT_FILE_PATH)
@@ -119,13 +102,10 @@ types = {
 }
 
 dk.parse_layout_file(deck, lmgr, types)
-
 dk.print_deck(deck)
 
-
-# -------------------------
-#         SETUP
-# -------------------------
+# Plate information and variables
+# TODO: Pull information from csv file
 
 plates = [
     "P4.2",
@@ -142,14 +122,14 @@ plates = [
     "P4.1",
 ]
 
-channel_steps = 0
 channels = 2
 channel_1 = "10"
 channel_2 = "01"
 
-current_tip = 0
+# Define labware from parsed layout file
+# TODO: Adjust stacks depending on number of plates
 
-plates_in_stack = len(plates)
+## Each labware is defined manually for now, this probably won't change in the future
 
 source_bact_plates = dk.get_labware_list(
     deck,
@@ -157,7 +137,7 @@ source_bact_plates = dk.get_labware_list(
     Plate384,
     [6, 6, 6, 6, 6, 6],
     True,
-)[0:plates_in_stack]
+)[0 : len(plates)]
 
 dest_bact_plates = dk.get_labware_list(
     deck,
@@ -165,20 +145,25 @@ dest_bact_plates = dk.get_labware_list(
     Plate384,
     [6, 6, 6, 6, 6, 6, 6],
     False,
-)[0:plates_in_stack]
+)[0 : len(plates)]
 
 active_bact_plate = dk.get_labware_list(deck, ["E5"], Plate384)[0]
 active_bact_lid = dk.get_labware_list(deck, ["E5"], Lid)[0]
 temp_bact_lid = dk.get_labware_list(deck, ["E4"], Lid)[0]
 
 ethanol_reservoir = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
-waste = dk.get_labware_list(deck, ["D1"], Reservoir300)[0]
+waste_reservoir = dk.get_labware_list(deck, ["D1"], Reservoir300)[0]
 
-tips_300 = dk.get_labware_list(deck, ["F5"], Tip96)[0]
+active_pipet_tips = dk.get_labware_list(deck, ["F5"], Tip96)[0]
+tip_indexes = dk.sort_96_indexes_2channel([dk.index_to_string_96(i) for i in range(96)])
+tips = [
+    (active_pipet_tips, dk.string_to_index_96(tip_index)) for tip_index in tip_indexes
+]
 
-tips = [(tips_300, position) for position in range(0, 96)]
-bact_waste = [(waste, position) for position in range(182, 187, channels * 2)]
+waste = [(waste_reservoir, position) for position in range(182, 187, channels * 2)]
 ethanol = [(ethanol_reservoir, position) for position in range(368, 373, channels * 2)]
+
+# Get wells to empty from csv file
 
 discard = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "plate_merging_emptying.csv"
@@ -188,271 +173,307 @@ with open(discard) as f:
     reader = csv.reader(f)
     wells_to_empty = [tuple(row) for row in reader]
 
+# Define state variables to keep track of current plate, well, and step in the protocol
+# TODO: Make this more general, useful for other protocols
+
 state = {
-    "current_plate": "",
-    "current_well": "",
-    "current_step": "",
+    "current_plate": 0,
+    "current_well": 0,
+    "current_step": 0,
+    "current_rack": 0,
+    "current_tip": 0,
+    "channel_steps": 0,
 }
+
+## We need to define separate liquid classes for ethanol dispense and aspirate steps
 
 ETHANOL_ASPIRATE = "StandardVolume_EtOH_DispenseJet_Empty"
 ETHANOL_DISPENSE = "StandardVolume_EtOH_DispenseJet_Part"
 
-# -------------------------
-#         ACTIONS
-# -------------------------
+# Main script starts here
+# TODO: reduce loops to functions to make it more readable
+# TODO: add error recovery
+# TODO: add tip rack handling if necessary (large number of plates)
+
+## simulate = True opens VENUS run control in a separate window where you can enable simulation mode to test protocol
 
 with HamiltonInterface(simulate=True) as hammy:
+    cmd.initialize(hammy)
 
-    hammy.wait_on_response(hammy.send_command(INITIALIZE))
+    # Iterate through plates
+    ## TODO: switch to explicit variables for current plate and well for better state tracking
 
-    for i, plate in enumerate(plates):
+    while state["current_plate"] < len(plates):
+        # Build well list for current plate and sort for efficient pipetting
 
-        raw_wells = [well[1] for well in wells_to_empty if well[0] == plate]
-
+        raw_wells = [
+            well[1]
+            for well in wells_to_empty
+            if well[0] == plates[state["current_plate"]]
+        ]
         indexes = dk.sort_384_indexes_2channel(raw_wells)
-
         wells = [
             (active_bact_plate, dk.string_to_index_384(index)) for index in indexes
         ]
 
-        print(indexes)
+        # Get next plate and move to active position, remove lid
 
-        cmdw.grip_get(
-            hammy, source_bact_plates[i], mode=0, gripWidth=82.0, gripHeight=9.0
+        cmd.grip_get(
+            hammy,
+            source_bact_plates[state["current_plate"]],
+            mode=0,
+            gripWidth=82.0,
+            gripHeight=9.0,
         )
-        cmdw.grip_place(hammy, active_bact_plate, mode=0)
+        cmd.grip_place(hammy, active_bact_plate, mode=0)
+        cmd.grip_get(hammy, active_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0)
+        cmd.grip_place(hammy, temp_bact_lid, mode=1, eject=True)
 
-        state.update({"current_plate": plate, "current_step": "move_to_active"})
-        print(json.dumps(state))
+        # Get next 2 tips from active tip stack
 
-        cmdw.grip_get(hammy, active_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0)
-        cmdw.grip_place(hammy, temp_bact_lid, mode=1, eject=True)
+        cmd.tip_pick_up(
+            hammy, tips[state["current_tip"] : state["current_tip"] + channels]
+        )
+        st.update_state(state, "current_tip", channels)
 
-        state.update({"current_step": "remove_lid"})
-        print(json.dumps(state))
+        # Aspirate media from active plate and dispense to waste reservoir
+        ## We loop through the wells in groups of 4 (2 * 2 channels) and aspirate 140 uL from each well
 
-        cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
-        current_tip += channels
+        while state["current_well"] < len(wells) and state["current_step"] == 0:
+            ## In the case where there are less than 4 wells left, we only aspirate from the remaining wells
 
-        ### Aspirate media
+            stop = min(4, len(wells[state["current_well"] :]))
 
-        for j in range(0, len(wells), 4):
+            for i in range(0, stop, 2):
+                ## Currently there seems to be a bug in VENUS when aspirating > 60 times from one channel consecutively
+                ## This is a workaround to reset the channel after 58 steps
 
-            stop = min(4, len(wells[j:]))
-
-            for k in range(0, stop, 2):
-
-                channel_steps += 1
-
-                if channel_steps % 58 == 0:
-                    cmdw.tip_eject(
-                        hammy, tips[current_tip : current_tip + 2], waste=True
+                if state["channel_steps"] % 58 == 0:
+                    cmd.tip_eject(
+                        hammy,
+                        tips[state["current_tip"] : state["current_tip"] + channels],
+                        waste=True,
                     )
-                    cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
-                    current_tip += channels
+                    cmd.tip_pick_up(
+                        hammy,
+                        tips[state["current_tip"] : state["current_tip"] + channels],
+                    )
+                    st.update_state(state, "current_tip", channels)
 
-                if k >= 2:
+                ## The first aspirate command must be set to aspirateMode = 0, otherwise the pipette will not aspirate blowout volume
+                ## This doesn't seem to work (VENUS still outputs warning about aspiration mode)
+
+                if i >= 2:
                     aspirateMode = 1
                 else:
                     aspirateMode = 0
 
-                if stop - k == 1:
-                    cmdw.aspirate(
+                # Aspirate from wells (with mixing) and dispense to waste
+                ## If there are an odd number of wells left, aspirate and dispense with one channel
+
+                if stop - i == 1:
+                    cmd.aspirate(
                         hammy,
-                        [wells[j + k]],
+                        [wells[state["current_well"] + i]],
                         [140],
                         channelVariable=channel_1,
                         aspirateMode=aspirateMode,
                         mixCycles=3,
                         mixVolume=50.0,
-                        liquidHeight=0.05,
                     )
-
-                    dispense_volume = [140 * int((k + channels) / 2), 100 * (k / 2)]
-
-                    state.update(
-                        {
-                            "current_well": dk.index_to_string_384(wells[j + k][1]),
-                            "current_step": "aspirate_media",
-                        }
-                    )
-                    print(json.dumps(state))
+                    dispense_volume = [
+                        140 * int((i + channels) / channels),
+                        100 * (i / channels),
+                    ]
+                    st.update_state(state, "current_well", 1)
 
                 else:
-                    cmdw.aspirate(
+                    cmd.aspirate(
                         hammy,
-                        wells[j + k : j + k + 2],
+                        wells[
+                            state["current_well"]
+                            + i : state["current_well"]
+                            + i
+                            + channels
+                        ],
                         [140],
                         aspirateMode=aspirateMode,
                         mixCycles=3,
                         mixVolume=50.0,
-                        liquidHeight=0.05,
                     )
+                    dispense_volume = [140 * int((i + channels) / channels)]
+                    st.update_state(state, "current_well", 2)
 
-                    dispense_volume = [140 * int((k + channels) / 2)]
+                st.update_state(state, "channel_steps", 1)
 
-                    state.update(
-                        {
-                            "current_well": dk.index_to_string_384(wells[j + k + 1][1]),
-                            "current_step": "aspirate_media",
-                        }
-                    )
-                    print(json.dumps(state))
+            cmd.dispense(hammy, waste, dispense_volume, dispenseMode=9)
 
-            cmdw.dispense(hammy, bact_waste, dispense_volume, dispenseMode=9)
+        # Dispense ethanol into emptied wells of active plate
+        ## This loop advances in steps of 6 (3 * 2 channels) and dispenses 100 uL into each well
 
-            state.update({"current_step": "dispense_media"})
-            print(json.dumps(state))
+        while state["current_well"] < len(wells) and state["current_step"] == 1:
+            ## In the case where there are less than 6 wells left, we only dispense into the remaining wells
 
-        ### Dispense ethanol
+            stop = min(6, len(wells[state["current_well"] :]))
 
-        for j in range(0, len(wells), 6):
+            ## Currently there seems to be a bug in VENUS when aspirating > 60 times from one channel consecutively
+            ## This is a workaround to reset the channel after 58 steps
 
-            stop = min(6, len(wells[j:]))
+            if state["channel_steps"] % 58 == 0:
+                cmd.tip_eject(
+                    hammy,
+                    tips[state["current_tip"] : state["current_tip"] + channels],
+                    waste=True,
+                )
+                cmd.tip_pick_up(
+                    hammy,
+                    tips[state["current_tip"] : state["current_tip"] + channels],
+                )
+                st.update_state(state, "current_tip", channels)
+
+            # Set aspirate volume depending on number of channels used and aspirate
 
             if stop % 2 == 0:
-                aspirate_volume = [100 * stop / 2]
-
+                aspirate_volume = [100 * stop / channels]
             else:
-                aspirate_volume = [100 * (stop + 1) / 2, 100 * (stop - 1) / 2]
+                aspirate_volume = [
+                    100 * (stop + 1) / channels,
+                    100 * (stop - 1) / channels,
+                ]
 
-            cmdw.aspirate(hammy, ethanol, aspirate_volume, liquidClass=ETHANOL_DISPENSE)
+            cmd.aspirate(hammy, ethanol, aspirate_volume, liquidClass=ETHANOL_DISPENSE)
 
-            state.update({"current_step": "aspirate_ethanol"})
-            print(json.dumps(state))
+            st.update_state(state, "channel_steps", 1)
 
-            for k in range(0, stop, 2):
+            for i in range(0, stop, 2):
+                state["channel_steps"] += 1
 
-                channel_steps += 1
+                # Dispense into wells
+                ## If there are an odd number of wells left, dispense with one channel
 
-                if channel_steps % 58 == 0:
-                    cmdw.tip_eject(
-                        hammy, tips[current_tip : current_tip + 2], waste=True
-                    )
-                    cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
-                    current_tip += channels
-
-                if stop - k == 1:
-                    cmdw.dispense(
+                if stop - i == 1:
+                    cmd.dispense(
                         hammy,
-                        [wells[j + k]],
+                        [wells[state["current_well"] + i]],
                         [100],
                         channelVariable=channel_1,
                         liquidClass=ETHANOL_DISPENSE,
                     )
-
-                    state.update(
-                        {
-                            "current_well": dk.index_to_string_384(wells[j + k][1]),
-                            "current_step": "dispense_ethanol",
-                        }
-                    )
-                    print(json.dumps(state))
+                    st.update_state(state, "current_well", 1)
 
                 else:
-                    cmdw.dispense(
+                    cmd.dispense(
                         hammy,
-                        wells[j + k : j + k + 2],
+                        wells[
+                            state["current_well"]
+                            + i : state["current_well"]
+                            + i
+                            + channels
+                        ],
                         [100],
                         liquidClass=ETHANOL_DISPENSE,
                     )
+                    st.update_state(state, "current_well", 2)
 
-                    state.update(
-                        {
-                            "current_well": dk.index_to_string_384(wells[j + k + 1][1]),
-                            "current_step": "dispense_ethanol",
-                        }
+        # Update state variables for next step
+
+        st.update_state(state, "current_step", 1)
+        st.reset_state(state, "current_well", 0)
+
+        # Aspirate ethanol from active plate and dispense to waste reservoir
+        ## Loop advances in steps of 4 (2 * 2 channels) and aspirates 140 uL from each well
+
+        while state["current_well"] < len(wells) and state["current_step"] == 2:
+            ## In the case where there are less than 4 wells left, we only aspirate from the remaining wells
+
+            stop = min(4, len(wells[state["current_well"] :]))
+
+            for i in range(0, stop, 2):
+                ## Currently there seems to be a bug in VENUS when aspirating > 60 times from one channel consecutively
+                ## This is a workaround to reset the channel after 58 steps
+
+                if state["channel_steps"] % 58 == 0:
+                    cmd.tip_eject(
+                        hammy,
+                        tips[state["current_tip"] : state["current_tip"] + channels],
+                        waste=True,
                     )
-                    print(json.dumps(state))
-
-        ### Aspirate ethanol
-
-        for j in range(0, len(wells), 4):
-
-            stop = min(4, len(wells[j:]))
-
-            for k in range(0, stop, 2):
-
-                channel_steps += 1
-
-                if channel_steps % 58 == 0:
-                    cmdw.tip_eject(
-                        hammy, tips[current_tip : current_tip + 2], waste=True
+                    cmd.tip_pick_up(
+                        hammy,
+                        tips[state["current_tip"] : state["current_tip"] + channels],
                     )
-                    cmdw.tip_pick_up(hammy, tips[current_tip : current_tip + 2])
-                    current_tip += channels
+                    st.update_state(state, "current_tip", channels)
 
-                if k >= 2:
+                ## The first aspirate command must be set to aspirateMode = 0, otherwise the pipette will not aspirate blowout volume
+                ## This doesn't seem to work (VENUS still outputs warning about aspiration mode)
+
+                if i >= 2:
                     aspirateMode = 1
                 else:
                     aspirateMode = 0
 
-                if stop - k == 1:
-                    cmdw.aspirate(
+                # Aspirate from wells (with mixing) and dispense to waste
+                ## If there are an odd number of wells left, aspirate and dispense with one channel
+
+                if stop - i == 1:
+                    cmd.aspirate(
                         hammy,
-                        [wells[j + k]],
+                        [wells[state["current_well"] + i]],
                         [140],
                         channelVariable=channel_1,
                         aspirateMode=aspirateMode,
                         liquidClass=ETHANOL_ASPIRATE,
                         mixCycles=3,
                         mixVolume=50.0,
-                        liquidHeight=0.2,
                     )
-
-                    dispense_volume = [140 * int((k + channels) / 2), 100 * (k / 2)]
-
-                    state.update(
-                        {
-                            "current_well": dk.index_to_string_384(wells[j + k][1]),
-                            "current_step": "aspirate_ethanol",
-                        }
-                    )
-                    print(json.dumps(state))
+                    dispense_volume = [
+                        140 * int((i + channels) / channels),
+                        100 * (i / channels),
+                    ]
+                    st.update_state(state, "current_well", 1)
 
                 else:
-                    cmdw.aspirate(
+                    cmd.aspirate(
                         hammy,
-                        wells[j + k : j + k + 2],
+                        wells[
+                            state["current_well"]
+                            + i : state["current_well"]
+                            + i
+                            + channels
+                        ],
                         [140],
                         aspirateMode=aspirateMode,
                         liquidClass=ETHANOL_ASPIRATE,
                         mixCycles=3,
                         mixVolume=50.0,
-                        liquidHeight=0.2,
                     )
+                    dispense_volume = [140 * int((i + channels) / channels)]
+                    st.update_state(state, "current_well", 2)
 
-                    dispense_volume = [140 * int((k + channels) / 2)]
+                st.update_state(state, "channel_steps", 1)
 
-                    state.update(
-                        {
-                            "current_well": dk.index_to_string_384(wells[j + k + 1][1]),
-                            "current_step": "aspirate_ethanol",
-                        }
-                    )
-                    print(json.dumps(state))
-
-            cmdw.dispense(
+            cmd.dispense(
                 hammy,
-                bact_waste,
+                waste,
                 dispense_volume,
                 liquidClass=ETHANOL_ASPIRATE,
                 dispenseMode=9,
             )
 
-            state.update({"current_step": "dispense_ethanol"})
-            print(json.dumps(state))
+        # Update state variables for next step
 
-        cmdw.tip_eject(hammy, tips[current_tip : current_tip + 2], waste=True)
+        st.update_state(state, "current_step", 1)
+        st.reset_state(state, "current_well", 0)
 
-        cmdw.grip_get(hammy, temp_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0)
-        cmdw.grip_place(hammy, active_bact_lid, mode=1)
+        # Eject tips on pickup position
 
-        state.update({"current_step": "place_lid"})
-        print(json.dumps(state))
+        cmd.tip_eject(
+            hammy, tips[state["current_tip"] : state["current_tip"] + channels]
+        )
 
-        cmdw.grip_get(hammy, active_bact_plate, mode=0, gripWidth=82.0, gripHeight=9.0)
-        cmdw.grip_place(hammy, dest_bact_plates[i], mode=0, eject=True)
+        # Place lid on active plate and move to done stack
 
-        state.update({"current_step": "move_to_done"})
-        print(json.dumps(state))
+        cmd.grip_get(hammy, temp_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0)
+        cmd.grip_place(hammy, active_bact_lid, mode=1)
+        cmd.grip_get(hammy, active_bact_plate, mode=0, gripWidth=82.0, gripHeight=9.0)
+        cmd.grip_place(hammy, dest_bact_plates[state["current_plate"]], mode=0)

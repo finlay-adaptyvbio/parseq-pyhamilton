@@ -1,7 +1,6 @@
 from pyhamilton import (
     LayoutManager,
     ResourceType,
-    DeckResource,
     Lid,
     Plate96,
     Plate384,
@@ -89,7 +88,6 @@ def index_to_string_96(position: int) -> str:
 
 
 def sort_384_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
-
     sorted_cols = []
     unsorted_cols = []
 
@@ -128,7 +126,6 @@ def sort_384_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
 
 
 def sort_96_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
-
     sorted_cols = []
     unsorted_cols = []
 

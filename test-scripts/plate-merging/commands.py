@@ -1,12 +1,11 @@
 from pyhamilton import (
     HamiltonInterface,
-    LayoutManager,
-    ResourceType,
     Plate384,
     Plate96,
     Tip96,
     Tip384,
     Lid,
+    INITIALIZE,
     GRIP_GET,
     GRIP_PLACE,
     PICKUP,
@@ -16,11 +15,19 @@ from pyhamilton import (
 )
 
 from pyhamilton.oemerr import PositionError
-
 from typing import Union
 
 DEFAULT_GRIP_TOOL_SEQUENCE = "CORE_Grip"
 DEFAULT_LIQUID_CLASS = "StandardVolume_Water_DispenseJet_Empty"
+
+
+def initialize(ham: HamiltonInterface):
+    cid = ham.send_command(INITIALIZE)
+
+    try:
+        ham.wait_on_response(cid, raise_first_exception=True)
+    except:
+        raise IOError
 
 
 def labware_pos_str(labware, idx):
@@ -40,7 +47,6 @@ def grip_get(
     mode: int,
     **kw_args,
 ):
-
     labwarePositions = labware_pos_str(labware, 0)
     transportMode = mode
 
@@ -64,7 +70,7 @@ def grip_get(
         raise ValueError
 
     try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        ham.wait_on_response(cid, raise_first_exception=True)
     except PositionError:
         raise IOError
 
@@ -76,7 +82,6 @@ def grip_place(
     eject: bool = False,
     **kw_args,
 ):
-
     labwarePositions = labware_pos_str(labware, 0)
     transportMode = mode
     ejectToolWhenFinish = eject
@@ -103,7 +108,7 @@ def grip_place(
         raise ValueError
 
     try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        ham.wait_on_response(cid, raise_first_exception=True)
     except PositionError:
         raise IOError
 
@@ -113,7 +118,6 @@ def tip_pick_up(
     positions: list[tuple[Tip96, int]],
     **kw_args,
 ):
-
     labwarePositions = compound_pos_str(positions)
 
     cid = ham.send_command(
@@ -123,7 +127,7 @@ def tip_pick_up(
     )
 
     try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        ham.wait_on_response(cid, raise_first_exception=True)
     except PositionError:
         raise IOError
 
@@ -134,7 +138,6 @@ def tip_eject(
     waste: bool = False,
     **kw_args,
 ):
-
     if waste:
         useDefaultWaste = int(waste)
         labwarePositions = ""
@@ -151,7 +154,7 @@ def tip_eject(
     )
 
     try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        ham.wait_on_response(cid, raise_first_exception=True)
     except PositionError:
         raise IOError
 
@@ -162,7 +165,6 @@ def aspirate(
     volumes: list,
     **kw_args,
 ):
-
     if len(volumes) < len(positions):
         volumes.extend([volumes[0] for _ in range(len(volumes), len(positions))])
     elif len(volumes) > len(positions):
@@ -181,7 +183,7 @@ def aspirate(
     )
 
     try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        ham.wait_on_response(cid, raise_first_exception=True)
     except PositionError:
         raise IOError
 
@@ -192,7 +194,6 @@ def dispense(
     volumes: list,
     **kw_args,
 ):
-
     if len(volumes) < len(positions):
         volumes.extend([volumes[0] for _ in range(len(volumes), len(positions))])
     elif len(volumes) > len(positions):
@@ -211,7 +212,7 @@ def dispense(
     )
 
     try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        ham.wait_on_response(cid, raise_first_exception=True)
     except PositionError:
         raise IOError
 
@@ -221,7 +222,6 @@ def grip_get_tip_rack(
     labware: Union[Tip96, Tip384],
     **kw_args,
 ):
-
     labwarePositions = labware_pos_str(labware, 0)
 
     if isinstance(labware, Tip96):
@@ -243,7 +243,7 @@ def grip_get_tip_rack(
     )
 
     try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        ham.wait_on_response(cid, raise_first_exception=True)
     except PositionError:
         raise IOError
 
@@ -255,7 +255,6 @@ def grip_place_tip_rack(
     eject: bool = False,
     **kw_args,
 ):
-
     ejectToolWhenFinish = eject
 
     if isinstance(labware, Tip96):
@@ -282,6 +281,6 @@ def grip_place_tip_rack(
     )
 
     try:
-        ham.wait_on_response(cid, raise_first_exception=True, timeout=120)
+        ham.wait_on_response(cid, raise_first_exception=True)
     except PositionError:
         raise IOError
