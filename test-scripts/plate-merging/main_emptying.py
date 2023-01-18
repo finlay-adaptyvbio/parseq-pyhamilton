@@ -217,7 +217,9 @@ with HamiltonInterface(simulate=True) as hammy:
 
         print(indexes)
 
-        cmdw.grip_get(hammy, source_bact_plates[i], mode=0, gripWidth=82.0)
+        cmdw.grip_get(
+            hammy, source_bact_plates[i], mode=0, gripWidth=82.0, gripHeight=9.0
+        )
         cmdw.grip_place(hammy, active_bact_plate, mode=0)
 
         state.update({"current_plate": plate, "current_step": "move_to_active"})
