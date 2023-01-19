@@ -1,8 +1,6 @@
 import string
 import pandas as pd
 
-from pyhamilton import ResourceType, LayoutManager
-
 
 def convertPlatePositionToIndex(
     plate_position: str, plate_type: str = "Plate384"
@@ -211,41 +209,3 @@ def get_next_stacked_tip_rack(state: dict, stack_limit: int):
         plate_index -= 1
     # print("plate index: ", plate_index)
     return stack_to_take_from, plate_index
-
-
-def resource_list_with_filter(
-    layout_manager,
-    prefix,
-    res_class,
-    num_ress,
-    suffix=None,
-    order_key=None,
-    reverse=False,
-):
-    def name_from_line(line):
-        field = LayoutManager.layline_objid(line)
-        if field:
-            return field
-        return LayoutManager.layline_first_field(line)
-
-    def filter(field, prefix, suffix):
-        try:
-            if suffix:
-                if field.index(prefix) == 0 and field.index(suffix) + len(
-                    suffix
-                ) == len(field):
-                    return True
-            else:
-                return field.index(prefix) == 0
-        except ValueError:
-            return False
-
-    layline_test = lambda line: filter(name_from_line(line), prefix, suffix)
-    res_type = ResourceType(res_class, layline_test, name_from_line)
-    res_list = [
-        layout_manager.assign_unused_resource(
-            res_type, order_key=order_key, reverse=reverse
-        )
-        for _ in range(num_ress)
-    ]
-    return res_list
