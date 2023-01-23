@@ -152,8 +152,8 @@ tips = [(tip_rack_pipet, i) for i in range(384)]
 # TODO: Make this more general, useful for other protocols
 
 state = {
-    "current_pcr_plate": 0,
-    "current_rack": 0,
+    "current_pcr_plate": 1,
+    "current_rack": 1,
 }
 
 # Main script starts here
@@ -185,7 +185,7 @@ with HamiltonInterface(simulate=True) as hammy:
             active_pcr_lid,
             mode=1,
             gripWidth=85.0,
-            gripHeight=1.0,
+            gripHeight=0.5,
         )
         cmd.grip_place(hammy, temp_pcr_lid, mode=1)
 

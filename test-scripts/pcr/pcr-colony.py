@@ -120,17 +120,17 @@ bact_plates = [f"P{i}" for i in range(4)]
 
 source_bact_plates = dk.get_labware_list(
     deck,
-    ["F1", "F2"],
+    ["F1"],
     Plate384,
-    [5, 5],
+    [4],
     True,
 )[0 : len(bact_plates)]
 
 dest_bact_plates = dk.get_labware_list(
     deck,
-    ["F3", "F4"],
+    ["F2"],
     Plate384,
-    [5, 5],
+    [4],
     False,
 )[0 : len(bact_plates)]
 
@@ -138,7 +138,7 @@ source_pcr_plates = dk.get_labware_list(
     deck,
     ["E3"],
     Plate384,
-    [10],
+    [4],
     True,
 )[0 : len(bact_plates)]
 
@@ -146,7 +146,7 @@ source_pcr_lids = dk.get_labware_list(
     deck,
     ["E2"],
     Lid,
-    [10],
+    [4],
     True,
 )[0 : len(bact_plates)]
 
@@ -154,7 +154,7 @@ dest_pcr_plates = dk.get_labware_list(
     deck,
     ["E1"],
     Plate384,
-    [10],
+    [4],
     False,
 )[0 : len(bact_plates)]
 
@@ -169,17 +169,15 @@ active_pcr_plates = dk.get_labware_list(
 )
 active_pcr_lids = dk.get_labware_list(deck, ["C1", "C2", "C3", "C4"], Lid, [1, 1, 1, 1])
 
-master_mix_reservoir = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
-master_mix = [(master_mix_reservoir, i) for i in range(384)]
+master_mix_plate = dk.get_labware_list(deck, ["C5"], Plate96)[0]
+master_mix = [(master_mix_plate, i) for i in range(96)]
 
-tip_racks_transport = dk.get_labware_list(
-    deck, ["B1", "B2", "B3"], Tip384, [3, 3, 3], True
-)
-tip_rack_pipet, tip_rack_transport = dk.get_labware_list(deck, ["D2"], Tip384, [2])
-tips = [(tip_rack_pipet, i) for i in range(384)]
+tip_racks = dk.get_labware_list(deck, ["B1", "B2"], Tip384, [2, 2], True)
+active_tip_rack, virtual_tip_rack = dk.get_labware_list(deck, ["D2"], Tip384, [2])
+tips = [(active_tip_rack, i) for i in range(384)]
 
-master_mix_tip_rack = dk.get_labware_list(deck, ["B5"], Tip384)[0]
-master_mix_tips = [(master_mix_tip_rack, i) for i in range(384)]
+master_mix_rack = dk.get_labware_list(deck, ["B5"], Tip96)[0]
+master_mix_tips = [(master_mix_rack, i) for i in range(96)]
 
 
 # Define state variables to keep track of current plate, well, and step in the protocol
@@ -234,17 +232,20 @@ with HamiltonInterface(simulate=True) as hammy:
 
                 st.update_state(state, "current_active_pcr_plates", 1)
 
-            cmd.tip_pick_up_384(hammy, master_mix_tips)
+            cmd.tip_pick_up_384(hammy, master_mix_tips, tipMode=1)
 
             for i in range(pcr_plates_to_process):
-                pcr_wells = [(active_pcr_plates[i], j) for j in range(384)]
+                for quadrant in range(4):
+                    pcr_wells = [
+                        (active_pcr_plates[i], j) for j in dk.pos_96_in_384(quadrant)
+                    ]
 
-                cmd.aspirate_384(hammy, master_mix, 18.5, liquidHeight=1.5)
-                cmd.dispense_384(
-                    hammy, pcr_wells, 18.5, liquidHeight=8.0, dispenseMode=9
-                )
+                    cmd.aspirate_384(hammy, master_mix, 18.5, liquidHeight=0.1)
+                    cmd.dispense_384(
+                        hammy, pcr_wells, 18.5, liquidHeight=8.0, dispenseMode=9
+                    )
 
-            cmd.tip_eject_384(hammy, master_mix_tips)
+            cmd.tip_eject_384(hammy, master_mix_tips, 1)
 
         # aspirate from active bact plate to current active pcr plate
 
@@ -255,8 +256,8 @@ with HamiltonInterface(simulate=True) as hammy:
 
         # get next tip rack
 
-        cmd.grip_get_tip_rack(hammy, tip_racks_transport[state["current_rack"]])
-        cmd.grip_place_tip_rack(hammy, tip_rack_transport)
+        cmd.grip_get_tip_rack(hammy, tip_racks[state["current_rack"]])
+        cmd.grip_place_tip_rack(hammy, virtual_tip_rack)
 
         cmd.tip_pick_up_384(hammy, tips)
         cmd.aspirate_384(
@@ -282,8 +283,8 @@ with HamiltonInterface(simulate=True) as hammy:
 
         # discard current active rack to waste
 
-        cmd.grip_get_tip_rack(hammy, tip_rack_pipet)
-        cmd.grip_place_tip_rack(hammy, tip_rack_pipet, waste=True)
+        cmd.grip_get_tip_rack(hammy, active_tip_rack)
+        cmd.grip_place_tip_rack(hammy, active_tip_rack, waste=True)
 
         # update state variables for loop
 

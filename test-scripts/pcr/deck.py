@@ -93,10 +93,40 @@ def index_to_string_96(position: int) -> str:
 
 
 def pos_96_in_384(quadrant: int):
-    l = []
-    for i in range(0, 24, 2):
-        for j in range(1, 17, 2):
-            l.append(j + i * 16 - 1)
+    pos = []
+    if quadrant == 1:
+        q1, q2 = 1, 0
+    elif quadrant == 2:
+        q1, q2 = 0, 1
+    elif quadrant == 3:
+        q1, q2 = 1, 1
+    else:
+        q1, q2 = 0, 0
+
+    for i in range(0 + q1, 24 + q1, 2):
+        for j in range(1 + q2, 17 + q2, 2):
+            pos.append(j + i * 16 - 1)
+    return pos
+
+
+def pos_2ch(stop: int, start: int = 0):
+    pos = []
+    for i in range(start, stop - 1, 2):
+        pos.append(i)
+    for j in range(start + 1, stop, 2):
+        pos.append(j)
+    return pos
+
+
+def pos_96_rev():
+    pos = []
+    for i in range(12):
+        col = []
+        for j in range(8):
+            col.append((12 - i) * 8 - j - 1)
+        col.reverse()
+        pos.extend(col)
+    return pos
 
 
 def sort_384_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
