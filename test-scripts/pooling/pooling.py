@@ -1,4 +1,6 @@
-import os, csv, requests, atexit
+import os, sys, csv, requests, atexit
+
+sys.path.append("test-scripts")
 
 import commands as cmd
 import deck as dk
@@ -104,6 +106,7 @@ types = {
 }
 
 dk.parse_layout_file(deck, lmgr, types)
+dk.clean_deck(deck)
 dk.print_deck(deck)
 
 # Plate information and variables
@@ -118,30 +121,38 @@ CHANNELS_384_96_8 = "1" + ("0" * 11)
 WASTE96 = "Waste_plate96"
 MIXING = "50ulTip_conductive_384COREHead_Water_DispenseSurface_Empty"
 
-pcr_plates = [f"P{i}" for i in range(6)]
+pcr_plates = [f"P{i}" for i in range(8)]
 
 source_pcr_plates = dk.get_labware_list(
     deck,
     ["E1"],
     Plate384,
-    [6],
+    [8],
     True,
 )[0 : len(pcr_plates)]
 
 dest_pcr_plates = dk.get_labware_list(
     deck,
-    ["E3"],
+    ["E2"],
     Plate384,
-    [6],
+    [8],
     False,
 )[0 : len(pcr_plates)]
 
 source_pooling_plates = dk.get_labware_list(
     deck,
-    ["E2"],
+    ["F1"],
     Plate96,
-    [7],
+    [8],
     True,
+)[0 : len(pcr_plates)]
+
+dest_pooling_plates = dk.get_labware_list(
+    deck,
+    ["F2"],
+    Plate96,
+    [8],
+    False,
 )[0 : len(pcr_plates)]
 
 edta_reservoir = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
@@ -179,10 +190,10 @@ tips_96 = [(tip_rack_96_pipet, i) for i in range(96)]
 # TODO: Make this more general, useful for other protocols
 
 state = {
-    "current_pcr_plate": 0,
-    "current_pooling_plate": 0,
-    "current_rack": 0,
-    "current_tip_column": 0,
+    "current_pcr_plate": 5,
+    "current_pooling_plate": 5,
+    "current_rack": 5,
+    "current_tip_column": 5,
     "current_tip": 0,
 }
 
@@ -191,7 +202,7 @@ state = {
 # TODO: Add error recovery
 # TODO: Check if total number of tips available is enough for the protocol, add prompt when new tip racks are needed
 
-# simulate = True opens VENUS run control in a separate window where you can enable simulation mode to test protocol
+## simulate = True opens VENUS run control in a separate window where you can enable simulation mode to test protocol
 
 with HamiltonInterface(simulate=True) as hammy:
     cmd.initialize(hammy)
@@ -258,19 +269,19 @@ with HamiltonInterface(simulate=True) as hammy:
             cmd.aspirate_384(
                 hammy,
                 pcr_wells,
-                4.0,
+                5.0,
                 liquidHeight=3.0,
                 mixCycles=3,
                 mixVolume=20.0,
-                liquidClass=MIXING,
+                # liquidClass=MIXING,
             )
             cmd.dispense_384(
                 hammy,
                 active_pooling_wells,
-                4.0,
+                5.0,
                 liquidHeight=10.0,
                 dispenseMode=9,
-                liquidClass=MIXING,
+                # liquidClass=MIXING,
             )
 
         cmd.tip_eject_384(hammy, tips_96, 2)
@@ -297,7 +308,7 @@ with HamiltonInterface(simulate=True) as hammy:
 
         for i in range(1, 12):
             cmd.aspirate_384(
-                hammy, active_pooling_wells[8 * i : 8 * (i + 1)], 16.0, liquidHeight=0.1
+                hammy, active_pooling_wells[8 * i : 8 * (i + 1)], 16.0, liquidHeight=0.5
             )
             cmd.dispense_384(
                 hammy,
@@ -320,7 +331,7 @@ with HamiltonInterface(simulate=True) as hammy:
         for i in range(0, 8, 2):
 
             cmd.aspirate(
-                hammy, active_pooling_wells_column_2[i : i + 2], [192], liquidHeight=0.1
+                hammy, active_pooling_wells_column_2[i : i + 2], [192], liquidHeight=0.5
             )
             cmd.dispense(
                 hammy,
@@ -334,7 +345,9 @@ with HamiltonInterface(simulate=True) as hammy:
             )
 
         cmd.tip_eject(
-            hammy, tips_300[state["current_tip"] : state["current_tip"] + 2], waste=True
+            hammy,
+            tips_300[state["current_tip"] : state["current_tip"] + 2],
+            waste=True,
         )
 
         st.update_state(state, "current_tip", 2)
@@ -346,7 +359,7 @@ with HamiltonInterface(simulate=True) as hammy:
             temp_pcr_lid,
             mode=1,
             gripWidth=85.0,
-            gripHeight=1.0,
+            gripHeight=0.5,
         )
         cmd.grip_place(hammy, active_pcr_lid, mode=1)
 
@@ -370,9 +383,11 @@ with HamiltonInterface(simulate=True) as hammy:
             active_pooling_plate,
             mode=0,
             gripWidth=81.0,
-            gripHeight=5.0,
+            gripHeight=9.0,
         )
-        cmd.grip_place(hammy, active_pooling_plate, mode=0, eject=True)
+        cmd.grip_place(
+            hammy, dest_pooling_plates[state["current_pooling_plate"]], mode=0
+        )
 
         st.update_state(state, "current_pcr_plate", 1)
         st.update_state(state, "current_pooling_plate", 1)
