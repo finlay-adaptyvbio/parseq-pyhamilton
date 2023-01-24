@@ -7,6 +7,7 @@ from pyhamilton import (
     Tip384,
     Tip96,
     Reservoir300,
+    EppiCarrier24,
 )
 
 from pyhamilton.oemerr import ResourceUnavailableError
@@ -43,6 +44,23 @@ def parse_layout_file(deck: dict, lmgr: LayoutManager, types: dict):
             ]
 
 
+def clean_deck(deck: dict):
+
+    for col in deck.keys():
+        for row in range(len(deck[col])):
+            ghost_labware = []
+            stack = False
+            for idx, labware in enumerate(deck[col][row]["labware"]):
+                if labware.layout_name().count("0") > 2:
+                    stack = True
+                else:
+                    ghost_labware.append(idx)
+            if stack:
+                print(ghost_labware)
+                for shift, idx in enumerate(ghost_labware):
+                    del deck[col][row]["labware"][idx - shift]
+
+
 def print_deck(deck: dict):
     for col in deck.keys():
         for row in range(0, len(deck[col])):
@@ -52,6 +70,11 @@ def print_deck(deck: dict):
             for idx, labware in enumerate(deck[col][row]["labware"]):
                 state = deck[col][row]["state"][idx]
                 print(labware.layout_name(), type(labware), state)
+
+
+def print_list(labwares: list):
+    for labware in labwares:
+        print(labware.layout_name())
 
 
 def assign_to_stack(deck: dict, position: str, stack: list):
@@ -85,6 +108,43 @@ def index_to_string_96(position: int) -> str:
     alphabet = "ABCDEFGH"
     x, y = int(position) // 8, int(position) % 8
     return alphabet[y] + str(x + 1)
+
+
+def pos_96_in_384(quadrant: int):
+    pos = []
+    if quadrant == 1:
+        q1, q2 = 1, 0
+    elif quadrant == 2:
+        q1, q2 = 0, 1
+    elif quadrant == 3:
+        q1, q2 = 1, 1
+    else:
+        q1, q2 = 0, 0
+
+    for i in range(0 + q1, 24 + q1, 2):
+        for j in range(1 + q2, 17 + q2, 2):
+            pos.append(j + i * 16 - 1)
+    return pos
+
+
+def pos_2ch(stop: int, start: int = 0):
+    pos = []
+    for i in range(start, stop - 1, 2):
+        pos.append(i)
+    for j in range(start + 1, stop, 2):
+        pos.append(j)
+    return pos
+
+
+def pos_96_rev():
+    pos = []
+    for i in range(12):
+        col = []
+        for j in range(8):
+            col.append((12 - i) * 8 - j - 1)
+        col.reverse()
+        pos.extend(col)
+    return pos
 
 
 def sort_384_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
@@ -246,6 +306,12 @@ def extract_resource_from_field(field, resource, position):
 
     elif resource == Reservoir300:
         if field.startswith(position) and field.find("_reservoir300") > 0:
+            return True
+        else:
+            return False
+
+    elif resource == EppiCarrier24:
+        if field.startswith(position) and field.find("_eppi24") > 0:
             return True
         else:
             return False
