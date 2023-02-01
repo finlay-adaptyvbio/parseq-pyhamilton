@@ -87,7 +87,7 @@ deck = {
 # Define layout file and parse it
 
 LAYOUT_FILE_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "pcr-colony.lay"
+    os.path.dirname(os.path.abspath(__file__)), "plate-merging-filling.lay"
 )
 
 lmgr = LayoutManager(LAYOUT_FILE_PATH)
@@ -114,47 +114,45 @@ TIPS_384 = 384
 CHANNELS_384 = "1" * 384
 CHANNELS_384_96 = (("10" * 12) + ("0" * 24)) * 8
 
-MIXING = "50ulTip_conductive_384COREHead_Water_DispenseSurface_Empty"
-
-bact_plates = [f"P{i}" for i in range(4)]
+bact_plates = []
 
 source_bact_plates = dk.get_labware_list(
     deck,
-    ["F1"],
+    ["F1", "F2"],
     Plate384,
-    [4],
+    [5, 5],
     True,
 )[0 : len(bact_plates)]
 
 dest_bact_plates = dk.get_labware_list(
     deck,
-    ["F2"],
+    ["F3", "F4"],
     Plate384,
-    [4],
+    [5, 5],
     False,
 )[0 : len(bact_plates)]
 
 source_pcr_plates = dk.get_labware_list(
     deck,
-    ["E3"],
+    ["F2"],
     Plate384,
-    [4],
+    [10],
     True,
 )[0 : len(bact_plates)]
 
 source_pcr_lids = dk.get_labware_list(
     deck,
-    ["E2"],
+    ["F1"],
     Lid,
-    [4],
+    [10],
     True,
 )[0 : len(bact_plates)]
 
 dest_pcr_plates = dk.get_labware_list(
     deck,
-    ["E1"],
+    ["F3"],
     Plate384,
-    [4],
+    [10],
     False,
 )[0 : len(bact_plates)]
 
@@ -162,26 +160,21 @@ active_bact_plate = dk.get_labware_list(deck, ["E5"], Plate384)[0]
 active_bact_lid = dk.get_labware_list(deck, ["E5"], Lid)[0]
 temp_bact_lid = dk.get_labware_list(deck, ["E4"], Lid)[0]
 
-source_wells = [(active_bact_plate, i) for i in range(384)]
-
 active_pcr_plates = dk.get_labware_list(
-    deck, ["C1", "C2", "C3", "C4"], Plate384, [1, 1, 1, 1]
+    deck, ["C1", "C2", "C3", "C4"], [1, 1, 1, 1], Plate384
 )
-active_pcr_lids = dk.get_labware_list(deck, ["C1", "C2", "C3", "C4"], Lid, [1, 1, 1, 1])
+active_pcr_lids = dk.get_labware_list(deck, ["C1", "C2", "C3", "C4"], [1, 1, 1, 1], Lid)
 
-master_mix_plate = dk.get_labware_list(deck, ["C5"], Plate96)[0]
-master_mix = [(master_mix_plate, i) for i in range(96)]
+master_mix = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
 
-tip_racks = dk.get_labware_list(deck, ["B1", "B2"], Tip384, [2, 2], True)
-active_tip_rack, virtual_tip_rack = dk.get_labware_list(deck, ["D2"], Tip384, [2])
-tips = [(active_tip_rack, i) for i in range(384)]
+tip_racks = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip384, [4, 4, 4], True)
 
-master_mix_rack = dk.get_labware_list(deck, ["B5"], Tip96)[0]
-master_mix_tips = [(master_mix_rack, i) for i in range(96)]
+master_mix_tips = dk.get_labware_list(deck, ["B5"], Tip384)[0]
 
 
 # Define state variables to keep track of current plate, well, and step in the protocol
 # TODO: Make this more general, useful for other protocols
+
 
 state = {
     "current_bact_plate": 0,
@@ -196,7 +189,7 @@ state = {
 # TODO: Add error recovery
 # TODO: Check if total number of tips available is enough for the protocol, add prompt when new tip racks are needed
 
-# simulate = True opens VENUS run control in a separate window where you can enable simulation mode to test protocol
+## simulate = True opens VENUS run control in a separate window where you can enable simulation mode to test protocol
 
 with HamiltonInterface(simulate=True) as hammy:
     cmd.initialize(hammy)
@@ -213,7 +206,7 @@ with HamiltonInterface(simulate=True) as hammy:
             gripHeight=9.0,
         )
         cmd.grip_place(hammy, active_bact_plate, mode=0)
-        cmd.grip_get(hammy, active_bact_lid, mode=1, gripWidth=85.0, gripHeight=5.0)
+        cmd.grip_get(hammy, active_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0)
         cmd.grip_place(hammy, temp_bact_lid, mode=1)
 
         if state["current_active_pcr_plates"] == 0:
@@ -226,65 +219,31 @@ with HamiltonInterface(simulate=True) as hammy:
                     source_pcr_plates[state["current_pcr_plate"] + i],
                     mode=0,
                     gripWidth=82.0,
-                    gripHeight=4.0,
+                    gripHeight=8.0,
                 )
                 cmd.grip_place(hammy, active_pcr_plates[i], mode=0)
 
                 st.update_state(state, "current_active_pcr_plates", 1)
 
-            cmd.tip_pick_up_384(hammy, master_mix_tips, tipMode=1)
-
+            cmd.tip_pick_up_384()  # from master mix tips
             for i in range(pcr_plates_to_process):
-                for quadrant in range(4):
-                    pcr_wells = [
-                        (active_pcr_plates[i], j) for j in dk.pos_96_in_384(quadrant)
-                    ]
-
-                    cmd.aspirate_384(hammy, master_mix, 18.5, liquidHeight=0.1)
-                    cmd.dispense_384(
-                        hammy, pcr_wells, 18.5, liquidHeight=8.0, dispenseMode=9
-                    )
-
-            cmd.tip_eject_384(hammy, master_mix_tips, 1)
+                cmd.aspirate_384()  # from reservoir
+                cmd.dispense_384()  # to active pcr plates
+            cmd.tip_eject_384()  # to master mix tips
 
         # aspirate from active bact plate to current active pcr plate
 
-        target_wells = [
-            (active_pcr_plates[state["current_active_pcr_plate"]], i)
-            for i in range(384)
-        ]
-
-        # get next tip rack
-
-        cmd.grip_get_tip_rack(hammy, tip_racks[state["current_rack"]])
-        cmd.grip_place_tip_rack(hammy, virtual_tip_rack)
-
-        cmd.tip_pick_up_384(hammy, tips)
-        cmd.aspirate_384(
-            hammy,
-            source_wells,
-            1.0,
-            liquidHeight=3.0,
-            mixCycles=3,
-            mixVolume=5.0,
-            liquidClass=MIXING,
-        )
-        cmd.dispense_384(
-            hammy, target_wells, 1.0, mixCycles=3, mixVolume=5.0, liquidClass=MIXING
-        )
-        cmd.tip_eject_384(hammy, tips, 2)
+        cmd.tip_pick_up_384()  # from current rack
+        cmd.aspirate_384()  # from current active bact plate
+        cmd.dispense_384()  # to current active pcr plate
+        cmd.tip_eject_384()  # to current waste
 
         # place current active bact plate in dest bact plate stack
 
-        cmd.grip_get(hammy, temp_bact_lid, mode=1, gripWidth=85.0, gripHeight=5.0)
+        cmd.grip_get(hammy, temp_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0)
         cmd.grip_place(hammy, active_bact_lid, mode=1)
         cmd.grip_get(hammy, active_bact_plate, mode=0, gripWidth=82.0, gripHeight=9.0)
         cmd.grip_place(hammy, dest_bact_plates[state["current_bact_plate"]], mode=0)
-
-        # discard current active rack to waste
-
-        cmd.grip_get_tip_rack(hammy, active_tip_rack)
-        cmd.grip_place_tip_rack(hammy, active_tip_rack, waste=True)
 
         # update state variables for loop
 
@@ -298,18 +257,10 @@ with HamiltonInterface(simulate=True) as hammy:
             for i in range(state["current_active_pcr_plates"]):
                 cmd.grip_get(
                     hammy,
-                    source_pcr_lids[state["current_pcr_plate"]],
-                    mode=1,
-                    gripWidth=85.0,
-                    gripHeight=1.5,
-                )
-                cmd.grip_place(hammy, active_pcr_lids[i], mode=1)
-                cmd.grip_get(
-                    hammy,
                     active_pcr_plates[i],
                     mode=0,
-                    gripWidth=81.0,
-                    gripHeight=6.0,
+                    gripWidth=82.0,
+                    gripHeight=8.0,
                 )
                 cmd.grip_place(
                     hammy,

@@ -4,8 +4,8 @@ from pyhamilton import (
     Lid,
     Plate96,
     Plate384,
-    Tip384,
     Tip96,
+    Tip384,
     Reservoir300,
     EppiCarrier24,
 )
@@ -13,14 +13,24 @@ from pyhamilton import (
 from pyhamilton.oemerr import ResourceUnavailableError
 from typing import Union
 
+TYPES = {
+    "Lid": Lid,
+    "Plate96": Plate96,
+    "Plate384": Plate384,
+    "Tip96": Tip96,
+    "Tip384": Tip384,
+    "Reservoir300": Reservoir300,
+    "EppiCarrier24": EppiCarrier24,
+}
 
-def parse_layout_file(deck: dict, lmgr: LayoutManager, types: dict):
+
+def parse_layout_file(deck: dict, lmgr: LayoutManager):
     for col in deck.keys():
         for row in range(0, len(deck[col])):
             position = col + str(row + 1)
             resource_list = []
 
-            for resource in types.values():
+            for resource in TYPES.values():
                 resource_test = lambda line: extract_resource_from_field(
                     LayoutManager.name_from_line(line), resource, position
                 )
@@ -45,7 +55,6 @@ def parse_layout_file(deck: dict, lmgr: LayoutManager, types: dict):
 
 
 def clean_deck(deck: dict):
-
     for col in deck.keys():
         for row in range(len(deck[col])):
             ghost_labware = []

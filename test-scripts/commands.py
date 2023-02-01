@@ -1,10 +1,12 @@
 from pyhamilton import (
     HamiltonInterface,
-    Plate384,
+    Lid,
     Plate96,
+    Plate384,
     Tip96,
     Tip384,
-    Lid,
+    Reservoir300,
+    EppiCarrier24,
     INITIALIZE,  # type: ignore
     GRIP_GET,  # type: ignore
     GRIP_PLACE,  # type: ignore
@@ -18,6 +20,8 @@ from pyhamilton import (
     EJECT384,  # type: ignore
 )
 
+import deck as dk
+
 from pyhamilton.oemerr import PositionError
 from typing import Union
 
@@ -27,6 +31,8 @@ DEFAULT_LIQUID_CLASS_384MPH = "50ulTip_conductive_384COREHead_Water_DispenseJet_
 
 
 def initialize(ham: HamiltonInterface):
+    print(f"Command: initialize")
+
     cid = ham.send_command(INITIALIZE)
 
     try:
@@ -47,11 +53,13 @@ def compound_pos_str(pos_tuples):
 
 
 def grip_get(
-    ham,
+    ham: HamiltonInterface,
     labware: Union[Plate96, Plate384, Lid],
     mode: int,
     **kw_args,
 ):
+    print(f"Command: grip_get | Labware: {labware.layout_name()} | Mode: {mode}")
+
     labwarePositions = labware_pos_str(labware, 0)
     transportMode = mode
 
@@ -81,12 +89,17 @@ def grip_get(
 
 
 def grip_place(
-    ham,
+    ham: HamiltonInterface,
     labware: Union[Plate96, Plate384, Lid],
     mode: int,
     eject: bool = False,
     **kw_args,
 ):
+    print(
+        f"Command: grip_place | Labware: {labware.layout_name()} | Mode: {mode} |"
+        f" Eject: {eject}"
+    )
+
     labwarePositions = labware_pos_str(labware, 0)
     transportMode = mode
     ejectToolWhenFinish = eject
@@ -119,10 +132,15 @@ def grip_place(
 
 
 def tip_pick_up(
-    ham,
+    ham: HamiltonInterface,
     positions: list[tuple[Tip96, int]],
     **kw_args,
 ):
+    print(
+        f"Command: tip_pick_up | Labware: {positions[0][0].layout_name()} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]}"
+    )
+
     labwarePositions = compound_pos_str(positions)
 
     cid = ham.send_command(
@@ -138,11 +156,16 @@ def tip_pick_up(
 
 
 def tip_eject(
-    ham,
+    ham: HamiltonInterface,
     positions: list[tuple[Tip96, int]],
     waste: bool = False,
     **kw_args,
 ):
+    print(
+        f"Command: tip_eject | Labware: {positions[0][0].layout_name()} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]} | Waste: {waste}"
+    )
+
     if waste:
         useDefaultWaste = int(waste)
         labwarePositions = ""
@@ -166,10 +189,15 @@ def tip_eject(
 
 def aspirate(
     ham: HamiltonInterface,
-    positions: list[tuple],
-    volumes: list,
+    positions: list[tuple[Union[Plate96, Plate384, Reservoir300, EppiCarrier24], int]],
+    volumes: list[float],
     **kw_args,
 ):
+    print(
+        f"Command: aspirate | Labware: {positions[0][0].layout_name()} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]} | Volumes: {volumes}"
+    )
+
     if len(volumes) < len(positions):
         volumes.extend([volumes[0] for _ in range(len(volumes), len(positions))])
     elif len(volumes) > len(positions):
@@ -195,10 +223,15 @@ def aspirate(
 
 def dispense(
     ham: HamiltonInterface,
-    positions: list[tuple],
-    volumes: list,
+    positions: list[tuple[Union[Plate96, Plate384, Reservoir300, EppiCarrier24], int]],
+    volumes: list[float],
     **kw_args,
 ):
+    print(
+        f"Command: dispense | Labware: {positions[0][0].layout_name()} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]} | Volumes: {volumes}"
+    )
+
     if len(volumes) < len(positions):
         volumes.extend([volumes[0] for _ in range(len(volumes), len(positions))])
     elif len(volumes) > len(positions):
@@ -223,10 +256,15 @@ def dispense(
 
 
 def tip_pick_up_384(
-    ham,
+    ham: HamiltonInterface,
     positions: list[tuple[Tip384, int]],
     **kw_args,
 ):
+    print(
+        f"Command: tip_pick_up_384 | Labware: {positions[0][0].layout_name()} |"
+        f" Positions: {len(positions)}"
+    )
+
     labwarePositions = compound_pos_str(positions)
 
     cid = ham.send_command(
@@ -242,11 +280,15 @@ def tip_pick_up_384(
 
 
 def tip_eject_384(
-    ham,
+    ham: HamiltonInterface,
     positions: list[tuple[Tip384, int]],
     mode: int = 0,
     **kw_args,
 ):
+    print(
+        f"Command: tip_eject_384 | Labware: {positions[0][0].layout_name()} |"
+        f" Positions: {len(positions)} | Mode: {mode}"
+    )
 
     tipEjectToKnownPosition = int(mode)
 
@@ -274,10 +316,14 @@ def tip_eject_384(
 
 def aspirate_384(
     ham: HamiltonInterface,
-    positions: list[tuple],
+    positions: list[tuple[Union[Plate96, Plate384, Reservoir300], int]],
     volume: float,
     **kw_args,
 ):
+    print(
+        f"Command: aspirate_384 | Labware: {positions[0][0].layout_name()} | Positions:"
+        f" {len(positions)} | Volume: {volume}"
+    )
 
     if "liquidClass" not in kw_args:
         kw_args.update({"liquidClass": DEFAULT_LIQUID_CLASS_384MPH})
@@ -299,10 +345,15 @@ def aspirate_384(
 
 def dispense_384(
     ham: HamiltonInterface,
-    positions: list[tuple],
+    positions: list[tuple[Union[Plate96, Plate384, Reservoir300], int]],
     volume: float,
     **kw_args,
 ):
+    print(
+        f"Command: dispense_384 | Labware: {positions[0][0].layout_name()} | Positions:"
+        f" {len(positions)} | Volume: {volume}"
+    )
+
     if "liquidClass" not in kw_args:
         kw_args.update({"liquidClass": DEFAULT_LIQUID_CLASS_384MPH})
 
@@ -322,10 +373,12 @@ def dispense_384(
 
 
 def grip_get_tip_rack(
-    ham,
+    ham: HamiltonInterface,
     labware: Union[Tip96, Tip384],
     **kw_args,
 ):
+    print(f"Command: grip_get_tip_rack | Labware: {labware.layout_name()}")
+
     labwarePositions = labware_pos_str(labware, 0)
 
     if isinstance(labware, Tip96):
@@ -353,12 +406,17 @@ def grip_get_tip_rack(
 
 
 def grip_place_tip_rack(
-    ham,
+    ham: HamiltonInterface,
     labware: Union[Tip96, Tip384],
     waste: bool = False,
     eject: bool = False,
     **kw_args,
 ):
+    print(
+        f"Command: grip_get_tip_rack | Labware: {labware.layout_name()} | Waste:"
+        f" {waste} | Eject: {eject}"
+    )
+
     ejectToolWhenFinish = eject
 
     if isinstance(labware, Tip96):

@@ -1,18 +1,7 @@
-import os, csv, requests, atexit
+import os
 
 import deck as dk
-
-from pyhamilton import (
-    HamiltonInterface,
-    LayoutManager,
-    Plate96,
-    Plate384,
-    Lid,
-    Tip96,
-    Tip384,
-    Reservoir300,
-    EppiCarrier24,
-)
+from pyhamilton import LayoutManager
 
 # Empty deck dictionary
 
@@ -67,18 +56,12 @@ LAYOUT_FILE_PATH = os.path.join(
 
 lmgr = LayoutManager(LAYOUT_FILE_PATH)
 
-types = {
-    "Lid": Lid,
-    "Plate96": Plate96,
-    "Plate384": Plate384,
-    "Tip96": Tip96,
-    "Tip384": Tip384,
-    "Reservoir300": Reservoir300,
-    "EppiCarrier24": EppiCarrier24,
-}
+# Parse layout file and print deck
 
 dk.parse_layout_file(deck, lmgr, types)
 dk.print_deck(deck)
+
+# Clean deck dictionary to remove any ghost labware, reprint to compare
 
 dk.clean_deck(deck)
 dk.print_deck(deck)
