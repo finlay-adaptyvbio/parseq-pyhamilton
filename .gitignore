@@ -2,6 +2,8 @@
 !*/
 
 *test*
+*__pycache__*
+runs/*
 
 !.gitignore
 !.gitmodules
@@ -9,3 +11,4 @@
 !*.py
 !*.lay
 !*.md
+!*.json
