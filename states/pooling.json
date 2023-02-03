@@ -1,0 +1,15 @@
+{
+    "current_pcr_plate": 0,
+    "current_pooling_plate": 0,
+    "current_quadrant": 0,
+    "current_column": 0,
+    "current_well": 0,
+    "current_eppi": 0,
+    "current_rack": 0,
+    "current_tip_column": 0,
+    "current_tip": 0,
+    "active_pooling_plate": 0,
+    "active_pcr_plate": 0,
+    "edta": 0,
+    "active_rack": 0
+}
