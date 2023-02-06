@@ -128,9 +128,8 @@ def print_deck(deck: dict):
             position = col + str(row + 1)
             print(f"--- {position} ---")
 
-            for idx, labware in enumerate(deck[col][row]["labware"]):
-                state = deck[col][row]["state"][idx]
-                print(labware.layout_name(), type(labware), state)
+            for labware in deck[col][row]["labware"]:
+                print(labware.layout_name(), type(labware))
 
 
 def print_list(labwares: list):

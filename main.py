@@ -2,7 +2,7 @@
 
 import os, sys, argparse, requests, atexit, time, datetime, shutil
 
-# import deck as dk
+import deck as dk
 import state as st
 
 # Notification settings for Slack on script exit
@@ -166,7 +166,7 @@ if __name__ == "__main__":
                             elif recover == "n":
                                 run_dir_path = os.path.join(runs_dir_path, run_id)
                                 print(f"Backing up previous {method} run.")
-                                now = datetime.datetime.now().strftime("%y.%m.%d_%H:%M")
+                                now = datetime.datetime.now().strftime("%y.%m.%d_%H%M")
                                 shutil.move(
                                     os.path.join(run_dir_path, f"{method}.json"),
                                     os.path.join(
@@ -250,36 +250,36 @@ if __name__ == "__main__":
     match method:
         case "pooling":
             # no other input needed
-            # from scripts import pooling as script
+            from scripts import pooling as script
 
             pass
         case "pcr_colony":
             # no other input needed
-            # from scripts import pcr_colony as script
+            from scripts import pcr_colony as script
 
             pass
         case "pcr_barcode":
             # no other input needed
-            # from scripts import pcr_barcode as script
+            from scripts import pcr_barcode as script
 
             pass
         case "pm_emptying":
             # get sorted_well_map.csv
-            # from scripts import pm_emptying as script
+            from scripts import pm_emptying as script
 
             pass
         case "pm_filling":
             # get sorted_well_map.csv
-            # from scripts import pm_filling as script
+            from scripts import pm_filling as script
 
             pass
         case "cherry_picking":
             # get sorted_well_list.csv
-            # from scripts import cherry_picking as script
+            from scripts import cherry_picking as script
 
             pass
         case _:
             raise ValueError(f"Method {method} not found.")
 
-    # deck = dk.get_deck(layout_path)
-    # script.run(deck, state, state_path, run_dir_path)
+    deck = dk.get_deck(layout_path)
+    script.run(deck, state, state_path, run_dir_path)
