@@ -5,5 +5,6 @@
     "current_target_well": 0,
     "current_tip": 0,
     "current_rack": 0,
-    "channel_steps": 0
+    "active_source_plate": 0,
+    "active_target_plate": 0
 }

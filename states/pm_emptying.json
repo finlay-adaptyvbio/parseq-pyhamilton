@@ -4,5 +4,6 @@
     "current_step": 0,
     "current_rack": 0,
     "current_tip": 0,
-    "channel_steps": 0
+    "channel_steps": 0,
+    "active_plate": 0
 }

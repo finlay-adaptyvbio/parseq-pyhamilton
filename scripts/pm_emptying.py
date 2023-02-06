@@ -1,4 +1,4 @@
-import os, csv, requests, atexit
+import os, csv
 
 import commands as cmd
 import deck as dk
@@ -25,17 +25,27 @@ CHANNEL_1 = "10"
 CHANNEL_2 = "01"
 
 
-def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
+def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
     # TODO: Pull information from csv file
 
     # Get wells to empty from csv file
 
-    well_map = os.path.join(temp_dir_path, "sorted_well_map.csv")
+    plate_map_path = os.path.join(run_dir_path, "plates.csv")
 
-    with open(discard) as f:
+    with open(plate_map_path) as f:
         reader = csv.reader(f)
-        wells_to_empty = [tuple(row) for row in reader]
+        plate_map = [tuple(row) for row in reader]
+
+    plates = [t[1] for t in plate_map]
+
+    well_map_path = os.path.join(run_dir_path, "sorted_well_map.csv")
+
+    with open(well_map_path) as f:
+        reader = csv.reader(f)
+        well_map = [tuple(row) for row in reader]
+
+    wells_to_empty = [(t[2], t[3]) for t in well_map]
 
     # Define labware from parsed layout file
     # TODO: Adjust stacks depending on number of plates
@@ -96,37 +106,38 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
         ## TODO: switch to explicit variables for current plate and well for better state tracking
 
         while state["current_plate"] < len(plates):
-            # Build well list for current plate and sort for efficient pipetting
+            # Get next plate and move to active position if not done already
 
-            raw_wells = [
-                well[1]
-                for well in wells_to_empty
-                if well[0] == plates[state["current_plate"]]
-            ]
-            indexes = dk.sort_384_indexes_2channel(raw_wells)
-            wells = [
-                (active_bact_plate, dk.string_to_index_384(index)) for index in indexes
-            ]
+            if not state["active_plate"]:
+                cmd.grip_get(
+                    hammy,
+                    source_bact_plates[state["current_plate"]],
+                    mode=0,
+                    gripWidth=82.0,
+                    gripHeight=9.0,
+                )
+                cmd.grip_place(hammy, active_bact_plate, mode=0)
+                cmd.grip_get(
+                    hammy, active_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0
+                )
+                cmd.grip_place(hammy, temp_bact_lid, mode=1, eject=True)
 
-            # Get next plate and move to active position, remove lid
+                # Build well list for current plate
 
-            cmd.grip_get(
-                hammy,
-                source_bact_plates[state["current_plate"]],
-                mode=0,
-                gripWidth=82.0,
-                gripHeight=9.0,
-            )
-            cmd.grip_place(hammy, active_bact_plate, mode=0)
-            cmd.grip_get(hammy, active_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0)
-            cmd.grip_place(hammy, temp_bact_lid, mode=1, eject=True)
+                wells = [
+                    (active_bact_plate, dk.string_to_index_384(t[0]))
+                    for t in wells_to_empty
+                    if t[1] == plates[state["current_plate"]]
+                ]
+
+                state = st.reset_state(state, state_file_path, "active_plate", 1)
 
             # Get next 2 tips from active tip stack
 
             cmd.tip_pick_up(
                 hammy, tips[state["current_tip"] : state["current_tip"] + CHANNELS]
             )
-            st.update_state(state, "current_tip", CHANNELS)
+            state = st.update_state(state, state_file_path, "current_tip", CHANNELS)
 
             # Aspirate media from active plate and dispense to waste reservoir
             ## We loop through the wells in groups of 4 (2 * 2 CHANNELS) and aspirate 140 uL from each well
@@ -148,13 +159,15 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                             ],
                             waste=True,
                         )
+                        state = st.update_state(
+                            state, state_file_path, "current_tip", CHANNELS
+                        )
                         cmd.tip_pick_up(
                             hammy,
                             tips[
                                 state["current_tip"] : state["current_tip"] + CHANNELS
                             ],
                         )
-                        st.update_state(state, "current_tip", CHANNELS)
 
                     ## The first aspirate command must be set to aspirateMode = 0, otherwise the pipette will not aspirate blowout volume
                     ## This doesn't seem to work (VENUS still outputs warning about aspiration mode)
@@ -170,7 +183,7 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                     if stop - i == 1:
                         cmd.aspirate(
                             hammy,
-                            [wells[state["current_well"] + i]],
+                            [wells[state["current_well"]]],
                             [140],
                             channelVariable=CHANNEL_1,
                             aspirateMode=aspirateMode,
@@ -181,16 +194,15 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                             140 * int((i + CHANNELS) / CHANNELS),
                             100 * (i / CHANNELS),
                         ]
-                        st.update_state(state, "current_well", 1)
+                        state = st.update_state(
+                            state, state_file_path, "current_well", 1
+                        )
 
                     else:
                         cmd.aspirate(
                             hammy,
                             wells[
-                                state["current_well"]
-                                + i : state["current_well"]
-                                + i
-                                + CHANNELS
+                                state["current_well"] : state["current_well"] + CHANNELS
                             ],
                             [140],
                             aspirateMode=aspirateMode,
@@ -198,11 +210,20 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                             mixVolume=50.0,
                         )
                         dispense_volume = [140 * int((i + CHANNELS) / CHANNELS)]
-                        st.update_state(state, "current_well", 2)
+                        state = st.update_state(
+                            state, state_file_path, "current_well", 2
+                        )
 
-                    st.update_state(state, "channel_steps", 1)
+                    state = st.update_state(state, state_file_path, "channel_steps", 1)
+
+                # state = st.update_state(state, state_file_path, "current_well", stop)
 
                 cmd.dispense(hammy, waste, dispense_volume, dispenseMode=9)
+
+            # Update state variables for next step
+
+            state = st.update_state(state, state_file_path, "current_step", 1)
+            state = st.reset_state(state, state_file_path, "current_well", 0)
 
             # Dispense ethanol into emptied wells of active plate
             ## This loop advances in steps of 6 (3 * 2 CHANNELS) and dispenses 100 uL into each well
@@ -221,11 +242,13 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                         tips[state["current_tip"] : state["current_tip"] + CHANNELS],
                         waste=True,
                     )
+                    state = st.update_state(
+                        state, state_file_path, "current_tip", CHANNELS
+                    )
                     cmd.tip_pick_up(
                         hammy,
                         tips[state["current_tip"] : state["current_tip"] + CHANNELS],
                     )
-                    st.update_state(state, "current_tip", CHANNELS)
 
                 # Set aspirate volume depending on number of CHANNELS used and aspirate
 
@@ -241,7 +264,7 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                     hammy, ethanol, aspirate_volume, liquidClass=ETHANOL_DISPENSE
                 )
 
-                st.update_state(state, "channel_steps", 1)
+                state = st.update_state(state, state_file_path, "channel_steps", 1)
 
                 for i in range(0, stop, 2):
                     state["channel_steps"] += 1
@@ -252,31 +275,32 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                     if stop - i == 1:
                         cmd.dispense(
                             hammy,
-                            [wells[state["current_well"] + i]],
+                            [wells[state["current_well"]]],
                             [100],
                             channelVariable=CHANNEL_1,
                             liquidClass=ETHANOL_DISPENSE,
                         )
-                        st.update_state(state, "current_well", 1)
+                        state = st.update_state(
+                            state, state_file_path, "current_well", 1
+                        )
 
                     else:
                         cmd.dispense(
                             hammy,
                             wells[
-                                state["current_well"]
-                                + i : state["current_well"]
-                                + i
-                                + CHANNELS
+                                state["current_well"] : state["current_well"] + CHANNELS
                             ],
                             [100],
                             liquidClass=ETHANOL_DISPENSE,
                         )
-                        st.update_state(state, "current_well", 2)
+                        state = st.update_state(
+                            state, state_file_path, "current_well", 2
+                        )
 
             # Update state variables for next step
 
-            st.update_state(state, "current_step", 1)
-            st.reset_state(state, "current_well", 0)
+            state = st.update_state(state, state_file_path, "current_step", 1)
+            state = st.reset_state(state, state_file_path, "current_well", 0)
 
             # Aspirate ethanol from active plate and dispense to waste reservoir
             ## Loop advances in steps of 4 (2 * 2 CHANNELS) and aspirates 140 uL from each well
@@ -298,13 +322,15 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                             ],
                             waste=True,
                         )
+                        state = st.update_state(
+                            state, state_file_path, "current_tip", CHANNELS
+                        )
                         cmd.tip_pick_up(
                             hammy,
                             tips[
                                 state["current_tip"] : state["current_tip"] + CHANNELS
                             ],
                         )
-                        st.update_state(state, "current_tip", CHANNELS)
 
                     ## The first aspirate command must be set to aspirateMode = 0, otherwise the pipette will not aspirate blowout volume
                     ## This doesn't seem to work (VENUS still outputs warning about aspiration mode)
@@ -320,7 +346,7 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                     if stop - i == 1:
                         cmd.aspirate(
                             hammy,
-                            [wells[state["current_well"] + i]],
+                            [wells[state["current_well"]]],
                             [140],
                             channelVariable=CHANNEL_1,
                             aspirateMode=aspirateMode,
@@ -332,16 +358,15 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                             140 * int((i + CHANNELS) / CHANNELS),
                             100 * (i / CHANNELS),
                         ]
-                        st.update_state(state, "current_well", 1)
+                        state = st.update_state(
+                            state, state_file_path, "current_well", 1
+                        )
 
                     else:
                         cmd.aspirate(
                             hammy,
                             wells[
-                                state["current_well"]
-                                + i : state["current_well"]
-                                + i
-                                + CHANNELS
+                                state["current_well"] : state["current_well"] + CHANNELS
                             ],
                             [140],
                             aspirateMode=aspirateMode,
@@ -350,9 +375,11 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                             mixVolume=50.0,
                         )
                         dispense_volume = [140 * int((i + CHANNELS) / CHANNELS)]
-                        st.update_state(state, "current_well", 2)
+                        state = st.update_state(
+                            state, state_file_path, "current_well", 2
+                        )
 
-                    st.update_state(state, "channel_steps", 1)
+                    state = st.update_state(state, state_file_path, "channel_steps", 1)
 
                 cmd.dispense(
                     hammy,
@@ -362,22 +389,27 @@ def run(deck: dict, state: dict, state_file_path: str, temp_dir_path: str):
                     dispenseMode=9,
                 )
 
-            # Update state variables for next step
+            if state["active_plate"]:
+                # Eject tips on pickup position
 
-            st.update_state(state, "current_step", 1)
-            st.reset_state(state, "current_well", 0)
+                cmd.tip_eject(
+                    hammy, tips[state["current_tip"] : state["current_tip"] + CHANNELS]
+                )
 
-            # Eject tips on pickup position
+                # Place lid on active plate and move to done stack
 
-            cmd.tip_eject(
-                hammy, tips[state["current_tip"] : state["current_tip"] + CHANNELS]
-            )
+                cmd.grip_get(
+                    hammy, temp_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0
+                )
+                cmd.grip_place(hammy, active_bact_lid, mode=1)
+                cmd.grip_get(
+                    hammy, active_bact_plate, mode=0, gripWidth=82.0, gripHeight=9.0
+                )
+                cmd.grip_place(hammy, dest_bact_plates[state["current_plate"]], mode=0)
 
-            # Place lid on active plate and move to done stack
+                # Update state variables for next step
 
-            cmd.grip_get(hammy, temp_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0)
-            cmd.grip_place(hammy, active_bact_lid, mode=1)
-            cmd.grip_get(
-                hammy, active_bact_plate, mode=0, gripWidth=82.0, gripHeight=9.0
-            )
-            cmd.grip_place(hammy, dest_bact_plates[state["current_plate"]], mode=0)
+                state = st.reset_state(state, state_file_path, "current_well", 0)
+                state = st.update_state(state, state_file_path, "current_plate", 1)
+                state = st.reset_state(state, state_file_path, "active_plate", 0)
+                state = st.reset_state(state, state_file_path, "current_step", 0)

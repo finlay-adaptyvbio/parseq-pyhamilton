@@ -1,12 +1,9 @@
-import os, sys, csv, requests, atexit
-
 import commands as cmd
 import deck as dk
 import state as st
 
 from pyhamilton import (
     HamiltonInterface,
-    LayoutManager,
     Lid,
     Plate96,
     Plate384,
@@ -23,7 +20,7 @@ TIPS_384 = 384
 CHANNELS_384_96_8 = "1" + ("0" * 11)
 
 
-def run(deck: dict, state: dict, state_file_path: str, temp_file_path: str):
+def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
 
     pcr_plates = [f"P{i}" for i in range(8)]
