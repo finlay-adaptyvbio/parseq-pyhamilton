@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, argparse, requests, atexit, time, datetime, shutil
+import os, argparse, requests, atexit, time, datetime, shutil
 
 import deck as dk
 import state as st
@@ -28,7 +28,7 @@ def notify(text):
     ).json()
 
 
-# atexit.register(notify, "Script complete or error.")
+atexit.register(notify, "Script complete or error.")
 
 # Folders
 
