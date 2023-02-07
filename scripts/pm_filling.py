@@ -7,9 +7,11 @@ import state as st
 from pyhamilton import (
     HamiltonInterface,
     Plate384,
-    Lid,
+    Lid,  # type: ignore
     Tip96,
 )
+
+# Constants
 
 RACKS = 12
 TIPS = 96
@@ -82,35 +84,32 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     active_target_bact_lid = dk.get_labware_list(deck, ["E4"], Lid)[0]
     temp_target_bact_lid = dk.get_labware_list(deck, ["C2"], Lid)[0]
 
-    active_pipet_tips, active_dest_tips = dk.get_labware_list(deck, ["F5"], Tip96, [2])
+    racks = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip96, [4, 4, 4], True)
+    rack_tips, rack_virtual = dk.get_labware_list(deck, ["F5"], Tip96, [2])
+    tips = [(rack_tips, i) for i in dk.pos_96_2ch(96)]
 
-    tip_racks = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip96, [4, 4, 4], True)
+    # HACK: get rid of type errors due to state not being initialized
 
-    tip_indexes = dk.sort_96_indexes_2channel(
-        [dk.index_to_string_96(i) for i in range(96)]
-    )
-    tips = [
-        (active_pipet_tips, dk.string_to_index_96(tip_index))
-        for tip_index in tip_indexes
-    ]
+    source_wells = []
+    target_wells = []
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable
-    # TODO: Add error recovery
     # TODO: Check if total number of tips available is enough for the protocol, add prompt when new tip racks are needed
 
-    ## simulate = True opens VENUS run control in a separate window where you can enable simulation mode to test protocol
-
     with HamiltonInterface(simulate=True) as hammy:
+        # Initialize Hamilton
+
         cmd.initialize(hammy)
 
         # Loop over plates as long as there are still plates (source or target) to process
-        # TODO: check if the last plate is processed correctly
 
         while (
             state["current_source_plate"] < len(source_plates) - 1
             or state["current_target_plate"] < len(target_plates) - 1
         ):
+            # Get next target plate if not already done
+
             if not state["active_target_plate"]:
                 cmd.grip_get(
                     hammy,
@@ -139,6 +138,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 ]
 
                 st.reset_state(state, state_file_path, "current_target_well", 0)
+
+            # Get next source plate if not already done
 
             if not state["active_source_plate"]:
                 cmd.grip_get(
@@ -173,10 +174,10 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Discard rack and get new one from stacked racks if current one is done
 
             if state["current_tip"] >= TIPS:
-                cmd.grip_get_tip_rack(hammy, active_pipet_tips)
-                cmd.grip_place_tip_rack(hammy, active_pipet_tips, waste=True)
-                cmd.grip_get_tip_rack(hammy, tip_racks[state["current_rack"]])
-                cmd.grip_place_tip_rack(hammy, active_dest_tips)
+                cmd.grip_get_tip_rack(hammy, rack_tips)
+                cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
+                cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
+                cmd.grip_place_tip_rack(hammy, rack_virtual)
 
                 st.update_state(state, state_file_path, "current_rack", 1)
                 st.reset_state(state, state_file_path, "current_tip", 0)
@@ -184,7 +185,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Check how many wells are left to pipet in the current source and target plate
             # Also check if there are enough tips left to pipet the remaining wells
 
-            ## This outputs the minimum of the three values (wells left, tips left, channels)
+            # This outputs the minimum of the three values (wells left, tips left, channels)
 
             source_well_stop = min(
                 CHANNELS,
@@ -224,7 +225,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.update_state(state, state_file_path, "current_target_well", 1)
                 st.update_state(state, state_file_path, "current_tip", 1)
 
-            # Otherwise, use all channels
+            # Otherwise, use all channels (as long as pipetting steps are equal between source and target)
 
             elif source_well_stop == CHANNELS and target_well_stop == CHANNELS:
                 cmd.tip_pick_up(
