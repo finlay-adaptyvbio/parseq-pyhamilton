@@ -3,6 +3,7 @@ import os, csv, math
 import commands as cmd
 import deck as dk
 import state as st
+import helpers as hp
 
 from pyhamilton import (
     HamiltonInterface,
@@ -55,7 +56,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         Plate384,
         [6, 6, 6, 6, 6, 6],
         True,
-    )[0 : len(plates)]
+    )[-len(plates) :]
 
     dest_bact_plates = dk.get_labware_list(
         deck,
@@ -84,6 +85,10 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # HACK: get rid of type errors due to state not being initialized
 
     wells = []
+
+    # Inform user of labware positions, ask for confirmation after placing plates
+
+    hp.place_plates(plates, source_bact_plates, "source")
 
     # Main Hamilton method starts here
     # TODO: reduce loops to functions, for example wells_to_reservoir or reservoir_to_wells

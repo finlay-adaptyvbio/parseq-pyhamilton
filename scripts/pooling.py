@@ -1,6 +1,7 @@
 import commands as cmd
 import deck as dk
 import state as st
+import helpers as hp
 
 from pyhamilton import (
     HamiltonInterface,
@@ -25,7 +26,9 @@ CHANNELS_384_96_8 = "1" + ("0" * 11)
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
 
-    pcr_plates = [f"P{i}" for i in range(8)]
+    plates = hp.prompt_int("Plates to pool: ", 8)
+
+    pcr_plates = [f"P{i}" for i in range(1, plates + 1)]
 
     # Define labware from parsed layout file
 
@@ -92,6 +95,11 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     racks_96 = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip96, [3, 3, 3], True)
     rack_96_tips, rack_96_virtual = dk.get_labware_list(deck, ["D2"], Tip96, [2])
     tips_96 = [(rack_96_tips, i) for i in range(96)]
+
+    # Inform user of labware positions, ask for confirmation after placing plates
+
+    hp.place_plates(pcr_plates, source_pcr_plates, "pcr")
+    hp.place_plates(pcr_plates, source_pooling_plates, "pooling")
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable

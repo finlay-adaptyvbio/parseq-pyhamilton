@@ -3,6 +3,7 @@ import os, csv
 import commands as cmd
 import deck as dk
 import state as st
+import helpers as hp
 
 from pyhamilton import (
     HamiltonInterface,
@@ -98,6 +99,11 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     source_wells = []
     target_wells = []
 
+    # Inform user of labware positions, ask for confirmation after placing plates
+
+    hp.place_plates(source_plates, source_bact_plates, "source")
+    hp.place_plates(target_plates, target_bact_plates, "target")
+
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable
     # TODO: Check if total number of tips available is enough for the protocol, add prompt when new tip racks are needed
@@ -163,18 +169,11 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.reset_state(state, state_file_path, "active_source_plate", 1)
 
                 # Build list of source wells for current plate
-                # FIXME: switch to external sorting to have csv reflect real mapping
 
-                source_indexes = dk.sort_384_indexes_2channel(
-                    [
-                        t[0]
-                        for t in wells_to_empty
-                        if t[1] == source_plates[state["current_source_plate"]]
-                    ]
-                )
                 source_wells = [
-                    (active_source_bact_plate, dk.string_to_index_384(i))
-                    for i in source_indexes
+                    (active_source_bact_plate, dk.string_to_index_384(t[0]))
+                    for t in wells_to_empty
+                    if t[1] == source_plates[state["current_source_plate"]]
                 ]
 
                 st.reset_state(state, state_file_path, "current_source_well", 0)

@@ -3,6 +3,7 @@ import os, csv
 import commands as cmd
 import deck as dk
 import state as st
+import helpers as hp
 
 from pyhamilton import (
     HamiltonInterface,
@@ -50,7 +51,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         Plate384,
         [6, 6],
         True,
-    )[0 : len(target_plates)]
+    )[-len(target_plates) :]
 
     source_bact_plates = dk.get_labware_list(
         deck,
@@ -58,7 +59,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         Plate384,
         [6, 6, 6],
         True,
-    )[0 : len(source_plates)]
+    )[-len(source_plates) :]
 
     dest_target_bact_plates = dk.get_labware_list(
         deck,
@@ -92,6 +93,11 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     source_wells = []
     target_wells = []
+
+    # Inform user of labware positions, ask for confirmation after placing plates
+
+    hp.place_plates(source_plates, source_bact_plates, "source")
+    hp.place_plates(target_plates, target_bact_plates, "target")
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable

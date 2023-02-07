@@ -3,6 +3,7 @@ import os, csv, requests, atexit
 import commands as cmd
 import deck as dk
 import state as st
+import helpers as hp
 
 from pyhamilton import (
     HamiltonInterface,
@@ -27,7 +28,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information
     # TODO: get plate info from prompt or csv file
 
-    pcr_plates = [f"P{i}" for i in range(4)]
+    plates = hp.prompt_int("Plates to process: ", 4)
+
+    pcr_plates = [f"P{i}" for i in range(1, plates + 1)]
 
     # Assign labware to deck positions
 
@@ -35,7 +38,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         deck,
         ["E1"],
         Plate384,
-        [5],
+        [4],
         True,
     )[0 : len(pcr_plates)]
 
@@ -57,6 +60,10 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     racks = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip384, [3, 3, 3], True)
     rack_tips, rack_virtual = dk.get_labware_list(deck, ["D2"], Tip384, [2])
     tips = [(rack_tips, i) for i in range(384)]
+
+    # Inform user of labware positions, ask for confirmation after placing plates
+
+    hp.place_plates(pcr_plates, source_pcr_plates, "pcr")
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable
