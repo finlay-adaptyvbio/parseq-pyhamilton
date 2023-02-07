@@ -24,7 +24,7 @@ CHANNEL_2 = "01"
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Get plates and well map from csv files
 
-    plate_map_path = os.path.join(run_dir_path, "plates.csv")
+    plate_map_path = os.path.join(run_dir_path, "pm_filling_plate_map.csv")
 
     with open(plate_map_path) as f:
         reader = csv.reader(f)
@@ -33,7 +33,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     target_plates = [t[0] for t in plate_map]
     source_plates = [t[1] for t in plate_map]
 
-    well_map_path = os.path.join(run_dir_path, "sorted_well_map.csv")
+    well_map_path = os.path.join(run_dir_path, "pm_filling_sorted_well_map.csv")
 
     with open(well_map_path) as f:
         reader = csv.reader(f)
