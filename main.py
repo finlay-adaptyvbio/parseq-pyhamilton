@@ -4,6 +4,7 @@ import os, sys, argparse, requests, atexit, time, datetime, shutil
 
 import deck as dk
 import state as st
+import helpers as hp
 
 # Notification settings for Slack on script exit
 
@@ -82,6 +83,8 @@ if __name__ == "__main__":
         ]
         print(f"{idx + 1:<5}{run:<25}{methods}")
     print(f"{'-' * 80}")
+
+    # Prompt for run id
 
     while True:
         run_idx = input("Run id (0 for new): ")
@@ -241,9 +244,9 @@ if __name__ == "__main__":
 
     # Run script
 
-    print(f"Method: {method}")
-    print(f"State: {state_path}")
-    print(f"Layout: {layout_path}")
+    print(f"{'Method:':<8}{method}")
+    print(f"{'State:':<8}{state_path}")
+    print(f"{'Layout:':<8}{layout_path}")
 
     # Get necessary input files depending on method and copy to temp dir
 
@@ -252,32 +255,50 @@ if __name__ == "__main__":
             # no other input needed
             from scripts import pooling as script
 
-            pass
         case "pcr_colony":
             # no other input needed
             from scripts import pcr_colony as script
 
-            pass
         case "pcr_barcode":
             # no other input needed
             from scripts import pcr_barcode as script
 
-            pass
         case "pm_emptying":
             # get sorted_well_map.csv
             from scripts import pm_emptying as script
 
-            pass
+            well_map_path = hp.prompt_file_path(
+                "Path to sorted_well_map.csv for run {run_id}: "
+            )
+            shutil.copy(
+                well_map_path,
+                os.path.join(run_dir_path, f"{method}_sorted_well_map.csv"),
+            )
+            hp.process_pm_csv(well_map_path, run_dir_path, method)
+
         case "pm_filling":
             # get sorted_well_map.csv
             from scripts import pm_filling as script
 
-            pass
+            well_map_path = hp.prompt_file_path(
+                "Path to sorted_well_map.csv for run {run_id}: "
+            )
+            shutil.copy(
+                well_map_path,
+                os.path.join(run_dir_path, f"{method}_sorted_well_map.csv"),
+            )
+            hp.process_pm_csv(well_map_path, run_dir_path, method)
+
         case "cherry_picking":
             # get sorted_well_list.csv
             from scripts import cherry_picking as script
 
-            pass
+            well_list_path = hp.prompt_file_path(
+                "Path to cherry.csv for run {run_id}: "
+            )
+            shutil.copy(well_list_path, os.path.join(run_dir_path, f"{method}.csv"))
+            hp.process_cherry_csv(well_list_path, run_dir_path, method)
+
         case _:
             raise ValueError(f"Method {method} not found.")
 

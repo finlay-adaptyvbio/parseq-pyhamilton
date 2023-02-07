@@ -45,13 +45,11 @@ def save_state(state, path):
 def update_state(state, path, key, value):
     state[key] += value
     save_state(state, path)
-    return state
 
 
 def reset_state(state, path, key, value):
     state[key] = value
     save_state(state, path)
-    return state
 
 
 def print_state(state):
