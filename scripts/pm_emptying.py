@@ -88,7 +88,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing plates
 
-    hp.place_plates(plates, source_bact_plates, "source")
+    hp.place_plates(plates, source_bact_plates, "source", state["current_plate"])
 
     # Main Hamilton method starts here
     # TODO: reduce loops to functions, for example wells_to_reservoir or reservoir_to_wells
@@ -150,8 +150,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 # Discard rack and get new one from stacked racks if current one is done
 
                 if state["current_tip"] >= TIPS:
-                    cmd.grip_get_tip_rack(hammy, tips)
-                    cmd.grip_place_tip_rack(hammy, tips, waste=True)
+                    cmd.grip_get_tip_rack(hammy, rack_tips)
+                    cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
                     cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
                     cmd.grip_place_tip_rack(hammy, rack_virtual)
 
@@ -262,8 +262,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 # Discard rack and get new one from stacked racks if current one is done
 
                 if state["current_tip"] >= TIPS:
-                    cmd.grip_get_tip_rack(hammy, tips)
-                    cmd.grip_place_tip_rack(hammy, tips, waste=True)
+                    cmd.grip_get_tip_rack(hammy, rack_tips)
+                    cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
                     cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
                     cmd.grip_place_tip_rack(hammy, rack_virtual)
 
@@ -350,8 +350,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 # Discard rack and get new one from stacked racks if current one is done
 
                 if state["current_tip"] >= TIPS:
-                    cmd.grip_get_tip_rack(hammy, tips)
-                    cmd.grip_place_tip_rack(hammy, tips, waste=True)
+                    cmd.grip_get_tip_rack(hammy, rack_tips)
+                    cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
                     cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
                     cmd.grip_place_tip_rack(hammy, rack_virtual)
 

@@ -279,7 +279,7 @@ if __name__ == "__main__":
 
             if get_input_files:
                 well_map_path = hp.prompt_file_path(
-                    "Path to sorted_well_map.csv for run {run_id}: "
+                    "Path to sorted_well_map.csv for run {run_id}"
                 )
                 shutil.copy(
                     well_map_path,
@@ -295,7 +295,7 @@ if __name__ == "__main__":
 
             if get_input_files:
                 well_map_path = hp.prompt_file_path(
-                    f"Path to sorted_well_map.csv for run {run_id}: "
+                    f"Path to sorted_well_map.csv for run {run_id}"
                 )
                 shutil.copy(
                     well_map_path,
@@ -311,7 +311,7 @@ if __name__ == "__main__":
 
             if get_input_files:
                 well_list_path = hp.prompt_file_path(
-                    f"Path to cherry.csv for run {run_id}: "
+                    f"Path to cherry.csv for run {run_id}"
                 )
                 shutil.copy(well_list_path, os.path.join(run_dir_path, f"{method}.csv"))
                 hp.process_cherry_csv(well_list_path, run_dir_path, method)

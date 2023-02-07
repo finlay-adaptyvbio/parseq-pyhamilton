@@ -151,15 +151,16 @@ def process_pm_csv(csv_path: str, output_dir: str, prefix: str):
     )
 
 
-def place_plates(plates: list, labwares: list, type: str):
+def place_plates(plates: list, labwares: list, type: str, done: int):
+    done_plates = [1 for i in range(done)] + [0 for i in range(len(plates) - done)]
     print("-" * 80)
-    print(f"Please place {type} plates in the following positions:")
+    print(f"Please place {type} plates in the following positions (ignore if done):")
     print("-" * 80)
-    print(f"{'Plates':<15}{'Position':<10}{'Level':<10}{'Labware':<10}")
+    print(f"{'Plate':<10}{'Position':<10}{'Level':<8}{'Labware':<12}{'Done':<10}")
 
-    for t in zip(plates, labwares):
+    for t in zip(plates, labwares, done_plates):
         pos, labware, level = t[1].layout_name().split("_")
-        print(f"{t[0]:<15}{pos:<10}{level[-1]:<10}{labware:<10}")
+        print(f"{t[0]:<10}{pos:<10}{level[-1]:<8}{labware:<12}{str(bool(t[2])):<10}")
 
     print("-" * 80)
     input(f"Press enter when all {type} plates are in place...")

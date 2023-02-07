@@ -28,7 +28,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information
     # TODO: get plate info from prompt or csv file
 
-    plates = hp.prompt_int("Plates to process: ", 4)
+    plates = hp.prompt_int("Plates to process", 4)
 
     pcr_plates = [f"P{i}" for i in range(1, plates + 1)]
 
@@ -63,7 +63,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing plates
 
-    hp.place_plates(pcr_plates, source_pcr_plates, "pcr")
+    hp.place_plates(pcr_plates, source_pcr_plates, "pcr", state["current_pcr_plate"])
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable

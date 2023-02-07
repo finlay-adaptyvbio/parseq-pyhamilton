@@ -26,7 +26,7 @@ CHANNELS_384_96_8 = "1" + ("0" * 11)
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
 
-    plates = hp.prompt_int("Plates to pool: ", 8)
+    plates = hp.prompt_int("Plates to pool", 8)
 
     pcr_plates = [f"P{i}" for i in range(1, plates + 1)]
 
@@ -38,7 +38,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         Plate384,
         [8],
         True,
-    )[0 : len(pcr_plates)]
+    )[-len(pcr_plates) :]
 
     dest_pcr_plates = dk.get_labware_list(
         deck,
@@ -54,7 +54,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         Plate96,
         [8],
         True,
-    )[0 : len(pcr_plates)]
+    )[-len(pcr_plates) :]
 
     dest_pooling_plates = dk.get_labware_list(
         deck,
@@ -98,8 +98,10 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing plates
 
-    hp.place_plates(pcr_plates, source_pcr_plates, "pcr")
-    hp.place_plates(pcr_plates, source_pooling_plates, "pooling")
+    hp.place_plates(pcr_plates, source_pcr_plates, "pcr", state["current_pcr_plate"])
+    hp.place_plates(
+        pcr_plates, source_pooling_plates, "pooling", state["current_pooling_plate"]
+    )
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable

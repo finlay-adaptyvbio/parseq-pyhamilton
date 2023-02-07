@@ -96,8 +96,12 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing plates
 
-    hp.place_plates(source_plates, source_bact_plates, "source")
-    hp.place_plates(target_plates, target_bact_plates, "target")
+    hp.place_plates(
+        source_plates, source_bact_plates, "source", state["current_source_plate"]
+    )
+    hp.place_plates(
+        target_plates, target_bact_plates, "target", state["current_target_plate"]
+    )
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable
