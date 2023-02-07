@@ -1,13 +1,13 @@
 from pyhamilton import (
     LayoutManager,
     ResourceType,
-    Lid,
+    Lid,  # type: ignore
     Plate96,
     Plate384,
     Tip96,
-    Tip384,
-    Reservoir300,
-    EppiCarrier24,
+    Tip384,  # type: ignore
+    Reservoir300,  # type: ignore
+    EppiCarrier24,  # type: ignore
 )
 
 from pyhamilton.oemerr import ResourceUnavailableError
@@ -187,12 +187,19 @@ def pos_96_in_384(quadrant: int):
     return pos
 
 
-def pos_2ch(stop: int, start: int = 0):
+def pos_96_2ch(stop: int, start: int = 0):
     pos = []
-    for i in range(start, stop - 1, 2):
-        pos.append(i)
-    for j in range(start + 1, stop, 2):
-        pos.append(j)
+    for i in range(2):
+        for j in range(start + i, stop, 2):
+            pos.append(j)
+    return pos
+
+
+def pos_384_2ch(stop: int, start: int = 0):
+    pos = []
+    for i in range(5):
+        for j in range(start + i, stop, 5):
+            pos.append(j)
     return pos
 
 
@@ -213,7 +220,6 @@ def sort_384_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
 
     rows = "ABCDEFGHIJKLMNOP"
 
-    unsorted_indexes_set = set(unsorted_indexes)
     unsorted_indexes_by_col = sorted(unsorted_indexes, key=lambda x: int(x[1:]))
 
     for col in range(1, 25):
@@ -251,7 +257,6 @@ def sort_96_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
 
     rows = "ABCDEFGH"
 
-    unsorted_indexes_set = set(unsorted_indexes)
     unsorted_indexes_by_col = sorted(unsorted_indexes, key=lambda x: int(x[1:]))
 
     for col in range(1, 13):
