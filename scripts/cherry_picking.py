@@ -20,21 +20,23 @@ CHANNELS = 2
 CHANNEL_1 = "10"
 CHANNEL_2 = "01"
 
+LIQUID_CLASS = "Tip_50ul_Water_DispenseJet_Empty"
+
 
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Get plates and well map from csv files
 
-    plates_path = os.path.join(run_dir_path, "cherry_plates.csv")
+    plates_path = os.path.join(run_dir_path, "cherry_picking_plates.csv")
 
-    with open(plates_path) as f:
+    with open(plates_path, "r") as f:
         reader = csv.reader(f)
         plates = [row[0] for row in reader]
 
     source_plates = [p for p in plates]
 
-    wells_path = os.path.join(run_dir_path, "cherry_wells.csv")
+    wells_path = os.path.join(run_dir_path, "cherry_picking_wells.csv")
 
-    with open(wells_path) as f:
+    with open(wells_path, "r") as f:
         reader = csv.reader(f)
         wells = [tuple(row) for row in reader]
 
@@ -42,8 +44,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     target_plates = [f"P{i}" for i in range(1, len(wells) // 384 + 2)]
     wells_to_fill = [
-        (p, w) for w in dk.pos_384_2ch(384) for p in target_plates[:-1]
-    ] + [(target_plates[-1], w) for w in dk.pos_384_2ch(len(wells) % 384)]
+        (w, p) for w in dk.pos_384_2ch(384) for p in target_plates[:-1]
+    ] + [(w, target_plates[-1]) for w in dk.pos_384_2ch(len(wells) % 384)]
 
     # Assign labware to deck positions
 
@@ -53,7 +55,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         Plate384,
         [6, 6],
         True,
-    )[0 : len(target_plates)]
+    )[-len(target_plates) :]
 
     source_bact_plates = dk.get_labware_list(
         deck,
@@ -61,7 +63,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         Plate384,
         [6, 6, 6],
         True,
-    )[0 : len(source_plates)]
+    )[-len(source_plates) :]
 
     dest_target_bact_plates = dk.get_labware_list(
         deck,
@@ -132,7 +134,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 # Build list of target wells for current plate
 
                 target_wells = [
-                    (active_target_bact_plate, dk.string_to_index_384(t[0]))
+                    (active_target_bact_plate, t[0])
                     for t in wells_to_fill
                     if t[1] == target_plates[state["current_target_plate"]]
                 ]
@@ -161,105 +163,21 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.reset_state(state, state_file_path, "active_source_plate", 1)
 
                 # Build list of source wells for current plate
+                # FIXME: switch to external sorting to have csv reflect real mapping
 
+                source_indexes = dk.sort_384_indexes_2channel(
+                    [
+                        t[0]
+                        for t in wells_to_empty
+                        if t[1] == source_plates[state["current_source_plate"]]
+                    ]
+                )
                 source_wells = [
-                    (active_source_bact_plate, dk.string_to_index_384(t[0]))
-                    for t in wells_to_empty
-                    if t[1] == source_plates[state["current_source_plate"]]
+                    (active_source_bact_plate, dk.string_to_index_384(i))
+                    for i in source_indexes
                 ]
 
                 st.reset_state(state, state_file_path, "current_source_well", 0)
-
-            # Check if there are still tips in the active rack
-            # Discard rack and get new one from stacked racks if current one is done
-
-            if state["current_tip"] >= TIPS:
-                cmd.grip_get_tip_rack(hammy, rack_tips)
-                cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
-                cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
-                cmd.grip_place_tip_rack(hammy, rack_virtual)
-
-                st.update_state(state, state_file_path, "current_rack", 1)
-                st.reset_state(state, state_file_path, "current_tip", 0)
-
-            # Check how many wells are left to pipet in the current source and target plate
-            # Also check if there are enough tips left to pipet the remaining wells
-
-            # This outputs the minimum of the three values (wells left, tips left, channels)
-
-            source_well_stop = min(
-                CHANNELS,
-                len(source_wells[state["current_source_well"] :]),
-                (TIPS - state["current_tip"]),
-            )
-            target_well_stop = min(
-                CHANNELS,
-                len(target_wells[state["current_target_well"] :]),
-                (TIPS - state["current_tip"]),
-            )
-
-            # In the case that there is only one well left to pipet, use only one channel
-
-            if source_well_stop == 1 or target_well_stop == 1:
-                cmd.tip_pick_up(
-                    hammy, [tips[state["current_tip"]]], channelVariable=CHANNEL_1
-                )
-                cmd.aspirate(
-                    hammy,
-                    [source_wells[state["current_source_well"]]],
-                    [100],
-                    channelVariable=CHANNEL_1,
-                    mixCycles=3,
-                    mixVolume=50.0,
-                )
-                cmd.dispense(
-                    hammy,
-                    [target_wells[state["current_target_well"]]],
-                    [100],
-                    channelVariable=CHANNEL_1,
-                    dispenseMode=9,
-                )
-                cmd.tip_eject(hammy, [tips[state["current_tip"]]], waste=True)
-
-                st.update_state(state, state_file_path, "current_source_well", 1)
-                st.update_state(state, state_file_path, "current_target_well", 1)
-                st.update_state(state, state_file_path, "current_tip", 1)
-
-            # Otherwise, use all channels (as long as pipetting steps are equal between source and target)
-
-            elif source_well_stop == CHANNELS and target_well_stop == CHANNELS:
-                cmd.tip_pick_up(
-                    hammy,
-                    tips[state["current_tip"] : state["current_tip"] + CHANNELS],
-                )
-                cmd.aspirate(
-                    hammy,
-                    source_wells[
-                        state["current_source_well"] : state["current_source_well"]
-                        + CHANNELS
-                    ],
-                    [100],
-                    mixCycles=3,
-                    mixVolume=50.0,
-                )
-                cmd.dispense(
-                    hammy,
-                    target_wells[
-                        state["current_target_well"] : state["current_target_well"]
-                        + CHANNELS
-                    ],
-                    [100],
-                    dispenseMode=9,
-                )
-                cmd.tip_eject(
-                    hammy,
-                    tips[state["current_tip"] : state["current_tip"] + CHANNELS],
-                    waste=True,
-                )
-
-                st.update_state(state, state_file_path, "current_source_well", CHANNELS)
-                st.update_state(state, state_file_path, "current_target_well", CHANNELS)
-                st.update_state(state, state_file_path, "current_tip", CHANNELS)
 
             # Check if there are still wells to process in the current source plate
             # Swich to next source plate if current one is done
@@ -308,5 +226,100 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
                 st.update_state(state, state_file_path, "current_target_plate", 1)
                 st.reset_state(state, state_file_path, "active_target_plate", 0)
+
+            # Check if there are still tips in the active rack
+            # Discard rack and get new one from stacked racks if current one is done
+
+            if state["current_tip"] >= TIPS:
+                cmd.grip_get_tip_rack(hammy, rack_tips)
+                cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
+                cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
+                cmd.grip_place_tip_rack(hammy, rack_virtual)
+
+                st.update_state(state, state_file_path, "current_rack", 1)
+                st.reset_state(state, state_file_path, "current_tip", 0)
+
+            # Check how many wells are left to pipet in the current source and target plate
+            # Also check if there are enough tips left to pipet the remaining wells
+
+            # This outputs the minimum of the three values (wells left, tips left, channels)
+
+            source_well_stop = min(
+                CHANNELS,
+                len(source_wells[state["current_source_well"] :]),
+                (TIPS - state["current_tip"]),
+            )
+            target_well_stop = min(
+                CHANNELS,
+                len(target_wells[state["current_target_well"] :]),
+                (TIPS - state["current_tip"]),
+            )
+
+            # In the case that there is only one well left to pipet, use only one channel
+
+            if source_well_stop == 1 or target_well_stop == 1:
+                cmd.tip_pick_up(
+                    hammy, [tips[state["current_tip"]]], channelVariable=CHANNEL_1
+                )
+                cmd.aspirate(
+                    hammy,
+                    [source_wells[state["current_source_well"]]],
+                    [5],
+                    channelVariable=CHANNEL_1,
+                    mixCycles=3,
+                    mixVolume=50.0,
+                    liquidClass=LIQUID_CLASS,
+                )
+                cmd.dispense(
+                    hammy,
+                    [target_wells[state["current_target_well"]]],
+                    [5],
+                    channelVariable=CHANNEL_1,
+                    dispenseMode=9,
+                    liquidClass=LIQUID_CLASS,
+                )
+                cmd.tip_eject(hammy, [tips[state["current_tip"]]], waste=True)
+
+                st.update_state(state, state_file_path, "current_source_well", 1)
+                st.update_state(state, state_file_path, "current_target_well", 1)
+                st.update_state(state, state_file_path, "current_tip", 1)
+
+            # Otherwise, use all channels (as long as pipetting steps are equal between source and target)
+
+            elif source_well_stop == CHANNELS and target_well_stop == CHANNELS:
+                cmd.tip_pick_up(
+                    hammy,
+                    tips[state["current_tip"] : state["current_tip"] + CHANNELS],
+                )
+                cmd.aspirate(
+                    hammy,
+                    source_wells[
+                        state["current_source_well"] : state["current_source_well"]
+                        + CHANNELS
+                    ],
+                    [5.0],
+                    mixCycles=3,
+                    mixVolume=50.0,
+                    liquidClass=LIQUID_CLASS,
+                )
+                cmd.dispense(
+                    hammy,
+                    target_wells[
+                        state["current_target_well"] : state["current_target_well"]
+                        + CHANNELS
+                    ],
+                    [5.0],
+                    dispenseMode=9,
+                    liquidClass=LIQUID_CLASS,
+                )
+                cmd.tip_eject(
+                    hammy,
+                    tips[state["current_tip"] : state["current_tip"] + CHANNELS],
+                    waste=True,
+                )
+
+                st.update_state(state, state_file_path, "current_source_well", CHANNELS)
+                st.update_state(state, state_file_path, "current_target_well", CHANNELS)
+                st.update_state(state, state_file_path, "current_tip", CHANNELS)
 
             st.print_state(state)

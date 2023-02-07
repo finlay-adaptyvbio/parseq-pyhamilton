@@ -31,18 +31,11 @@ DEFAULT_GRIP_TOOL_SEQUENCE = "CORE_Grip"
 DEFAULT_LIQUID_CLASS_2CH = "StandardVolume_Water_DispenseJet_Empty"
 DEFAULT_LIQUID_CLASS_384MPH = "50ulTip_conductive_384COREHead_Water_DispenseJet_Empty"
 
-# Formatting constants
-
-STR1 = 20
-STR2 = 20
-STR3 = 20
-STR4 = 20
-
 # TODO: Add docstrings
 
 
 def initialize(ham: HamiltonInterface):
-    print(f"Command: {'initialize':<STR1}")
+    print(f"Command: {'initialize'}")
 
     cid = ham.send_command(INITIALIZE)
 
@@ -70,8 +63,7 @@ def grip_get(
     **kw_args,
 ):
     print(
-        f"Command: {'grip_get':<STR1} | Labware: {labware.layout_name():<STR2} |"
-        f" Mode: {mode:<STR3}"
+        f"Command: {'grip_get'} | Labware: {labware.layout_name()} |" f" Mode: {mode}"
     )
 
     labwarePositions = labware_pos_str(labware, 0)
@@ -110,8 +102,8 @@ def grip_place(
     **kw_args,
 ):
     print(
-        f"Command: {'grip_place':<STR1} | Labware: {labware.layout_name():<STR2} |"
-        f" Mode: {mode:<STR3} | Eject: {eject:<STR4}"
+        f"Command: {'grip_place'} | Labware: {labware.layout_name()} |"
+        f" Mode: {mode} | Eject: {eject}"
     )
 
     labwarePositions = labware_pos_str(labware, 0)
@@ -151,9 +143,9 @@ def tip_pick_up(
     **kw_args,
 ):
     print(
-        f"Command: {'tip_pick_up':<STR1} | Labware:"
-        f" {positions[0][0].layout_name():<STR2} | Positions:"
-        f" {[p[0].position_id(p[1]) for p in positions]:<STR3}"
+        f"Command: {'tip_pick_up'} | Labware:"
+        f" {positions[0][0].layout_name()} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]}"
     )
 
     labwarePositions = compound_pos_str(positions)
@@ -177,10 +169,10 @@ def tip_eject(
     **kw_args,
 ):
     print(
-        f"Command: {'tip_eject':<STR1} | Labware:"
-        f" {positions[0][0].layout_name():<STR2} | Positions:"
-        f" {[p[0].position_id(p[1]) for p in positions]:<STR3} | Waste:"
-        f" {waste:<STR4}"
+        f"Command: {'tip_eject'} | Labware:"
+        f" {positions[0][0].layout_name()} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]} | Waste:"
+        f" {waste}"
     )
 
     if waste:
@@ -211,10 +203,10 @@ def aspirate(
     **kw_args,
 ):
     print(
-        f"Command: {'aspirate':<STR1} | Labware:"
-        f" {positions[0][0].layout_name():<STR2} | Positions:"
-        f" {[p[0].position_id(p[1]) for p in positions]:<STR3} | Volumes:"
-        f" {volumes:<STR4}"
+        f"Command: {'aspirate'} | Labware:"
+        f" {positions[0][0].layout_name()} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]} | Volumes:"
+        f" {volumes}"
     )
 
     if len(volumes) < len(positions):
@@ -247,10 +239,10 @@ def dispense(
     **kw_args,
 ):
     print(
-        f"Command: {'dispense':<STR1} | Labware:"
-        f" {positions[0][0].layout_name():<STR2} | Positions:"
-        f" {[p[0].position_id(p[1]) for p in positions]:<STR3} | Volumes:"
-        f" {volumes:<STR4}"
+        f"Command: {'dispense'} | Labware:"
+        f" {positions[0][0].layout_name()} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]} | Volumes:"
+        f" {volumes}"
     )
 
     if len(volumes) < len(positions):
@@ -282,8 +274,8 @@ def tip_pick_up_384(
     **kw_args,
 ):
     print(
-        f"Command: {'tip_pick_up_384':<STR1} | Labware:"
-        f" {positions[0][0].layout_name():<STR2} | Positions: {len(positions):<STR3}"
+        f"Command: {'tip_pick_up_384'} | Labware:"
+        f" {positions[0][0].layout_name()} | Positions: {len(positions)}"
     )
 
     labwarePositions = compound_pos_str(positions)
@@ -307,9 +299,9 @@ def tip_eject_384(
     **kw_args,
 ):
     print(
-        f"Command: {'tip_eject_384':<STR1} | Labware:"
-        f" {positions[0][0].layout_name():<STR2} | Positions: {len(positions):<STR3} |"
-        f" Mode: {mode:<STR4}"
+        f"Command: {'tip_eject_384'} | Labware:"
+        f" {positions[0][0].layout_name()} | Positions: {len(positions)} |"
+        f" Mode: {mode}"
     )
 
     tipEjectToKnownPosition = int(mode)
@@ -343,9 +335,9 @@ def aspirate_384(
     **kw_args,
 ):
     print(
-        f"Command: {'aspirate_384':<STR1} | Labware:"
-        f" {positions[0][0].layout_name():<STR2} | Positions: {len(positions):<STR3} |"
-        f" Volume: {volume:<STR4}"
+        f"Command: {'aspirate_384'} | Labware:"
+        f" {positions[0][0].layout_name()} | Positions: {len(positions)} |"
+        f" Volume: {volume}"
     )
 
     if "liquidClass" not in kw_args:
@@ -373,9 +365,9 @@ def dispense_384(
     **kw_args,
 ):
     print(
-        f"Command: {'dispense_384':<STR1} | Labware:"
-        f" {positions[0][0].layout_name():<STR2} | Positions: {len(positions):<STR3} |"
-        f" Volume: {volume:<STR4}"
+        f"Command: {'dispense_384'} | Labware:"
+        f" {positions[0][0].layout_name()} | Positions: {len(positions)} |"
+        f" Volume: {volume}"
     )
 
     if "liquidClass" not in kw_args:
@@ -401,9 +393,7 @@ def grip_get_tip_rack(
     labware: Union[Tip96, Tip384],
     **kw_args,
 ):
-    print(
-        f"Command: {'grip_get_tip_rack':<STR1} | Labware: {labware.layout_name():<STR2}"
-    )
+    print(f"Command: {'grip_get_tip_rack'} | Labware: {labware.layout_name()}")
 
     labwarePositions = labware_pos_str(labware, 0)
 
@@ -439,8 +429,8 @@ def grip_place_tip_rack(
     **kw_args,
 ):
     print(
-        f"Command: {'grip_get_tip_rack':<STR1} | Labware:"
-        f" {labware.layout_name():<STR2} | Waste: {waste:<STR3} | Eject: {eject:<STR4}"
+        f"Command: {'grip_get_tip_rack'} | Labware:"
+        f" {labware.layout_name()} | Waste: {waste} | Eject: {eject}"
     )
 
     ejectToolWhenFinish = eject

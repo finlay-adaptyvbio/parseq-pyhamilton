@@ -51,7 +51,7 @@ deck = {
 # Define layout file and parse it
 
 LAYOUT_FILE_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "pooling/pooling.lay"
+    os.path.dirname(os.path.abspath(__file__)), "layouts/cherry_picking.lay"
 )
 
 lmgr = LayoutManager(LAYOUT_FILE_PATH)
