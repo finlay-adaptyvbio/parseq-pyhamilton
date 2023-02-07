@@ -1,9 +1,11 @@
 {
     "current_plate": 0,
     "current_well": 0,
-    "current_step": 0,
     "current_rack": 0,
     "current_tip": 0,
     "channel_steps": 0,
-    "active_plate": 0
+    "active_plate": 0,
+    "remove_media": 0,
+    "add_ethanol": 0,
+    "remove_ethanol": 0
 }

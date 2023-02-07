@@ -10,6 +10,9 @@
     "current_tip": 0,
     "active_pooling_plate": 0,
     "active_pcr_plate": 0,
+    "active_rack": 0,
     "edta": 0,
-    "active_rack": 0
+    "384_to_96": 0,
+    "96_to_8": 0,
+    "8_to_1": 0
 }
