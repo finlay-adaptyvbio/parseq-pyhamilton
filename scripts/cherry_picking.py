@@ -1,308 +1,312 @@
+import os, csv
+
 import commands as cmd
 import deck as dk
 import state as st
 
 from pyhamilton import (
     HamiltonInterface,
-    LayoutManager,
-    Lid,
-    Plate96,
     Plate384,
+    Lid,  # type: ignore
     Tip96,
-    Tip384,
-    Reservoir300,
-    EppiCarrier24,
 )
 
-RACKS = 9
-TIPS_96 = 96
-TIPS_384 = 384
+# Constants
 
-CHANNELS_384_96_8 = "1" + ("0" * 11)
+RACKS = 12
+TIPS = 96
+
+CHANNELS = 2
+CHANNEL_1 = "10"
+CHANNEL_2 = "01"
 
 
-def run(deck: dict, state: dict, state_file_path: str, temp_file_path: str):
-    # Plate information and variables
-    pcr_plates = [f"P{i}" for i in range(8)]
+def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+    # Get plates and well map from csv files
 
-    # Define labware from parsed layout file
-    # TODO: Allow user to specify labware type and number of labware from prompt
+    plates_path = os.path.join(run_dir_path, "cherry_plates.csv")
 
-    source_pcr_plates = dk.get_labware_list(
+    with open(plates_path) as f:
+        reader = csv.reader(f)
+        plates = [row[0] for row in reader]
+
+    source_plates = [p for p in plates]
+
+    wells_path = os.path.join(run_dir_path, "cherry_wells.csv")
+
+    with open(wells_path) as f:
+        reader = csv.reader(f)
+        wells = [tuple(row) for row in reader]
+
+    wells_to_empty = [(t[0], t[1]) for t in wells]
+
+    target_plates = [f"P{i}" for i in range(1, len(wells) // 384 + 2)]
+    wells_to_fill = [
+        (p, w) for w in dk.pos_384_2ch(384) for p in target_plates[:-1]
+    ] + [(target_plates[-1], w) for w in dk.pos_384_2ch(len(wells) % 384)]
+
+    # Assign labware to deck positions
+
+    target_bact_plates = dk.get_labware_list(
         deck,
-        ["E1"],
+        ["F1", "F2"],
         Plate384,
-        [8],
+        [6, 6],
         True,
-    )[0 : len(pcr_plates)]
+    )[0 : len(target_plates)]
 
-    dest_pcr_plates = dk.get_labware_list(
+    source_bact_plates = dk.get_labware_list(
         deck,
-        ["E2"],
+        ["E1", "E2", "E3"],
         Plate384,
-        [8],
-        False,
-    )[0 : len(pcr_plates)]
-
-    source_pooling_plates = dk.get_labware_list(
-        deck,
-        ["F1"],
-        Plate96,
-        [8],
+        [6, 6, 6],
         True,
-    )[0 : len(pcr_plates)]
+    )[0 : len(source_plates)]
 
-    dest_pooling_plates = dk.get_labware_list(
+    dest_target_bact_plates = dk.get_labware_list(
         deck,
-        ["F2"],
-        Plate96,
-        [8],
+        ["F3", "F1", "F2"],
+        Plate384,
+        [6, 6, 6],
         False,
-    )[0 : len(pcr_plates)]
+    )[0 : len(target_plates)]
 
-    edta_reservoir = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
-    edta = [(edta_reservoir, i) for i in range(384)]
+    dest_source_bact_plates = dk.get_labware_list(
+        deck,
+        ["F4", "E1", "E2", "E3"],
+        Plate384,
+        [6, 6, 6, 6],
+        False,
+    )[0 : len(source_plates)]
 
-    edta_rack = dk.get_labware_list(deck, ["B5"], Tip384)[0]
-    edta_tips = [(edta_rack, i) for i in range(384)]
+    active_source_bact_plate = dk.get_labware_list(deck, ["E5"], Plate384)[0]
+    active_source_bact_lid = dk.get_labware_list(deck, ["E5"], Lid)[0]
+    temp_source_bact_lid = dk.get_labware_list(deck, ["C3"], Lid)[0]
 
-    active_pcr_plate = dk.get_labware_list(deck, ["C4"], Plate384)[0]
-    active_pcr_wells = [(active_pcr_plate, i) for i in range(384)]
-    active_pcr_lid = dk.get_labware_list(deck, ["C4"], Lid)[0]
-    temp_pcr_lid = dk.get_labware_list(deck, ["C2"], Lid)[0]
+    active_target_bact_plate = dk.get_labware_list(deck, ["E4"], Plate384)[0]
+    active_target_bact_lid = dk.get_labware_list(deck, ["E4"], Lid)[0]
+    temp_target_bact_lid = dk.get_labware_list(deck, ["C2"], Lid)[0]
 
-    active_pooling_plate = dk.get_labware_list(deck, ["C3"], Plate96)[0]
-    active_pooling_wells = [(active_pooling_plate, i) for i in range(96)]
-    active_pooling_wells_8ch = [(active_pooling_plate, i) for i in range(8)]
-    active_pooling_wells_2ch = [(active_pooling_plate, i) for i in dk.pos_2ch(8)]
+    racks = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip96, [4, 4, 4], True)
+    rack_tips, rack_virtual = dk.get_labware_list(deck, ["F5"], Tip96, [2])
+    tips = [(rack_tips, i) for i in dk.pos_96_2ch(96)]
 
-    eppicarrier = dk.get_labware_list(deck, ["C1"], EppiCarrier24)[0]
-    eppies = [(eppicarrier, i) for i in range(24)]
+    # HACK: get rid of type errors due to state not being initialized
 
-    column_rack = dk.get_labware_list(deck, ["A3"], Tip96)[0]
-    column_rack_tips = [(column_rack, i) for i in range(96)]
+    source_wells = []
+    target_wells = []
 
-    column_holder = dk.get_labware_list(deck, ["A4"], Tip96)[0]
-    column_holder_tips = [(column_holder, i) for i in range(96)]
-
-    rack_300 = dk.get_labware_list(deck, ["F5"], Tip96)[0]
-    tips_300 = [(rack_300, i) for i in dk.pos_2ch(96)]
-
-    racks_96 = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip96, [3, 3, 3], True)
-    rack_96_tips, rack_96_virtual = dk.get_labware_list(deck, ["D2"], Tip96, [2])
-    tips_96 = [(rack_96_tips, i) for i in range(96)]
+    # Main script starts here
+    # TODO: reduce loops to functions to make it more readable
+    # TODO: Check if total number of tips available is enough for the protocol, add prompt when new tip racks are needed
 
     with HamiltonInterface(simulate=True) as hammy:
+        # Initialize Hamilton
+
         cmd.initialize(hammy)
 
-        cmd.tip_pick_up_384(hammy, column_rack_tips, tipMode=1)
-        cmd.tip_eject_384(hammy, column_holder_tips)
+        # Loop over plates as long as there are still source plates to process
 
-        # Loop over plates as long as there are still pcr plates to process
+        while state["current_source_plate"] < len(source_plates) - 1:
+            # Get next target plate if not already done
 
-        while state["current_pcr_plate"] < len(source_pcr_plates):
-            # Get next pcr plate from source stack if not already done
-
-            if not state["active_pcr_plate"]:
+            if not state["active_target_plate"]:
                 cmd.grip_get(
                     hammy,
-                    source_pcr_plates[state["current_pcr_plate"]],
+                    target_bact_plates[state["current_target_plate"]],
                     mode=0,
-                    gripWidth=81.0,
-                    gripHeight=4.0,
+                    gripWidth=82.0,
                 )
-                cmd.grip_place(hammy, active_pcr_plate, mode=0)
-                cmd.grip_get(
-                    hammy, active_pcr_lid, mode=1, gripWidth=85.0, gripHeight=0.5
-                )
-                cmd.grip_place(hammy, temp_pcr_lid, mode=1)
-
-                st.reset_state(state, state_file_path, "active_pcr_plate", 1)
-
-            # Get next pooling plate from source stack if not already done
-
-            if not state["active_pooling_plate"]:
+                cmd.grip_place(hammy, active_target_bact_plate, mode=0)
                 cmd.grip_get(
                     hammy,
-                    source_pooling_plates[state["current_pooling_plate"]],
-                    mode=0,
-                    gripWidth=81.0,
+                    active_target_bact_lid,
+                    mode=1,
+                    gripWidth=85.2,
                     gripHeight=5.0,
                 )
-                cmd.grip_place(hammy, active_pooling_plate, mode=0)
+                cmd.grip_place(hammy, temp_target_bact_lid, mode=1)
 
-                st.reset_state(state, state_file_path, "active_pooling_plate", 1)
+                st.reset_state(state, state_file_path, "active_target_plate", 1)
 
-            # Add EDTA to pcr plate if not already done
+                # Build list of target wells for current plate
 
-            if not state["edta"]:
-                cmd.tip_pick_up_384(hammy, edta_tips)
-                cmd.aspirate_384(hammy, edta, 20.0, liquidHeight=2.0)
-                cmd.dispense_384(
-                    hammy, active_pcr_wells, 20.0, liquidHeight=11.0, dispenseMode=9
-                )
-                cmd.tip_eject_384(hammy, edta_tips, 1)
+                target_wells = [
+                    (active_target_bact_plate, dk.string_to_index_384(t[0]))
+                    for t in wells_to_fill
+                    if t[1] == target_plates[state["current_target_plate"]]
+                ]
 
-                st.reset_state(state, state_file_path, "edta", 1)
+                st.reset_state(state, state_file_path, "current_target_well", 0)
 
-            # Get next 96_384-tip rack if not already done
+            # Get next source plate if not already done
 
-            if not state["active_rack"]:
-                cmd.grip_get_tip_rack(hammy, racks_96[state["current_rack"]])
-                cmd.grip_place_tip_rack(hammy, rack_96_virtual)
-
-                st.reset_state(state, state_file_path, "active_rack", True)
-
-            # Transfer 384 wells in pcr plate to 96 in pooling plate
-
-            cmd.tip_pick_up_384(hammy, tips_96, tipMode=1)
-
-            for quadrant in range(state["current_quadrant"], 4):
-                pcr_wells = [(active_pcr_plate, i) for i in dk.pos_96_in_384(quadrant)]
-
-                cmd.aspirate_384(
+            if not state["active_source_plate"]:
+                cmd.grip_get(
                     hammy,
-                    pcr_wells,
-                    5.0,
-                    liquidHeight=3.0,
-                    mixCycles=3,
-                    mixVolume=20.0,
+                    source_bact_plates[state["current_source_plate"]],
+                    mode=0,
+                    gripWidth=82.0,
                 )
-                cmd.dispense_384(
+                cmd.grip_place(hammy, active_source_bact_plate, mode=0)
+                cmd.grip_get(
                     hammy,
-                    active_pooling_wells,
-                    5.0,
-                    liquidHeight=10.0,
-                    dispenseMode=9,
+                    active_source_bact_lid,
+                    mode=1,
+                    gripWidth=85.2,
+                    gripHeight=5.0,
                 )
+                cmd.grip_place(hammy, temp_source_bact_lid, mode=1)
 
-                st.update_state(state, state_file_path, "current_quadrant", 1)
+                st.reset_state(state, state_file_path, "active_source_plate", 1)
 
-            cmd.tip_eject_384(hammy, tips_96, 2)
+                # Build list of source wells for current plate
 
-            # Transfer columns 2-12 to column 1 in pooling plate using 8 tips on 384-head
+                source_wells = [
+                    (active_source_bact_plate, dk.string_to_index_384(t[0]))
+                    for t in wells_to_empty
+                    if t[1] == source_plates[state["current_source_plate"]]
+                ]
 
-            column_tips = [(column_holder, i) for i in dk.pos_96_rev()][
-                state["current_tip_column"] * 8 :
-            ]
+                st.reset_state(state, state_file_path, "current_source_well", 0)
 
-            cmd.tip_pick_up_384(
-                hammy,
-                column_tips,
-                tipMode=1,
-                reducedPatternMode=4,
-                headPatternAsVariable=1,
-                headPatternVariable=CHANNELS_384_96_8,
+            # Check if there are still tips in the active rack
+            # Discard rack and get new one from stacked racks if current one is done
+
+            if state["current_tip"] >= TIPS:
+                cmd.grip_get_tip_rack(hammy, rack_tips)
+                cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
+                cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
+                cmd.grip_place_tip_rack(hammy, rack_virtual)
+
+                st.update_state(state, state_file_path, "current_rack", 1)
+                st.reset_state(state, state_file_path, "current_tip", 0)
+
+            # Check how many wells are left to pipet in the current source and target plate
+            # Also check if there are enough tips left to pipet the remaining wells
+
+            # This outputs the minimum of the three values (wells left, tips left, channels)
+
+            source_well_stop = min(
+                CHANNELS,
+                len(source_wells[state["current_source_well"] :]),
+                (TIPS - state["current_tip"]),
+            )
+            target_well_stop = min(
+                CHANNELS,
+                len(target_wells[state["current_target_well"] :]),
+                (TIPS - state["current_tip"]),
             )
 
-            for column in range(state["current_column"], 12):
-                cmd.aspirate_384(
-                    hammy,
-                    active_pooling_wells[8 * column : 8 * (column + 1)],
-                    16.0,
-                    liquidHeight=0.5,
+            # In the case that there is only one well left to pipet, use only one channel
+
+            if source_well_stop == 1 or target_well_stop == 1:
+                cmd.tip_pick_up(
+                    hammy, [tips[state["current_tip"]]], channelVariable=CHANNEL_1
                 )
-                cmd.dispense_384(
-                    hammy,
-                    active_pooling_wells_8ch,
-                    16.0,
-                    dispenseMode=9,
-                    liquidHeight=10.0,
-                )
-
-                st.update_state(state, state_file_path, "current_column", 1)
-
-            cmd.tip_eject_384(hammy, column_tips, 2)
-            st.update_state(state, state_file_path, "current_tip_column", 1)
-
-            # Transfer column 1 in pooling plate to next eppendorf tube using 2 channels
-
-            cmd.tip_pick_up(
-                hammy, tips_300[state["current_tip"] : state["current_tip"] + 2]
-            )
-
-            for well in range(state["current_well"], 8, 2):
                 cmd.aspirate(
                     hammy,
-                    active_pooling_wells_2ch[well : well + 2],
-                    [192],
-                    liquidHeight=0.5,
+                    [source_wells[state["current_source_well"]]],
+                    [100],
+                    channelVariable=CHANNEL_1,
+                    mixCycles=3,
+                    mixVolume=50.0,
                 )
                 cmd.dispense(
                     hammy,
-                    [
-                        eppies[state["current_pcr_plate"]],
-                        eppies[state["current_pcr_plate"]],
-                    ],
-                    [192],
+                    [target_wells[state["current_target_well"]]],
+                    [100],
+                    channelVariable=CHANNEL_1,
                     dispenseMode=9,
-                    liquidHeight=35.0,
+                )
+                cmd.tip_eject(hammy, [tips[state["current_tip"]]], waste=True)
+
+                st.update_state(state, state_file_path, "current_source_well", 1)
+                st.update_state(state, state_file_path, "current_target_well", 1)
+                st.update_state(state, state_file_path, "current_tip", 1)
+
+            # Otherwise, use all channels (as long as pipetting steps are equal between source and target)
+
+            elif source_well_stop == CHANNELS and target_well_stop == CHANNELS:
+                cmd.tip_pick_up(
+                    hammy,
+                    tips[state["current_tip"] : state["current_tip"] + CHANNELS],
+                )
+                cmd.aspirate(
+                    hammy,
+                    source_wells[
+                        state["current_source_well"] : state["current_source_well"]
+                        + CHANNELS
+                    ],
+                    [100],
+                    mixCycles=3,
+                    mixVolume=50.0,
+                )
+                cmd.dispense(
+                    hammy,
+                    target_wells[
+                        state["current_target_well"] : state["current_target_well"]
+                        + CHANNELS
+                    ],
+                    [100],
+                    dispenseMode=9,
+                )
+                cmd.tip_eject(
+                    hammy,
+                    tips[state["current_tip"] : state["current_tip"] + CHANNELS],
+                    waste=True,
                 )
 
-                st.update_state(state, state_file_path, "current_well", 2)
+                st.update_state(state, state_file_path, "current_source_well", CHANNELS)
+                st.update_state(state, state_file_path, "current_target_well", CHANNELS)
+                st.update_state(state, state_file_path, "current_tip", CHANNELS)
 
-            cmd.tip_eject(
-                hammy,
-                tips_300[state["current_tip"] : state["current_tip"] + 2],
-                waste=True,
-            )
-            st.update_state(state, state_file_path, "current_tip", 2)
+            # Check if there are still wells to process in the current source plate
+            # Swich to next source plate if current one is done
 
-            # Move active pcr plate to destination stack if not already done
-
-            if state["active_pcr_plate"]:
+            if state["current_source_well"] >= len(source_wells):
+                cmd.grip_get(
+                    hammy, temp_source_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0
+                )
+                cmd.grip_place(hammy, active_source_bact_lid, mode=1)
                 cmd.grip_get(
                     hammy,
-                    temp_pcr_lid,
-                    mode=1,
-                    gripWidth=85.0,
-                    gripHeight=0.5,
-                )
-                cmd.grip_place(hammy, active_pcr_lid, mode=1)
-                cmd.grip_get(
-                    hammy,
-                    active_pcr_plate,
+                    active_source_bact_plate,
                     mode=0,
-                    gripWidth=81.0,
-                    gripHeight=6.0,
-                )
-                cmd.grip_place(
-                    hammy,
-                    dest_pcr_plates[state["current_pcr_plate"]],
-                    mode=0,
-                )
-                st.update_state(state, state_file_path, "current_pcr_plate", 1)
-
-            # Move active pooling plate to destination stack if not already done
-
-            if state["active_pooling_plate"]:
-                cmd.grip_get(
-                    hammy,
-                    active_pooling_plate,
-                    mode=0,
-                    gripWidth=81.0,
+                    gripWidth=82.0,
                     gripHeight=9.0,
                 )
                 cmd.grip_place(
-                    hammy, dest_pooling_plates[state["current_pooling_plate"]], mode=0
+                    hammy,
+                    dest_source_bact_plates[state["current_source_plate"]],
+                    mode=0,
                 )
-                st.update_state(state, state_file_path, "current_pooling_plate", 1)
 
-            # Discard current 96_384-tip rack if not already done
+                st.update_state(state, state_file_path, "current_source_plate", 1)
+                st.reset_state(state, state_file_path, "active_source_plate", 0)
 
-            if state["active_rack"]:
-                cmd.grip_get_tip_rack(hammy, rack_96_tips)
-                cmd.grip_place_tip_rack(hammy, rack_96_tips, waste=True)
-                st.update_state(state, state_file_path, "current_rack", 1)
+            # Check if there are still wells to process in the current target plate
+            # Swich to next target plate if current one is done
 
-            # Reset state variables for next run
+            if state["current_target_well"] >= len(target_wells):
+                cmd.grip_get(
+                    hammy, temp_target_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0
+                )
+                cmd.grip_place(hammy, active_target_bact_lid, mode=1)
+                cmd.grip_get(
+                    hammy,
+                    active_target_bact_plate,
+                    mode=0,
+                    gripWidth=82.0,
+                    gripHeight=9.0,
+                )
+                cmd.grip_place(
+                    hammy,
+                    dest_target_bact_plates[state["current_target_plate"]],
+                    mode=0,
+                )
 
-            st.reset_state(state, state_file_path, "current_quadrant", 0)
-            st.reset_state(state, state_file_path, "current_column", 0)
-            st.reset_state(state, state_file_path, "current_well", 0)
-            st.reset_state(state, state_file_path, "active_pcr_plate", 0)
-            st.reset_state(state, state_file_path, "active_pooling_plate", 0)
-            st.reset_state(state, state_file_path, "edta", 0)
-            st.reset_state(state, state_file_path, "active_rack", 0)
+                st.update_state(state, state_file_path, "current_target_plate", 1)
+                st.reset_state(state, state_file_path, "active_target_plate", 0)
 
             st.print_state(state)
