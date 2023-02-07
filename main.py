@@ -111,6 +111,8 @@ if __name__ == "__main__":
 
                 st.save_state(state, state_path)
 
+                get_input_files = True
+
                 print(f"\n--- Starting run {run_id} ---\n")
 
             # Check if method already exists and prompt to recover
@@ -164,26 +166,31 @@ if __name__ == "__main__":
                                         " the correct method specified?"
                                     )
 
+                                get_input_files = False
+
                                 print(f"\n--- Resuming run {run_id} ---\n")
 
                             elif recover == "n":
                                 run_dir_path = os.path.join(runs_dir_path, run_id)
-                                print(f"Backing up previous {method} run.")
                                 now = datetime.datetime.now().strftime("%y.%m.%d_%H%M")
-                                shutil.move(
-                                    os.path.join(run_dir_path, f"{method}.json"),
-                                    os.path.join(
-                                        run_dir_path,
-                                        f"{now}_{method}.json.bak",
-                                    ),
+                                backup_dir_path = os.path.join(run_dir_path, now)
+                                print(
+                                    f"Backing up previous {method} run in"
+                                    f" {run_id}/{now}"
                                 )
-                                shutil.move(
-                                    os.path.join(run_dir_path, f"{method}.lay"),
-                                    os.path.join(
-                                        run_dir_path,
-                                        f"{now}_{method}.lay.bak",
-                                    ),
-                                )
+
+                                method_files = [
+                                    f
+                                    for f in os.listdir(run_dir_path)
+                                    if f.find(f"{method}") > -1
+                                ]
+                                for method_file in method_files:
+                                    shutil.move(
+                                        os.path.join(run_dir_path, method_file),
+                                        os.path.join(
+                                            backup_dir_path, f"{method_file}.bak"
+                                        ),
+                                    )
 
                                 layout_path = os.path.join(
                                     run_dir_path, f"{method}.lay"
@@ -206,6 +213,8 @@ if __name__ == "__main__":
                                 state = st.load_state(state_path)
 
                                 st.save_state(state, state_path)
+
+                                get_input_files = True
 
                                 print(f"\n--- Restarting run {run_id} ---\n")
 
@@ -233,6 +242,8 @@ if __name__ == "__main__":
 
                         st.save_state(state, state_path)
 
+                        get_input_files = True
+
                         print(f"\n--- Starting run {run_id} ---\n")
                 except IndexError:
                     print("Invalid run id.")
@@ -252,54 +263,62 @@ if __name__ == "__main__":
 
     match method:
         case "pooling":
-            # no other input needed
             from scripts import pooling as script
 
         case "pcr_colony":
-            # no other input needed
             from scripts import pcr_colony as script
 
         case "pcr_barcode":
-            # no other input needed
             from scripts import pcr_barcode as script
 
         case "pm_emptying":
             # get sorted_well_map.csv
+            # if recovering run, don't need to copy sorted_well_map.csv
+
             from scripts import pm_emptying as script
 
-            well_map_path = hp.prompt_file_path(
-                "Path to sorted_well_map.csv for run {run_id}: "
-            )
-            shutil.copy(
-                well_map_path,
-                os.path.join(run_dir_path, f"{method}_sorted_well_map.csv"),
-            )
-            hp.process_pm_csv(well_map_path, run_dir_path, method)
+            if get_input_files:
+                well_map_path = hp.prompt_file_path(
+                    "Path to sorted_well_map.csv for run {run_id}: "
+                )
+                shutil.copy(
+                    well_map_path,
+                    os.path.join(run_dir_path, f"{method}_sorted_well_map.csv"),
+                )
+                hp.process_pm_csv(well_map_path, run_dir_path, method)
 
         case "pm_filling":
             # get sorted_well_map.csv
+            # if recovering run, don't need to copy sorted_well_map.csv
+
             from scripts import pm_filling as script
 
-            well_map_path = hp.prompt_file_path(
-                f"Path to sorted_well_map.csv for run {run_id}: "
-            )
-            shutil.copy(
-                well_map_path,
-                os.path.join(run_dir_path, f"{method}_sorted_well_map.csv"),
-            )
-            hp.process_pm_csv(well_map_path, run_dir_path, method)
+            if get_input_files:
+                well_map_path = hp.prompt_file_path(
+                    f"Path to sorted_well_map.csv for run {run_id}: "
+                )
+                shutil.copy(
+                    well_map_path,
+                    os.path.join(run_dir_path, f"{method}_sorted_well_map.csv"),
+                )
+                hp.process_pm_csv(well_map_path, run_dir_path, method)
 
         case "cherry_picking":
             # get sorted_well_list.csv
+            # if recovering run, don't need to copy sorted_well_list.csv
+
             from scripts import cherry_picking as script
 
-            well_list_path = hp.prompt_file_path(
-                f"Path to cherry.csv for run {run_id}: "
-            )
-            shutil.copy(well_list_path, os.path.join(run_dir_path, f"{method}.csv"))
-            hp.process_cherry_csv(well_list_path, run_dir_path, method)
+            if get_input_files:
+                well_list_path = hp.prompt_file_path(
+                    f"Path to cherry.csv for run {run_id}: "
+                )
+                shutil.copy(well_list_path, os.path.join(run_dir_path, f"{method}.csv"))
+                hp.process_cherry_csv(well_list_path, run_dir_path, method)
 
         case _:
+            # This shoudn't be needed but avoids type error
+
             raise ValueError(f"Method {method} not found.")
 
     deck = dk.get_deck(layout_path)
