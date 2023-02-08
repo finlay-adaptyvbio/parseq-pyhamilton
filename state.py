@@ -1,4 +1,6 @@
-import os, json
+import json, logging
+
+logger = logging.getLogger(__name__)
 
 
 def recover_state(path) -> dict:
@@ -17,13 +19,15 @@ def recover_state(path) -> dict:
                 while True:
                     try:
                         reset_state(state, path, key, int(value))
-                    except ValueError:
+                    except ValueError as e:
+                        logger.exception(e)
                         continue
                     break
             elif answer == 0:
                 break
             continue
-        except ValueError:
+        except ValueError as e:
+            logger.exception(e)
             continue
     return state
 
@@ -34,6 +38,7 @@ def load_state(path) -> dict:
             state = json.load(f)
         return state
     except (FileNotFoundError, IsADirectoryError) as e:
+        logger.exception(e)
         raise e
 
 

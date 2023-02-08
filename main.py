@@ -1,10 +1,28 @@
 #!/usr/bin/python3
 
-import os, argparse, requests, atexit, time, datetime, shutil
+import os, argparse, requests, time, datetime, shutil, logging, traceback
 
 import deck as dk
 import state as st
 import helpers as hp
+
+# Folders
+
+root = os.path.dirname(os.path.abspath(__file__))
+state_dir_path = os.path.join(root, "states")
+layout_dir_path = os.path.join(root, "layouts")
+script_dir_path = os.path.join(root, "scripts")
+runs_dir_path = os.path.join(root, "runs")
+
+# Logging settings
+
+logger = logging.getLogger(__name__)
+
+c_handler = logging.StreamHandler()
+c_handler.setLevel(logging.INFO)
+c_format = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
+c_handler.setFormatter(c_format)
+logger.addHandler(c_handler)
 
 # Notification settings for Slack on script exit
 
@@ -26,17 +44,6 @@ def notify(text):
             "blocks": None,
         },
     ).json()
-
-
-atexit.register(notify, "Script complete or error.")
-
-# Folders
-
-root = os.path.dirname(os.path.abspath(__file__))
-state_dir_path = os.path.join(root, "states")
-layout_dir_path = os.path.join(root, "layouts")
-script_dir_path = os.path.join(root, "scripts")
-runs_dir_path = os.path.join(root, "runs")
 
 
 # CLI arguments
@@ -65,6 +72,8 @@ if __name__ == "__main__":
     parser = parse_args()
     args = parser.parse_args()
 
+    logger.debug(f"Arguments: {args}")
+
     method = args.method
 
     runs = [
@@ -73,16 +82,20 @@ if __name__ == "__main__":
         if os.path.isdir(os.path.join(runs_dir_path, d))
     ]
 
-    print(f"{'#':<5}{'run_id':<25}{'methods':<25}")
-    print(f"{'-' * 80}")
-    for idx, run in enumerate(runs):
-        methods = [
-            f[:-5]
-            for f in os.listdir(os.path.join(runs_dir_path, run))
-            if f.endswith(".json")
-        ]
-        print(f"{idx + 1:<5}{run:<25}{methods}")
-    print(f"{'-' * 80}")
+    logger.info(f"Found {len(runs)} previous runs.")
+    logger.debug(f"Runs: {runs}")
+
+    if len(runs) > 0:
+        print(f"{'#':<5}{'run_id':<25}{'methods':<25}")
+        print(f"{'-' * 80}")
+        for idx, run in enumerate(runs):
+            methods = [
+                f[:-5]
+                for f in os.listdir(os.path.join(runs_dir_path, run))
+                if f.endswith(".json")
+            ]
+            print(f"{idx + 1:<5}{run:<25}{methods}")
+        print(f"{'-' * 80}")
 
     # Prompt for run id
 
@@ -94,18 +107,19 @@ if __name__ == "__main__":
             # Start new run
 
             if run_idx == 0:
-                print(f"Generating new run id for {method} run...")
+                logger.info(f"Generating new run id for {method} run...")
                 run_id = hex(int((time.time() % 3600e4) * 1e6))
+                logger.debug(f"Run id: {run_id}")
                 run_dir_path = os.path.join(runs_dir_path, run_id)
                 os.makedirs(run_dir_path, exist_ok=True)
 
                 layout_path = os.path.join(run_dir_path, f"{method}.lay")
                 state_path = os.path.join(run_dir_path, f"{method}.json")
 
-                print(f"Using default layout for {method} method.")
+                logger.info(f"Using default layout for {method} method.")
                 shutil.copy(os.path.join(layout_dir_path, f"{method}.lay"), layout_path)
 
-                print(f"Using default state for {method} method.")
+                logger.info(f"Using default state for {method} method.")
                 shutil.copy(os.path.join(state_dir_path, f"{method}.json"), state_path)
                 state = st.load_state(state_path)
 
@@ -113,7 +127,7 @@ if __name__ == "__main__":
 
                 get_input_files = True
 
-                print(f"\n--- Starting run {run_id} ---\n")
+                logger.info(f"\n--- Starting run {run_id} ---\n")
 
             # Check if method already exists and prompt to recover
 
@@ -125,6 +139,7 @@ if __name__ == "__main__":
                         for f in os.listdir(os.path.join(runs_dir_path, run_id))
                         if f.endswith(".json")
                     ]
+                    logger.debug(f"Methods: {methods}")
                     if method in methods:
                         while True:
                             recover = input(
@@ -133,7 +148,7 @@ if __name__ == "__main__":
                             )
                             if recover == "y":
                                 run_dir_path = os.path.join(runs_dir_path, run_id)
-                                print(
+                                logger.info(
                                     f"Recovering state for {method} method of run"
                                     f" {run_id}..."
                                 )
@@ -142,15 +157,17 @@ if __name__ == "__main__":
                                 )
                                 try:
                                     with open(state_path, "r") as f:
+                                        logger.debug(f"State path: {state_path}")
                                         pass
-                                except FileNotFoundError:
+                                except FileNotFoundError as e:
+                                    logger.exception(e)
                                     raise ValueError(
                                         "State file not found for {method} method. Was"
                                         " the correct method specified?"
                                     )
                                 state = st.recover_state(state_path)
 
-                                print(
+                                logger.info(
                                     f"Recovering layout for {method} method of run"
                                     f" {run_id}..."
                                 )
@@ -159,8 +176,10 @@ if __name__ == "__main__":
                                 )
                                 try:
                                     with open(layout_path, "r") as f:
+                                        logger.debug(f"State path: {layout_path}")
                                         pass
-                                except FileNotFoundError:
+                                except FileNotFoundError as e:
+                                    logger.exception(e)
                                     raise ValueError(
                                         "Layout file not found for {method} method. Was"
                                         " the correct method specified?"
@@ -168,13 +187,13 @@ if __name__ == "__main__":
 
                                 get_input_files = False
 
-                                print(f"\n--- Resuming run {run_id} ---\n")
+                                logger.info(f"\n--- Resuming run {run_id} ---\n")
 
                             elif recover == "n":
                                 run_dir_path = os.path.join(runs_dir_path, run_id)
                                 now = datetime.datetime.now().strftime("%y.%m.%d_%H%M")
                                 backup_dir_path = os.path.join(run_dir_path, now)
-                                print(
+                                logger.info(
                                     f"Backing up previous {method} run in"
                                     f" {run_id}/{now}"
                                 )
@@ -184,6 +203,7 @@ if __name__ == "__main__":
                                     for f in os.listdir(run_dir_path)
                                     if f.find(f"{method}") > -1
                                 ]
+                                logger.debug(f"Method files: {method_files}")
                                 for method_file in method_files:
                                     shutil.move(
                                         os.path.join(run_dir_path, method_file),
@@ -199,13 +219,15 @@ if __name__ == "__main__":
                                     run_dir_path, f"{method}.json"
                                 )
 
-                                print(f"Using default layout for {method} method.")
+                                logger.info(
+                                    f"Using default layout for {method} method."
+                                )
                                 shutil.copy(
                                     os.path.join(layout_dir_path, f"{method}.lay"),
                                     layout_path,
                                 )
 
-                                print(f"Using default state for {method} method.")
+                                logger.info(f"Using default state for {method} method.")
                                 shutil.copy(
                                     os.path.join(state_dir_path, f"{method}.json"),
                                     state_path,
@@ -216,10 +238,10 @@ if __name__ == "__main__":
 
                                 get_input_files = True
 
-                                print(f"\n--- Restarting run {run_id} ---\n")
+                                logger.info(f"\n--- Restarting run {run_id} ---\n")
 
                             else:
-                                print("Please type y or n.")
+                                logger.error("Please type y or n.")
                                 continue
                             break
                     else:
@@ -227,13 +249,13 @@ if __name__ == "__main__":
                         layout_path = os.path.join(run_dir_path, f"{method}.lay")
                         state_path = os.path.join(run_dir_path, f"{method}.json")
 
-                        print(f"Using default layout for {method} method.")
+                        logger.info(f"Using default layout for {method} method.")
                         shutil.copy(
                             os.path.join(layout_dir_path, f"{method}.lay"),
                             layout_path,
                         )
 
-                        print(f"Using default state for {method} method.")
+                        logger.info(f"Using default state for {method} method.")
                         shutil.copy(
                             os.path.join(state_dir_path, f"{method}.json"),
                             state_path,
@@ -244,20 +266,20 @@ if __name__ == "__main__":
 
                         get_input_files = True
 
-                        print(f"\n--- Starting run {run_id} ---\n")
+                        logger.info(f"\n--- Starting run {run_id} ---\n")
                 except IndexError:
-                    print("Invalid run id.")
+                    logger.error("Invalid run id.")
                     continue
         except ValueError:
-            print("Invalid run id.")
+            logger.error("Invalid run id.")
             continue
         break
 
     # Run script
 
-    print(f"{'Method:':<8}{method}")
-    print(f"{'State:':<8}{state_path}")
-    print(f"{'Layout:':<8}{layout_path}")
+    logger.info(f"{'Method:':<8}{method}")
+    logger.info(f"{'State:':<8}{state_path}")
+    logger.info(f"{'Layout:':<8}{layout_path}")
 
     # Get necessary input files depending on method and copy to temp dir
 
@@ -318,8 +340,26 @@ if __name__ == "__main__":
 
         case _:
             # This shoudn't be needed but avoids type error
-
-            raise ValueError(f"Method {method} not found.")
+            logger.error(f"Method {method} not found.")
+            parser.error(f"Method {method} not found.")
 
     deck = dk.get_deck(layout_path)
-    script.run(deck, state, state_path, run_dir_path)
+
+    # Method logging settings
+
+    f_method_handler = logging.FileHandler(os.path.join(run_dir_path, f"{method}.log"))
+    f_method_handler.setLevel(logging.DEBUG)
+    f__method_format = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    f_method_handler.setFormatter(f__method_format)
+    logger.addHandler(f_method_handler)
+
+    # Run method
+
+    try:
+        script.run(deck, state, state_path, run_dir_path)
+    except Exception as e:
+        logger.exception(e)
+        notify(traceback.format_exc())
+        raise e

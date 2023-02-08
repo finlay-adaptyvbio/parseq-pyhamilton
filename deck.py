@@ -1,3 +1,5 @@
+import logging
+
 from pyhamilton import (
     LayoutManager,
     ResourceType,
@@ -12,6 +14,10 @@ from pyhamilton import (
 
 from pyhamilton.oemerr import ResourceUnavailableError
 from typing import Union
+
+# Logging
+
+logger = logging.getLogger(__name__)
 
 TYPES = {
     "Lid": Lid,
@@ -68,6 +74,7 @@ DECK = {
 
 
 def get_deck(layout_file_path: str) -> dict:
+    logger.debug(f"Getting deck from {layout_file_path}...")
     lmgr = LayoutManager(layout_file_path)
 
     deck = parse_layout_file(DECK, lmgr)
@@ -78,6 +85,7 @@ def get_deck(layout_file_path: str) -> dict:
 
 
 def parse_layout_file(deck: dict, lmgr: LayoutManager) -> dict:
+    logger.debug(f"Parsing layout file...")
     for col in deck.keys():
         for row in range(0, len(deck[col])):
             position = col + str(row + 1)
@@ -98,6 +106,7 @@ def parse_layout_file(deck: dict, lmgr: LayoutManager) -> dict:
                             )
                         )
                     except ResourceUnavailableError:
+                        logger.debug(f"Resource {resource} not found in {position}.")
                         break
 
             deck[col][row]["labware"] = resource_list
@@ -106,6 +115,7 @@ def parse_layout_file(deck: dict, lmgr: LayoutManager) -> dict:
 
 
 def clean_deck(deck: dict) -> dict:
+    logger.debug(f"Cleaing deck...")
     for col in deck.keys():
         for row in range(len(deck[col])):
             ghost_labware = []
@@ -123,6 +133,7 @@ def clean_deck(deck: dict) -> dict:
 
 
 def print_deck(deck: dict):
+    logger.debug(f"Printing deck...")
     for col in deck.keys():
         for row in range(0, len(deck[col])):
             position = col + str(row + 1)

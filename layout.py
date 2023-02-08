@@ -1,7 +1,11 @@
-import os
+import os, logging
 
 import deck as dk
 from pyhamilton import LayoutManager
+
+# Logging
+
+logger = logging.getLogger(__name__)
 
 # Empty deck dictionary
 

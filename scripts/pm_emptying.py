@@ -1,4 +1,4 @@
-import os, csv, math
+import os, csv, math, logging
 
 import commands as cmd
 import deck as dk
@@ -12,6 +12,10 @@ from pyhamilton import (
     Tip96,
     Reservoir300,  # type: ignore
 )
+
+# Logging
+
+logger = logging.getLogger(__name__)
 
 # Constants
 

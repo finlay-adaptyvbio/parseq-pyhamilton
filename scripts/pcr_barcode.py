@@ -1,4 +1,4 @@
-import os, csv, requests, atexit
+import logging
 
 import commands as cmd
 import deck as dk
@@ -11,6 +11,10 @@ from pyhamilton import (
     Lid,  # type: ignore
     Tip384,  # type: ignore
 )
+
+# Logging
+
+logger = logging.getLogger(__name__)
 
 # Constants
 

@@ -1,5 +1,9 @@
-import os, csv
+import os, csv, logging
 import pandas as pd
+
+# Logging
+
+logger = logging.getLogger(__name__)
 
 
 def prompt_file_path(message: str) -> str:

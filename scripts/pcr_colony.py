@@ -1,3 +1,5 @@
+import logging
+
 import commands as cmd
 import deck as dk
 import state as st
@@ -11,6 +13,10 @@ from pyhamilton import (
     Tip96,
     Tip384,  # type: ignore
 )
+
+# Logging
+
+logger = logging.getLogger(__name__)
 
 # Constants
 
