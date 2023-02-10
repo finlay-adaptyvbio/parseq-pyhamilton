@@ -34,12 +34,12 @@ A default state file from the **states** directory is also hardcoded for each sc
 - [x] migrate cherry-picking to new format
 - [x] automated error recovery
 - [x] add more user facing prompts
-- [ ] notifications
-  - [ ] script exit (fail | success)
-  - [ ] capture error msg
+- [x] notifications
+  - [x] script exit (fail | success)
+  - [x] capture error msg
 - [x] more output/logging
   - [ ] get VENUS log files
-  - [ ] save log to file not just stdout
+  - [x] save log to file not just stdout
 - [ ] comments
 
 ## Protocols
