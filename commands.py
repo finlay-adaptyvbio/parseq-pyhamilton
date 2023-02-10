@@ -25,9 +25,10 @@ from pyhamilton import (
 from pyhamilton.oemerr import PositionError
 from typing import Union
 
-# logger
+# Logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Defaults
 
@@ -43,10 +44,7 @@ def initialize(ham: HamiltonInterface):
 
     cid = ham.send_command(INITIALIZE)
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def labware_pos_str(labware, idx):
@@ -92,10 +90,7 @@ def grip_get(
     else:
         raise ValueError
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def grip_place(
@@ -135,10 +130,7 @@ def grip_place(
     else:
         raise ValueError
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def tip_pick_up(
@@ -160,10 +152,7 @@ def tip_pick_up(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def tip_eject(
@@ -194,10 +183,22 @@ def tip_eject(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
+
+
+def grip_eject(
+    ham: HamiltonInterface,
+    **kw_args,
+):
+    logger.info(f"Command: {'grip_eject'}")
+
+    cid = ham.send_command(
+        EJECT,
+        wasteSequence=DEFAULT_GRIP_TOOL_SEQUENCE,
+        **kw_args,
+    )
+
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def aspirate(
@@ -230,10 +231,7 @@ def aspirate(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def dispense(
@@ -266,10 +264,7 @@ def dispense(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def tip_pick_up_384(
@@ -290,10 +285,7 @@ def tip_pick_up_384(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def tip_eject_384(
@@ -326,10 +318,7 @@ def tip_eject_384(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def aspirate_384(
@@ -356,10 +345,7 @@ def aspirate_384(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def dispense_384(
@@ -386,10 +372,7 @@ def dispense_384(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def grip_get_tip_rack(
@@ -419,10 +402,7 @@ def grip_get_tip_rack(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)
 
 
 def grip_place_tip_rack(
@@ -462,7 +442,4 @@ def grip_place_tip_rack(
         **kw_args,
     )
 
-    try:
-        ham.wait_on_response(cid, raise_first_exception=True)
-    except PositionError:
-        raise IOError
+    ham.wait_on_response(cid, raise_first_exception=True)

@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-import os, argparse, requests, time, datetime, shutil, logging, traceback
+import os, argparse, requests, time, datetime, shutil, traceback
+import logging, logging.config
 
 import deck as dk
 import state as st
@@ -16,13 +17,33 @@ runs_dir_path = os.path.join(root, "runs")
 
 # Logging settings
 
-logger = logging.getLogger(__name__)
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+        "simple": {"format": "%(levelname)s %(message)s"},
+    },
+    "handlers": {
+        "default": {
+            "level": "INFO",
+            "formatter": "simple",
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "": {"handlers": ["default"], "level": "DEBUG", "propagate": True},
+    },
+}
 
-c_handler = logging.StreamHandler()
-c_handler.setLevel(logging.INFO)
-c_format = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
-c_handler.setFormatter(c_format)
-logger.addHandler(c_handler)
+logging.getLogger("parse").setLevel(logging.WARNING)
+
+logging.config.dictConfig(LOGGING)
+
+logger = logging.getLogger()
 
 # Notification settings for Slack on script exit
 
@@ -127,7 +148,7 @@ if __name__ == "__main__":
 
                 get_input_files = True
 
-                logger.info(f"\n--- Starting run {run_id} ---\n")
+                logger.info(f"Starting run {run_id}")
 
             # Check if method already exists and prompt to recover
 
@@ -187,12 +208,13 @@ if __name__ == "__main__":
 
                                 get_input_files = False
 
-                                logger.info(f"\n--- Resuming run {run_id} ---\n")
+                                logger.info(f"Resuming run {run_id}")
 
                             elif recover == "n":
                                 run_dir_path = os.path.join(runs_dir_path, run_id)
                                 now = datetime.datetime.now().strftime("%y.%m.%d_%H%M")
                                 backup_dir_path = os.path.join(run_dir_path, now)
+                                os.makedirs(backup_dir_path, exist_ok=True)
                                 logger.info(
                                     f"Backing up previous {method} run in"
                                     f" {run_id}/{now}"
@@ -238,7 +260,7 @@ if __name__ == "__main__":
 
                                 get_input_files = True
 
-                                logger.info(f"\n--- Restarting run {run_id} ---\n")
+                                logger.info(f"Restarting run {run_id}")
 
                             else:
                                 logger.error("Please type y or n.")
@@ -266,7 +288,7 @@ if __name__ == "__main__":
 
                         get_input_files = True
 
-                        logger.info(f"\n--- Starting run {run_id} ---\n")
+                        logger.info(f" Starting run {run_id} ")
                 except IndexError:
                     logger.error("Invalid run id.")
                     continue
@@ -275,11 +297,21 @@ if __name__ == "__main__":
             continue
         break
 
+    # Method logging settings
+
+    f_method_handler = logging.FileHandler(os.path.join(run_dir_path, f"{method}.log"))
+    f_method_handler.setLevel(logging.DEBUG)
+    f__method_format = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    f_method_handler.setFormatter(f__method_format)
+    logger.addHandler(f_method_handler)
+
     # Run script
 
-    logger.info(f"{'Method:':<8}{method}")
-    logger.info(f"{'State:':<8}{state_path}")
-    logger.info(f"{'Layout:':<8}{layout_path}")
+    logger.debug(f"{'Method:':<8}{method}")
+    logger.debug(f"{'State:':<8}{state_path}")
+    logger.debug(f"{'Layout:':<8}{layout_path}")
 
     # Get necessary input files depending on method and copy to temp dir
 
@@ -345,20 +377,14 @@ if __name__ == "__main__":
 
     deck = dk.get_deck(layout_path)
 
-    # Method logging settings
-
-    f_method_handler = logging.FileHandler(os.path.join(run_dir_path, f"{method}.log"))
-    f_method_handler.setLevel(logging.DEBUG)
-    f__method_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    f_method_handler.setFormatter(f__method_format)
-    logger.addHandler(f_method_handler)
-
     # Run method
 
     try:
         script.run(deck, state, state_path, run_dir_path)
+        notify(f"Method {method} for run {run_id} completed successfully!")
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received. Exiting...")
+        notify(f"Method {method} for run {run_id} interrupted.")
     except Exception as e:
         logger.exception(e)
         notify(traceback.format_exc())

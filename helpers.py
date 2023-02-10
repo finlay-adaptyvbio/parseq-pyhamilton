@@ -4,6 +4,7 @@ import pandas as pd
 # Logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 def prompt_file_path(message: str) -> str:

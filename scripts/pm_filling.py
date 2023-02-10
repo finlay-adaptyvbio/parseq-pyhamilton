@@ -15,6 +15,7 @@ from pyhamilton import (
 # Logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Constants
 
@@ -27,7 +28,14 @@ CHANNEL_2 = "01"
 
 
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+    # Plate information and variables
     # Get plates and well map from csv files
+
+    logger.info("Parsing plate map and well map...")
+    logger.debug(f"Plate map: {os.path.join(run_dir_path, 'pm_filling_plate_map.csv')}")
+    logger.debug(
+        f"Well map: {os.path.join(run_dir_path, 'pm_filling_sorted_well_map.csv')}"
+    )
 
     plate_map_path = os.path.join(run_dir_path, "pm_filling_plate_map.csv")
 
@@ -47,7 +55,13 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     wells_to_fill = [(t[0], t[1]) for t in well_map]
     wells_to_empty = [(t[2], t[3]) for t in well_map]
 
+    logger.debug(f"Plates: {source_plates} | {target_plates}")
+    logger.debug(f"Wells to empty: {wells_to_empty}")
+    logger.debug(f"Wells to fill: {wells_to_fill}")
+
     # Assign labware to deck positions
+
+    logger.info("Assigning labware...")
 
     target_bact_plates = dk.get_labware_list(
         deck,
@@ -93,12 +107,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     rack_tips, rack_virtual = dk.get_labware_list(deck, ["F5"], Tip96, [2])
     tips = [(rack_tips, i) for i in dk.pos_96_2ch(96)]
 
-    # HACK: get rid of type errors due to state not being initialized
-
-    source_wells = []
-    target_wells = []
-
     # Inform user of labware positions, ask for confirmation after placing plates
+
+    logger.debug("Prompt user for plate placement...")
 
     hp.place_plates(
         source_plates, source_bact_plates, "source", state["current_source_plate"]
@@ -107,9 +118,17 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         target_plates, target_bact_plates, "target", state["current_target_plate"]
     )
 
+    if len(wells_to_empty) > RACKS * TIPS:
+        logger.warning(
+            f"Number of tips needed ({len(wells_to_empty)}) is larger than number of tips available ({RACKS * TIPS})."
+        )
+        logger.info("Script will prompt user to add more tip racks when needed.")
+
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable
     # TODO: Check if total number of tips available is enough for the protocol, add prompt when new tip racks are needed
+
+    logger.info("Starting Hamilton method...")
 
     with HamiltonInterface(simulate=True) as hammy:
         # Initialize Hamilton
@@ -122,9 +141,25 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             state["current_source_plate"] < len(source_plates) - 1
             or state["current_target_plate"] < len(target_plates) - 1
         ):
+            # Build list of target and source wells for current plate
+
+            logger.debug("Building well lists for current plate...")
+
+            target_wells = [
+                (active_target_bact_plate, dk.string_to_index_384(t[0]))
+                for t in wells_to_fill
+                if t[1] == target_plates[state["current_target_plate"]]
+            ]
+            source_wells = [
+                (active_source_bact_plate, dk.string_to_index_384(t[0]))
+                for t in wells_to_empty
+                if t[1] == source_plates[state["current_source_plate"]]
+            ]
+
             # Get next target plate if not already done
 
             if not state["active_target_plate"]:
+                logger.debug("Moving next target plate to active position...")
                 cmd.grip_get(
                     hammy,
                     target_bact_plates[state["current_target_plate"]],
@@ -142,20 +177,12 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 cmd.grip_place(hammy, temp_target_bact_lid, mode=1)
 
                 st.reset_state(state, state_file_path, "active_target_plate", 1)
-
-                # Build list of target wells for current plate
-
-                target_wells = [
-                    (active_target_bact_plate, dk.string_to_index_384(t[0]))
-                    for t in wells_to_fill
-                    if t[1] == target_plates[state["current_target_plate"]]
-                ]
-
                 st.reset_state(state, state_file_path, "current_target_well", 0)
 
             # Get next source plate if not already done
 
             if not state["active_source_plate"]:
+                logger.debug("Moving next source plate to active position...")
                 cmd.grip_get(
                     hammy,
                     source_bact_plates[state["current_source_plate"]],
@@ -173,21 +200,63 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 cmd.grip_place(hammy, temp_source_bact_lid, mode=1)
 
                 st.reset_state(state, state_file_path, "active_source_plate", 1)
-
-                # Build list of source wells for current plate
-
-                source_wells = [
-                    (active_source_bact_plate, dk.string_to_index_384(t[0]))
-                    for t in wells_to_empty
-                    if t[1] == source_plates[state["current_source_plate"]]
-                ]
-
                 st.reset_state(state, state_file_path, "current_source_well", 0)
+
+            # Check if there are still wells to process in the current source plate
+            # Swich to next source plate if current one is done
+
+            if state["current_source_well"] >= len(source_wells):
+                logger.debug("Current source plate is done, moving to done stack...")
+                cmd.grip_get(
+                    hammy, temp_source_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0
+                )
+                cmd.grip_place(hammy, active_source_bact_lid, mode=1)
+                cmd.grip_get(
+                    hammy,
+                    active_source_bact_plate,
+                    mode=0,
+                    gripWidth=82.0,
+                    gripHeight=9.0,
+                )
+                cmd.grip_place(
+                    hammy,
+                    dest_source_bact_plates[state["current_source_plate"]],
+                    mode=0,
+                )
+
+                st.update_state(state, state_file_path, "current_source_plate", 1)
+                st.reset_state(state, state_file_path, "active_source_plate", 0)
+
+            # Check if there are still wells to process in the current target plate
+            # Swich to next target plate if current one is done
+
+            if state["current_target_well"] >= len(target_wells):
+                logger.debug("Current target plate is done, moving to done stack...")
+                cmd.grip_get(
+                    hammy, temp_target_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0
+                )
+                cmd.grip_place(hammy, active_target_bact_lid, mode=1)
+                cmd.grip_get(
+                    hammy,
+                    active_target_bact_plate,
+                    mode=0,
+                    gripWidth=82.0,
+                    gripHeight=9.0,
+                )
+                cmd.grip_place(
+                    hammy,
+                    dest_target_bact_plates[state["current_target_plate"]],
+                    mode=0,
+                )
+
+                st.update_state(state, state_file_path, "current_target_plate", 1)
+                st.reset_state(state, state_file_path, "active_target_plate", 0)
 
             # Check if there are still tips in the active rack
             # Discard rack and get new one from stacked racks if current one is done
 
             if state["current_tip"] >= TIPS:
+                logger.debug("Current tip rack is empty, getting new one...")
                 cmd.grip_get_tip_rack(hammy, rack_tips)
                 cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
                 cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
@@ -212,9 +281,13 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 (TIPS - state["current_tip"]),
             )
 
+            logger.debug(f"Source wells to pipet: {source_well_stop}")
+            logger.debug(f"Target wells to pipet: {target_well_stop}")
+
             # In the case that there is only one well left to pipet, use only one channel
 
             if source_well_stop == 1 or target_well_stop == 1:
+                logger.debug("Aspirating from one well...")
                 cmd.tip_pick_up(
                     hammy, [tips[state["current_tip"]]], channelVariable=CHANNEL_1
                 )
@@ -242,6 +315,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Otherwise, use all channels (as long as pipetting steps are equal between source and target)
 
             elif source_well_stop == CHANNELS and target_well_stop == CHANNELS:
+                logger.debug("Aspirating from two wells...")
                 cmd.tip_pick_up(
                     hammy,
                     tips[state["current_tip"] : state["current_tip"] + CHANNELS],
@@ -275,52 +349,6 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.update_state(state, state_file_path, "current_target_well", CHANNELS)
                 st.update_state(state, state_file_path, "current_tip", CHANNELS)
 
-            # Check if there are still wells to process in the current source plate
-            # Swich to next source plate if current one is done
-
-            if state["current_source_well"] >= len(source_wells):
-                cmd.grip_get(
-                    hammy, temp_source_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0
-                )
-                cmd.grip_place(hammy, active_source_bact_lid, mode=1)
-                cmd.grip_get(
-                    hammy,
-                    active_source_bact_plate,
-                    mode=0,
-                    gripWidth=82.0,
-                    gripHeight=9.0,
-                )
-                cmd.grip_place(
-                    hammy,
-                    dest_source_bact_plates[state["current_source_plate"]],
-                    mode=0,
-                )
-
-                st.update_state(state, state_file_path, "current_source_plate", 1)
-                st.reset_state(state, state_file_path, "active_source_plate", 0)
-
-            # Check if there are still wells to process in the current target plate
-            # Swich to next target plate if current one is done
-
-            if state["current_target_well"] >= len(target_wells):
-                cmd.grip_get(
-                    hammy, temp_target_bact_lid, mode=1, gripWidth=85.2, gripHeight=5.0
-                )
-                cmd.grip_place(hammy, active_target_bact_lid, mode=1)
-                cmd.grip_get(
-                    hammy,
-                    active_target_bact_plate,
-                    mode=0,
-                    gripWidth=82.0,
-                    gripHeight=9.0,
-                )
-                cmd.grip_place(
-                    hammy,
-                    dest_target_bact_plates[state["current_target_plate"]],
-                    mode=0,
-                )
-
-                st.update_state(state, state_file_path, "current_target_plate", 1)
-                st.reset_state(state, state_file_path, "active_target_plate", 0)
-
             st.print_state(state)
+
+        cmd.grip_eject(hammy)

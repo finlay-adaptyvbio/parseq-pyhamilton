@@ -1,9 +1,13 @@
 import json, logging
 
+# Logging
+
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 def recover_state(path) -> dict:
+    logger.debug(f"Recovering state from: {path}")
     state = load_state(path)
 
     while True:
@@ -35,6 +39,7 @@ def recover_state(path) -> dict:
 def load_state(path) -> dict:
     try:
         with open(path, "r") as f:
+            logger.debug("Path is valid! Loading state...")
             state = json.load(f)
         return state
     except (FileNotFoundError, IsADirectoryError) as e:

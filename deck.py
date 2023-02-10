@@ -18,6 +18,7 @@ from typing import Union
 # Logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 TYPES = {
     "Lid": Lid,
@@ -74,12 +75,12 @@ DECK = {
 
 
 def get_deck(layout_file_path: str) -> dict:
-    logger.debug(f"Getting deck from {layout_file_path}...")
+    logger.debug(f"Getting deck from: {layout_file_path}")
     lmgr = LayoutManager(layout_file_path)
 
     deck = parse_layout_file(DECK, lmgr)
     deck = clean_deck(deck)
-    print_deck(deck)
+    # print_deck(deck)
 
     return deck
 
@@ -115,7 +116,7 @@ def parse_layout_file(deck: dict, lmgr: LayoutManager) -> dict:
 
 
 def clean_deck(deck: dict) -> dict:
-    logger.debug(f"Cleaing deck...")
+    logger.debug(f"Cleaning deck...")
     for col in deck.keys():
         for row in range(len(deck[col])):
             ghost_labware = []
@@ -126,7 +127,7 @@ def clean_deck(deck: dict) -> dict:
                 else:
                     ghost_labware.append(idx)
             if stack:
-                print(ghost_labware)
+                logger.debug(f"Column: {col}, Row: {row}, Ghosts: {ghost_labware}")
                 for shift, idx in enumerate(ghost_labware):
                     del deck[col][row]["labware"][idx - shift]
     return deck

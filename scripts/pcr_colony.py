@@ -17,6 +17,7 @@ from pyhamilton import (
 # Logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Constants
 
@@ -31,14 +32,19 @@ MIXING = "50ulTip_conductive_384COREHead_Water_DispenseSurface_Empty"
 
 
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
-    # Plate information
-    # TODO: get plate info from prompt or csv file
+    # Plate information and variables
+
+    logger.debug("Getting number of plates from prompt...")
 
     plates = hp.prompt_int("Plates to process", 4)
 
     bact_plates = [f"P{i}" for i in range(1, plates + 1)]
 
+    logger.debug(f"Plates to pool: {bact_plates}")
+
     # Assign labware to deck positions
+
+    logger.info("Assigning labware...")
 
     source_bact_plates = dk.get_labware_list(
         deck,
@@ -104,10 +110,14 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing plates
 
+    logger.debug("Prompt user for plate placement...")
+
     hp.place_plates(
         bact_plates, source_bact_plates, "bact", state["current_bact_plate"]
     )
     hp.place_plates(bact_plates, source_pcr_plates, "pcr", state["current_pcr_plate"])
+
+    logger.info("Starting Hamilton method...")
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable
@@ -121,10 +131,14 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         # Loop over plates as long as there are still bact plates to process
         # TODO: check if the last plate is processed correctly
 
+        logger.debug(f"Current pcr plate: {state['current_pcr_plate']}")
+        logger.debug(f"No. of pcr plates: {len(source_pcr_plates)}")
+
         while state["current_bact_plate"] < len(source_bact_plates):
             # Get bact plate from source rack if not already in active position
 
             if not state["active_bact_plate"]:
+                logger.info("Getting bact plate from source rack...")
                 cmd.grip_get(
                     hammy,
                     source_bact_plates[state["current_bact_plate"]],
@@ -144,12 +158,14 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Get next pcr plates from source rack if not already in active position
 
             if state["current_active_pcr_plates"] == 0:
+                logger.debug("Getting pcr plates from source rack...")
                 # Check how mnay plates to move into active position
                 # Gets the minimum of 4 (max positions) or the number of plates left to process
 
                 pcr_plates_to_process = min(
                     4, len(source_pcr_plates[state["current_pcr_plate"] :])
                 )
+                logger.debug(f"Plates to process: {pcr_plates_to_process}")
                 for i in range(pcr_plates_to_process):
                     cmd.grip_get(
                         hammy,
@@ -167,12 +183,14 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Add master mix to pcr plates if not already done
 
             if not state["add_mm"]:
+                logger.info("Adding master mix to pcr plates...")
                 # Check how mnay plates to move into active position
                 # Gets the minimum of 4 (max positions) or the number of plates left to process
 
                 pcr_plates_to_process = min(
                     4, len(source_pcr_plates[state["current_pcr_plate"] :])
                 )
+                logger.debug(f"Plates to process: {pcr_plates_to_process}")
                 cmd.tip_pick_up_384(hammy, master_mix_tips, tipMode=1)
 
                 for i in range(pcr_plates_to_process):
@@ -194,6 +212,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Get new tip rack if no current active tip rack
 
             if not state["active_rack"]:
+                logger.debug("Getting new tip rack...")
                 cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
                 cmd.grip_place_tip_rack(hammy, rack_virtual)
 
@@ -202,6 +221,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Aspirate from active bact plate to current active pcr plate
 
             if not state["add_bact"]:
+                logger.info("Adding bacteria to pcr plates...")
                 target_wells = [
                     (active_pcr_plates[state["current_active_pcr_plate"]], i)
                     for i in range(384)
@@ -233,6 +253,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Place current active bact plate in dest bact plate stack if not already done
 
             if state["active_bact_plate"]:
+                logger.debug("Placing bact plate in dest rack...")
                 cmd.grip_get(
                     hammy, temp_bact_lid, mode=1, gripWidth=85.0, gripHeight=5.0
                 )
@@ -250,6 +271,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Discard current active rack to waste if not already done
 
             if state["active_rack"]:
+                logger.debug("Discarding tip rack...")
                 cmd.grip_get_tip_rack(hammy, rack_tips)
                 cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
 
@@ -259,6 +281,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # If all currently active pcr plates are processed, place them in the dest pcr plate stack
 
             if state["current_active_pcr_plate"] == state["current_active_pcr_plates"]:
+                logger.debug("Placing pcr plates in dest rack...")
                 for i in range(state["current_active_pcr_plates"]):
                     cmd.grip_get(
                         hammy,
@@ -289,3 +312,5 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.reset_state(state, state_file_path, "current_active_pcr_plates", 0)
 
             st.print_state(state)
+
+        cmd.grip_eject(hammy)

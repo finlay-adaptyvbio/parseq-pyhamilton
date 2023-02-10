@@ -16,15 +16,15 @@ from pyhamilton import (
 # Logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Constants
+
+TIPS = 96
 
 CHANNELS = 2
 CHANNEL_1 = "10"
 CHANNEL_2 = "01"
-
-TIPS = 96
-RACKS = 9
 
 # We need to define separate liquid classes for ethanol dispense and aspirate steps
 
@@ -35,6 +35,14 @@ ETHANOL_DISPENSE = "StandardVolume_EtOH_DispenseJet_Part"
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
     # Get wells and plates to empty from csv files
+
+    logger.info("Parsing plate map and well map...")
+    logger.debug(
+        f"Plate map: {os.path.join(run_dir_path, 'pm_emptying_plate_map.csv')}"
+    )
+    logger.debug(
+        f"Well map: {os.path.join(run_dir_path, 'pm_emptying_sorted_well_map.csv')}"
+    )
 
     plate_map_path = os.path.join(run_dir_path, "pm_emptying_plate_map.csv")
 
@@ -52,7 +60,12 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     wells_to_empty = [(t[2], t[3]) for t in well_map]
 
-    # Define labware from parsed layout file
+    logger.debug(f"Plates: {plates}")
+    logger.debug(f"Wells to empty: {wells_to_empty}")
+
+    # Assign labware to deck positions
+
+    logger.info("Assigning labware...")
 
     source_bact_plates = dk.get_labware_list(
         deck,
@@ -77,25 +90,25 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     ethanol_reservoir = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
     waste_reservoir = dk.get_labware_list(deck, ["D1"], Reservoir300)[0]
 
-    racks = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip96, [4, 4, 4], True)
-    rack_tips, rack_virtual = dk.get_labware_list(deck, ["F5"], Tip96, [2])
-    tips = [(rack_tips, i) for i in dk.pos_96_2ch(96)]
+    rack_tips = dk.get_labware_list(deck, ["F5"], Tip96)[0]
+    tips_remove = [(rack_tips, i) for i in dk.pos_96_2ch(96)][0:2]
+    tips_add = [(rack_tips, i) for i in dk.pos_96_2ch(96)][2:4]
 
     waste = [(waste_reservoir, position) for position in range(182, 187, CHANNELS * 2)]
     ethanol = [
         (ethanol_reservoir, position) for position in range(368, 373, CHANNELS * 2)
     ]
 
-    # HACK: get rid of type errors due to state not being initialized
-
-    wells = []
-
     # Inform user of labware positions, ask for confirmation after placing plates
+
+    logger.debug("Prompt user for plate placement...")
 
     hp.place_plates(plates, source_bact_plates, "source", state["current_plate"])
 
     # Main Hamilton method starts here
     # TODO: reduce loops to functions, for example wells_to_reservoir or reservoir_to_wells
+
+    logger.info("Starting Hamilton method...")
 
     with HamiltonInterface(simulate=True) as hammy:
         # Initialize Hamilton
@@ -107,9 +120,20 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         # These are implemented as loops (over wells) and have some redundancies
 
         while state["current_plate"] < len(plates):
+            # Build well list for current plate
+
+            logger.debug("Building well list for current plate...")
+
+            wells = [
+                (active_bact_plate, dk.string_to_index_384(t[0]))
+                for t in wells_to_empty
+                if t[1] == plates[state["current_plate"]]
+            ]
+
             # Get next plate from stack and move to active position if not done already
 
             if not state["active_plate"]:
+                logger.debug("Moving next plate to active position...")
                 cmd.grip_get(
                     hammy,
                     source_bact_plates[state["current_plate"]],
@@ -123,301 +147,187 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 )
                 cmd.grip_place(hammy, temp_bact_lid, mode=1, eject=True)
 
-                # Build well list for current plate
-
-                wells = [
-                    (active_bact_plate, dk.string_to_index_384(t[0]))
-                    for t in wells_to_empty
-                    if t[1] == plates[state["current_plate"]]
-                ]
-
                 st.reset_state(state, state_file_path, "active_plate", 1)
                 st.reset_state(state, state_file_path, "current_well", 0)
                 st.reset_state(state, state_file_path, "remove_media", 0)
                 st.reset_state(state, state_file_path, "add_ethanol", 0)
                 st.reset_state(state, state_file_path, "remove_ethanol", 0)
 
-            # Get next 2 tips from active tip stack
-
-            cmd.tip_pick_up(
-                hammy, tips[state["current_tip"] : state["current_tip"] + CHANNELS]
-            )
-
-            st.update_state(state, state_file_path, "current_tip", CHANNELS)
-            st.reset_state(state, state_file_path, "channel_steps", 0)
-
             # Aspirate media from active plate and dispense to waste reservoir
             # We loop through the wells in groups of 4 (2 * 2 CHANNELS) and aspirate 140 uL from each well
 
-            while state["current_well"] < len(wells) and not state["remove_media"]:
-                # Check if there are still tips in the active rack
-                # Discard rack and get new one from stacked racks if current one is done
+            logger.debug(f"Current well: {state['current_well']}")
+            logger.debug(f"Number of wells: {len(wells)}")
+            logger.debug(f"Remove media: {bool(state['remove_media'])}")
 
-                if state["current_tip"] >= TIPS:
-                    cmd.grip_get_tip_rack(hammy, rack_tips)
-                    cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
-                    cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
-                    cmd.grip_place_tip_rack(hammy, rack_virtual)
+            if not state["remove_media"]:
+                logger.info("Starting media removal...")
 
-                    st.update_state(state, state_file_path, "current_rack", 1)
-                    st.reset_state(state, state_file_path, "current_tip", 0)
+                # Get next 2 tips from active tip stack
+                logger.debug("Getting next tips for media removal...")
 
-                # In the case where there are less than 4 wells left, we only aspirate from the remaining wells
-                # Also check if there are enough tips left to pipet the remaining wells
-                # This outputs the minimum of the three values (max wells to process, wells left, tips left)
+                cmd.tip_pick_up(hammy, tips_remove)
 
-                stop = min(
-                    4,
-                    len(wells[state["current_well"] :]),
-                    (TIPS - state["current_tip"]),
-                )
+                while state["current_well"] < len(wells):
+                    logger.debug("Starting media removal...")
 
-                for i in range(0, stop, CHANNELS):
-                    # Currently there seems to be a bug in VENUS when aspirating > 60 times from one channel consecutively
-                    # This is a workaround to reset the channel after 58 steps
+                    # In the case where there are less than 4 wells left, we only aspirate from the remaining wells
+                    # Also check if there are enough tips left to pipet the remaining wells
+                    # This outputs the minimum of the three values (max wells to process, wells left, tips left)
 
-                    if state["channel_steps"] >= 60:
-                        cmd.tip_eject(
-                            hammy,
-                            tips[
-                                state["current_tip"] : state["current_tip"] + CHANNELS
-                            ],
-                            waste=True,
-                        )
-                        st.update_state(state, state_file_path, "current_tip", CHANNELS)
-                        cmd.tip_pick_up(
-                            hammy,
-                            tips[
-                                state["current_tip"] : state["current_tip"] + CHANNELS
-                            ],
-                        )
-                        st.reset_state(state, state_file_path, "channel_steps", 0)
-
-                    # The first aspirate command must be set to aspirateMode = 0, otherwise the pipette will not aspirate blowout volume
-                    # This doesn't seem to work (VENUS still outputs warning about aspiration mode)
-                    # This is probably related to plunger errors encountered after 60 steps
-
-                    if i >= 2:
-                        aspirateMode = 1
-                    else:
-                        aspirateMode = 0
+                    stop = min(2, len(wells[state["current_well"] :]))
+                    logger.debug(f"Wells to pipet: {stop}")
 
                     # Aspirate from wells (with mixing) and dispense to waste
                     # If there is only one well left, aspirate and dispense with one channel
 
-                    if stop - i == 1:
+                    if stop == 1:
+                        logger.debug("Aspirating from one well...")
                         cmd.aspirate(
                             hammy,
                             [wells[state["current_well"]]],
                             [140.0],
                             channelVariable=CHANNEL_1,
-                            aspirateMode=aspirateMode,
                             mixCycles=3,
                             mixVolume=50.0,
                         )
                         st.update_state(state, state_file_path, "current_well", 1)
 
                     else:
+                        logger.debug("Aspirating from two wells...")
                         cmd.aspirate(
                             hammy,
                             wells[
                                 state["current_well"] : state["current_well"] + CHANNELS
                             ],
                             [140.0],
-                            aspirateMode=aspirateMode,
                             mixCycles=3,
                             mixVolume=50.0,
                         )
                         st.update_state(state, state_file_path, "current_well", 2)
 
-                    st.update_state(state, state_file_path, "channel_steps", 1)
+                    dispense_volume = [
+                        140.0 * math.ceil(stop / CHANNELS),
+                        140.0 * math.floor(stop / CHANNELS),
+                    ]
 
-                dispense_volume = [
-                    140.0 * math.ceil(stop / CHANNELS),
-                    140.0 * math.floor(stop / CHANNELS),
-                ]
+                    cmd.dispense(hammy, waste, dispense_volume, dispenseMode=9)
 
-                cmd.dispense(hammy, waste, dispense_volume, dispenseMode=9)
+                # Update state variables for next step
 
-            # Eject tips and pick up new ones
+                st.reset_state(state, state_file_path, "remove_media", 1)
+                st.reset_state(state, state_file_path, "current_well", 0)
 
-            cmd.tip_eject(
-                hammy,
-                tips[state["current_tip"] : state["current_tip"] + CHANNELS],
-                waste=True,
-            )
-            st.update_state(state, state_file_path, "current_tip", CHANNELS)
-            cmd.tip_pick_up(
-                hammy,
-                tips[state["current_tip"] : state["current_tip"] + CHANNELS],
-            )
-            st.reset_state(state, state_file_path, "channel_steps", 0)
-
-            # Update state variables for next step
-
-            st.reset_state(state, state_file_path, "remove_media", 1)
-            st.reset_state(state, state_file_path, "current_well", 0)
+                # Eject tips for media removal
+                logger.debug("Ejecting tips for media removal...")
+                cmd.tip_eject(hammy, tips_remove)
 
             # Dispense ethanol into emptied wells of active plate
             # This loop advances in steps of 6 (3 * 2 CHANNELS) and dispenses 100 uL into each well
 
-            while state["current_well"] < len(wells) and not state["add_ethanol"]:
-                # Check if there are still tips in the active rack
-                # Discard rack and get new one from stacked racks if current one is done
+            logger.debug(f"Current well: {state['current_well']}")
+            logger.debug(f"Number of wells: {len(wells)}")
+            logger.debug(f"Add ethanol: {bool(state['add_ethanol'])}")
 
-                if state["current_tip"] >= TIPS:
-                    cmd.grip_get_tip_rack(hammy, rack_tips)
-                    cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
-                    cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
-                    cmd.grip_place_tip_rack(hammy, rack_virtual)
+            if not state["add_ethanol"]:
+                logger.info("Starting ethanol addition...")
 
-                    st.update_state(state, state_file_path, "current_rack", 1)
-                    st.reset_state(state, state_file_path, "current_tip", 0)
+                # Get next 2 tips from active tip stack
+                logger.debug("Getting new tips for ethanol addition...")
+                cmd.tip_pick_up(hammy, tips_add)
 
-                # In the case where there are less than 6 wells left, we only aspirate from the remaining wells
-                # Also check if there are enough tips left to pipet the remaining wells
-                # This outputs the minimum of the three values (max wells to process, wells left, tips left)
+                while state["current_well"] < len(wells):
+                    # In the case where there are less than 6 wells left, we only aspirate from the remaining wells
+                    # Also check if there are enough tips left to pipet the remaining wells
+                    # This outputs the minimum of the three values (max wells to process, wells left, tips left)
 
-                stop = min(
-                    6,
-                    len(wells[state["current_well"] :]),
-                    (TIPS - state["current_tip"]),
-                )
+                    stop = min(6, len(wells[state["current_well"] :]))
 
-                # Currently there seems to be a bug in VENUS when aspirating > 60 times from one channel consecutively
-                # This is a workaround to reset the channel after 58 steps
+                    # Set aspirate volume depending on number of CHANNELS used and aspirate
 
-                if state["channel_steps"] >= 60:
-                    cmd.tip_eject(
-                        hammy,
-                        tips[state["current_tip"] : state["current_tip"] + CHANNELS],
-                        waste=True,
+                    aspirate_volume = [
+                        100.0 * math.ceil(stop / CHANNELS),
+                        100.0 * math.floor(stop / CHANNELS),
+                    ]
+
+                    cmd.aspirate(
+                        hammy, ethanol, aspirate_volume, liquidClass=ETHANOL_DISPENSE
                     )
-                    st.update_state(state, state_file_path, "current_tip", CHANNELS)
-                    cmd.tip_pick_up(
-                        hammy,
-                        tips[state["current_tip"] : state["current_tip"] + CHANNELS],
-                    )
-                    st.reset_state(state, state_file_path, "channel_steps", 0)
 
-                # Set aspirate volume depending on number of CHANNELS used and aspirate
+                    for i in range(0, stop, CHANNELS):
+                        # Dispense into wells
+                        # If there are an odd number of wells left, dispense with one channel
 
-                aspirate_volume = [
-                    100.0 * math.ceil(stop / CHANNELS),
-                    100.0 * math.floor(stop / CHANNELS),
-                ]
+                        if stop - i == 1:
+                            cmd.dispense(
+                                hammy,
+                                [wells[state["current_well"]]],
+                                [100.0],
+                                channelVariable=CHANNEL_1,
+                                liquidClass=ETHANOL_DISPENSE,
+                            )
+                            st.update_state(
+                                state, state_file_path, "current_well", stop - i
+                            )
 
-                cmd.aspirate(
-                    hammy, ethanol, aspirate_volume, liquidClass=ETHANOL_DISPENSE
-                )
-                st.update_state(state, state_file_path, "channel_steps", 1)
+                        else:
+                            cmd.dispense(
+                                hammy,
+                                wells[
+                                    state["current_well"] : state["current_well"]
+                                    + CHANNELS
+                                ],
+                                [100.0],
+                                liquidClass=ETHANOL_DISPENSE,
+                            )
+                            st.update_state(
+                                state, state_file_path, "current_well", CHANNELS
+                            )
 
-                for i in range(0, stop, CHANNELS):
-                    # Dispense into wells
-                    # If there are an odd number of wells left, dispense with one channel
+                # Update state variables for next step
 
-                    if stop - i == 1:
-                        cmd.dispense(
-                            hammy,
-                            [wells[state["current_well"]]],
-                            [100.0],
-                            channelVariable=CHANNEL_1,
-                            liquidClass=ETHANOL_DISPENSE,
-                        )
-                        st.update_state(
-                            state, state_file_path, "current_well", stop - i
-                        )
+                st.reset_state(state, state_file_path, "add_ethanol", 1)
+                st.reset_state(state, state_file_path, "current_well", 0)
 
-                    else:
-                        cmd.dispense(
-                            hammy,
-                            wells[
-                                state["current_well"] : state["current_well"] + CHANNELS
-                            ],
-                            [100.0],
-                            liquidClass=ETHANOL_DISPENSE,
-                        )
-                        st.update_state(
-                            state, state_file_path, "current_well", CHANNELS
-                        )
-
-            # Update state variables for next step
-
-            st.reset_state(state, state_file_path, "add_ethanol", 1)
-            st.reset_state(state, state_file_path, "current_well", 0)
+                # Eject tips for ethanol addition
+                logger.debug("Ejecting tips for ethanol addition...")
+                cmd.tip_eject(hammy, tips_add)
 
             # Aspirate ethanol from active plate and dispense to waste reservoir
             # Loop advances in steps of 4 (2 * 2 CHANNELS) and aspirates 140 uL from each well
 
-            while state["current_well"] < len(wells) and not state["remove_ethanol"]:
-                # Check if there are still tips in the active rack
-                # Discard rack and get new one from stacked racks if current one is done
+            logger.debug(f"Current well: {state['current_well']}")
+            logger.debug(f"Number of wells: {len(wells)}")
+            logger.debug(f"Remove ethanol: {bool(state['remove_ethanol'])}")
 
-                if state["current_tip"] >= TIPS:
-                    cmd.grip_get_tip_rack(hammy, rack_tips)
-                    cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
-                    cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
-                    cmd.grip_place_tip_rack(hammy, rack_virtual)
+            if not state["remove_ethanol"]:
+                logger.info("Starting ethanol removal...")
 
-                    st.update_state(state, state_file_path, "current_rack", 1)
-                    st.reset_state(state, state_file_path, "current_tip", 0)
+                # Get next 2 tips from active tip stack
+                logger.debug("Getting new tips for ethanol removal...")
+                cmd.tip_pick_up(hammy, tips_remove)
 
-                # In the case where there are less than 4 wells left, we only aspirate from the remaining wells
-                # Also check if there are enough tips left to pipet the remaining wells
-                # This outputs the minimum of the three values (max wells to process, wells left, tips left)
+                while state["current_well"] < len(wells):
+                    # In the case where there are less than 4 wells left, we only aspirate from the remaining wells
+                    # Also check if there are enough tips left to pipet the remaining wells
+                    # This outputs the minimum of the three values (max wells to process, wells left, tips left)
 
-                stop = min(
-                    4,
-                    len(wells[state["current_well"] :]),
-                    (TIPS - state["current_tip"]),
-                )
-
-                for i in range(0, stop, CHANNELS):
-                    # Currently there seems to be a bug in VENUS when aspirating > 60 times from one channel consecutively
-                    # This is a workaround to reset the channel after 60 steps
-
-                    if state["channel_steps"] >= 60:
-                        cmd.tip_eject(
-                            hammy,
-                            tips[
-                                state["current_tip"] : state["current_tip"] + CHANNELS
-                            ],
-                            waste=True,
-                        )
-                        st.update_state(state, state_file_path, "current_tip", CHANNELS)
-                        cmd.tip_pick_up(
-                            hammy,
-                            tips[
-                                state["current_tip"] : state["current_tip"] + CHANNELS
-                            ],
-                        )
-                        st.reset_state(state, state_file_path, "channel_steps", 0)
-
-                    # The first aspirate command must be set to aspirateMode = 0, otherwise the pipette will not aspirate blowout volume
-                    # This doesn't seem to work (VENUS still outputs warning about aspiration mode)
-
-                    if i >= 2:
-                        aspirateMode = 1
-                    else:
-                        aspirateMode = 0
+                    stop = min(CHANNELS, len(wells[state["current_well"] :]))
 
                     # Aspirate from wells (with mixing)
                     # If there are an odd number of wells left, aspirate and dispense with one channel
 
-                    if stop - i == 1:
+                    if stop == 1:
                         cmd.aspirate(
                             hammy,
                             [wells[state["current_well"]]],
                             [140],
                             channelVariable=CHANNEL_1,
-                            aspirateMode=aspirateMode,
                             liquidClass=ETHANOL_ASPIRATE,
                             mixCycles=3,
                             mixVolume=50.0,
                         )
-                        st.update_state(
-                            state, state_file_path, "current_well", stop - i
-                        )
+                        st.update_state(state, state_file_path, "current_well", stop)
 
                     else:
                         cmd.aspirate(
@@ -426,7 +336,6 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                                 state["current_well"] : state["current_well"] + CHANNELS
                             ],
                             [140],
-                            aspirateMode=aspirateMode,
                             liquidClass=ETHANOL_ASPIRATE,
                             mixCycles=3,
                             mixVolume=50.0,
@@ -435,30 +344,41 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                             state, state_file_path, "current_well", CHANNELS
                         )
 
-                    st.update_state(state, state_file_path, "channel_steps", 1)
+                    # Calculate dispense volume depending on number of CHANNELS used and dispense
 
-                # Calculate dispense volume depending on number of CHANNELS used and dispense
+                    dispense_volume = [
+                        140.0 * math.ceil(stop / CHANNELS),
+                        140.0 * math.floor(stop / CHANNELS),
+                    ]
 
-                dispense_volume = [
-                    140.0 * math.ceil(stop / CHANNELS),
-                    140.0 * math.floor(stop / CHANNELS),
-                ]
+                    cmd.dispense(
+                        hammy,
+                        waste,
+                        dispense_volume,
+                        liquidClass=ETHANOL_ASPIRATE,
+                        dispenseMode=9,
+                    )
 
-                cmd.dispense(
-                    hammy,
-                    waste,
-                    dispense_volume,
-                    liquidClass=ETHANOL_ASPIRATE,
-                    dispenseMode=9,
-                )
+                # Update state variables for next step
+
+                st.reset_state(state, state_file_path, "remove_ethanol", 1)
+                st.reset_state(state, state_file_path, "current_well", 0)
+
+                # Eject tips for ethanol removal
+                logger.debug("Ejecting tips for ethanol removal...")
+                cmd.tip_eject(hammy, tips_remove)
+
+            # Move completed plate to done stack if not already done
+            logger.debug(f"Active plate: {bool(state['active_plate'])}")
 
             if state["active_plate"]:
-                # Eject tips to current position in active rack
+                logger.info("Moving plate to done stack...")
+
+                # Eject tips to current position in active rack (should already be done)
                 # No need to change tips between ethanol removal and media removal steps
 
-                cmd.tip_eject(
-                    hammy, tips[state["current_tip"] : state["current_tip"] + CHANNELS]
-                )
+                logger.debug("Ejecting tips if needed...")
+                cmd.tip_eject(hammy, tips_remove)
 
                 # Place lid on active plate and move to done stack
 
@@ -475,3 +395,5 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.reset_state(state, state_file_path, "active_plate", 0)
 
             st.print_state(state)
+
+        cmd.grip_eject(hammy)

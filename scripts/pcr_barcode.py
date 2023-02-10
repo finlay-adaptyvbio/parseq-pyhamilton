@@ -15,10 +15,11 @@ from pyhamilton import (
 # Logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Constants
 
-RACKS = 12
+RACKS = 9
 TIPS_96 = 96
 TIPS_384 = 384
 
@@ -29,14 +30,19 @@ MIXING = "50ulTip_conductive_384COREHead_Water_DispenseSurface_Empty"
 
 
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
-    # Plate information
-    # TODO: get plate info from prompt or csv file
+    # Plate information and variables
+
+    logger.debug("Getting number of plates from prompt...")
 
     plates = hp.prompt_int("Plates to process", 4)
 
     pcr_plates = [f"P{i}" for i in range(1, plates + 1)]
 
+    logger.debug(f"Plates to pool: {pcr_plates}")
+
     # Assign labware to deck positions
+
+    logger.info("Assigning labware...")
 
     source_pcr_plates = dk.get_labware_list(
         deck,
@@ -67,11 +73,14 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing plates
 
+    logger.debug("Prompt user for plate placement...")
+
     hp.place_plates(pcr_plates, source_pcr_plates, "pcr", state["current_pcr_plate"])
+
+    logger.info("Starting Hamilton method...")
 
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable
-    # TODO: Check if total number of tips available is enough for the protocol, add prompt when new tip racks are needed
 
     with HamiltonInterface(simulate=True) as hammy:
         # Initialize Hamilton
@@ -80,10 +89,14 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
         # Loop over plates as long as there are still bact plates to process
 
+        logger.debug(f"Current pcr plate: {state['current_pcr_plate']}")
+        logger.debug(f"No. of pcr plates: {len(source_pcr_plates)}")
+
         while state["current_pcr_plate"] < len(source_pcr_plates):
             # Get PCR plate from source rack and place it in the active position if not already done
 
             if not state["active_pcr_plate"]:
+                logger.debug("Getting next PCR plate...")
                 cmd.grip_get(
                     hammy,
                     source_pcr_plates[state["current_pcr_plate"]],
@@ -106,6 +119,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.reset_state(state, state_file_path, "add_oligos", 0)
 
             if not state["active_rack"]:
+                logger.debug("Getting next tip rack...")
                 cmd.grip_get_tip_rack(hammy, racks[state["current_rack"]])
                 cmd.grip_place_tip_rack(hammy, rack_virtual)
 
@@ -114,6 +128,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Aspirate from oligo plate to active pcr plate
 
             if not state["add_oligos"]:
+                logger.info("Adding oligos to PCR plate...")
                 pcr_wells = [(active_pcr_plate, i) for i in range(384)]
 
                 cmd.tip_pick_up_384(hammy, tips)
@@ -141,6 +156,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Discard current active rack to waste if not already done
 
             if state["active_rack"]:
+                logger.debug("Discarding tip rack...")
                 cmd.grip_get_tip_rack(hammy, rack_tips)
                 cmd.grip_place_tip_rack(hammy, rack_tips, waste=True)
 
@@ -150,6 +166,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # if all currently active pcr plates are processed, place them in the dest pcr plate stack
 
             if state["active_pcr_plate"]:
+                logger.debug("Placing PCR plate in destination stack...")
                 cmd.grip_get(
                     hammy,
                     temp_pcr_lid,
@@ -176,3 +193,5 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.reset_state(state, state_file_path, "active_pcr_plate", 0)
 
             st.print_state(state)
+
+        cmd.grip_eject(hammy)

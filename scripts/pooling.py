@@ -19,6 +19,7 @@ from pyhamilton import (
 # Logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Constants
 
@@ -32,11 +33,17 @@ CHANNELS_384_96_8 = "1" + ("0" * 11)
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
 
+    logger.debug("Getting number of plates from prompt...")
+
     plates = hp.prompt_int("Plates to pool", 8)
 
     pcr_plates = [f"P{i}" for i in range(1, plates + 1)]
 
-    # Define labware from parsed layout file
+    logger.debug(f"Plates to pool: {pcr_plates}")
+
+    # Assign labware to deck positions
+
+    logger.info("Assigning labware...")
 
     source_pcr_plates = dk.get_labware_list(
         deck,
@@ -104,15 +111,17 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing plates
 
+    logger.debug("Prompt user for plate placement...")
+
     hp.place_plates(pcr_plates, source_pcr_plates, "pcr", state["current_pcr_plate"])
     hp.place_plates(
         pcr_plates, source_pooling_plates, "pooling", state["current_pooling_plate"]
     )
 
+    logger.info("Starting Hamilton method...")
+
     # Main script starts here
     # TODO: reduce loops to functions to make it more readable
-
-    ## simulate = True opens VENUS run control in a separate window where you can enable simulation mode to test protocol
 
     with HamiltonInterface(simulate=True) as hammy:
         # Initialize Hamilton
@@ -121,15 +130,21 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
         # Load tips into column holder
 
+        logger.debug("Loading tips into column holder...")
+
         cmd.tip_pick_up_384(hammy, column_rack_tips, tipMode=1)
         cmd.tip_eject_384(hammy, column_holder_tips)
 
         # Loop over plates as long as there are still pcr plates to process
 
+        logger.debug(f"Current pcr plate: {state['current_pcr_plate']}")
+        logger.debug(f"No. of pcr plates: {len(source_pcr_plates)}")
+
         while state["current_pcr_plate"] < len(source_pcr_plates):
             # Get next pcr plate from source stack if not already done
 
             if not state["active_pcr_plate"]:
+                logger.debug("Getting next pcr plate from source stack...")
                 cmd.grip_get(
                     hammy,
                     source_pcr_plates[state["current_pcr_plate"]],
@@ -152,6 +167,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Get next pooling plate from source stack if not already done
 
             if not state["active_pooling_plate"]:
+                logger.debug("Getting next pooling plate...")
                 cmd.grip_get(
                     hammy,
                     source_pooling_plates[state["current_pooling_plate"]],
@@ -166,6 +182,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Add EDTA to pcr plate if not already done
 
             if not state["edta"]:
+                logger.info("Adding EDTA to pcr plate...")
                 cmd.tip_pick_up_384(hammy, edta_tips)
                 cmd.aspirate_384(hammy, edta, 20.0, liquidHeight=2.0)
                 cmd.dispense_384(
@@ -178,6 +195,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Get next 96_384-tip rack if not already done
 
             if not state["active_rack"]:
+                logger.debug("Getting next tip rack...")
                 cmd.grip_get_tip_rack(hammy, racks_96[state["current_rack"]])
                 cmd.grip_place_tip_rack(hammy, rack_96_virtual)
 
@@ -186,6 +204,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Transfer 384 wells in pcr plate to 96 in pooling plate if not already done
 
             if not state["384_to_96"]:
+                logger.info("Transferring 384 wells to 96...")
                 cmd.tip_pick_up_384(hammy, tips_96, tipMode=1)
 
                 for quadrant in range(state["current_quadrant"], 4):
@@ -214,9 +233,20 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 cmd.tip_eject_384(hammy, tips_96, 2)
                 st.reset_state(state, state_file_path, "384_to_96", 1)
 
+            # Discard current 96_384-tip rack if not already done
+
+            if state["active_rack"]:
+                logger.debug("Discarding current tip rack...")
+                cmd.grip_get_tip_rack(hammy, rack_96_tips)
+                cmd.grip_place_tip_rack(hammy, rack_96_tips, waste=True)
+
+                st.update_state(state, state_file_path, "current_rack", 1)
+                st.reset_state(state, state_file_path, "active_rack", 0)
+
             # Transfer columns 2-12 to column 1 in pooling plate using 8 tips on 384-head if not already done
 
             if not state["96_to_8"]:
+                logger.info("Transferring 96 wells to 8...")
                 column_tips = [(column_holder, i) for i in dk.pos_96_rev()][
                     state["current_tip_column"] * 8 :
                 ]
@@ -255,6 +285,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Transfer column 1 in pooling plate to next eppendorf tube using 2 channels if not already done
 
             if not state["8_to_1"]:
+                logger.info("Transferring 8 wells to 1...")
                 cmd.tip_pick_up(
                     hammy, tips_300[state["current_tip"] : state["current_tip"] + 2]
                 )
@@ -291,6 +322,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Move active pcr plate to destination stack if not already done
 
             if state["active_pcr_plate"]:
+                logger.debug("Moving active pcr plate to destination stack...")
                 cmd.grip_get(
                     hammy,
                     temp_pcr_lid,
@@ -318,6 +350,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Move active pooling plate to destination stack if not already done
 
             if state["active_pooling_plate"]:
+                logger.debug("Moving active pooling plate to destination stack...")
                 cmd.grip_get(
                     hammy,
                     active_pooling_plate,
@@ -332,13 +365,6 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.update_state(state, state_file_path, "current_pooling_plate", 1)
                 st.reset_state(state, state_file_path, "active_pooling_plate", 0)
 
-            # Discard current 96_384-tip rack if not already done
-
-            if state["active_rack"]:
-                cmd.grip_get_tip_rack(hammy, rack_96_tips)
-                cmd.grip_place_tip_rack(hammy, rack_96_tips, waste=True)
-
-                st.update_state(state, state_file_path, "current_rack", 1)
-                st.reset_state(state, state_file_path, "active_rack", 0)
-
             st.print_state(state)
+
+        cmd.grip_eject(hammy)
