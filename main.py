@@ -47,20 +47,23 @@ logger = logging.getLogger()
 
 # Notification settings for Slack on script exit
 
-slack_token = "xoxb-4612406885399-4627932099202-REL8YycwsJbdBKYkGJ7qeq75"
-slack_channel = "#main"
-slack_icon_emoji = ":see_no_evil:"
-slack_user_name = "pyhamilton"
+import os
+import requests
+
+slack_api_token = os.environ.get("SLACK_API_TOKEN")  # set as environment variable on Hamilton PC
+slack_channel = "#hamilton-events" # public channel
+slack_icon_url = "https://i.ibb.co/L59D5KZ/Group-2164.png" # icon downloaded from Biorender
+slack_user_name = "Hamilton"
 
 
 def notify(text):
     return requests.post(
         "https://slack.com/api/chat.postMessage",
         {
-            "token": slack_token,
+            "token": slack_api_token,
             "channel": slack_channel,
             "text": text,
-            "icon_emoji": slack_icon_emoji,
+            "icon_url": slack_icon_url,
             "username": slack_user_name,
             "blocks": None,
         },
