@@ -50,9 +50,13 @@ logger = logging.getLogger()
 import os
 import requests
 
-slack_api_token = os.environ.get("SLACK_API_TOKEN")  # set as environment variable on Hamilton PC
-slack_channel = "#hamilton-events" # public channel
-slack_icon_url = "https://i.ibb.co/L59D5KZ/Group-2164.png" # icon downloaded from Biorender
+slack_api_token = os.environ.get(
+    "SLACK_API_TOKEN"
+)  # set as environment variable on Hamilton PC
+slack_channel = "#hamilton-events"  # public channel
+slack_icon_url = (  # icon downloaded from Biorender
+    "https://i.ibb.co/L59D5KZ/Group-2164.png"
+)
 slack_user_name = "Hamilton"
 
 
@@ -372,6 +376,9 @@ if __name__ == "__main__":
                 )
                 shutil.copy(well_list_path, os.path.join(run_dir_path, f"{method}.csv"))
                 hp.process_cherry_csv(well_list_path, run_dir_path, method)
+
+        case "plate_filling":
+            from scripts import plate_filling as script
 
         case _:
             # This shoudn't be needed but avoids type error
