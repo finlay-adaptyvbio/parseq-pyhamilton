@@ -61,6 +61,14 @@ slack_user_name = "Hamilton"
 
 
 def notify(text):
+    """Send a notification to Slack
+
+    Args:
+        text (str): message to send
+
+    Returns:
+        dict: response from Slack API
+    """
     return requests.post(
         "https://slack.com/api/chat.postMessage",
         {
