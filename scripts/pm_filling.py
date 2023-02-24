@@ -43,8 +43,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         reader = csv.reader(f)
         plate_map = [tuple(row) for row in reader]
 
-    target_plates = [t[0] for t in plate_map]
-    source_plates = [t[1] for t in plate_map]
+    target_plates = [t[1] for t in plate_map if t[1] != ""]
+    source_plates = [t[0] for t in plate_map if t[0] != ""]
 
     well_map_path = os.path.join(run_dir_path, "pm_filling_sorted_well_map.csv")
 
@@ -52,8 +52,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         reader = csv.reader(f)
         well_map = [tuple(row) for row in reader]
 
-    wells_to_fill = [(t[0], t[1]) for t in well_map]
-    wells_to_empty = [(t[2], t[3]) for t in well_map]
+    wells_to_fill = [(t[2], t[3]) for t in well_map]
+    wells_to_empty = [(t[0], t[1]) for t in well_map]
 
     logger.debug(f"Plates: {source_plates} | {target_plates}")
     logger.debug(f"Wells to empty: {wells_to_empty}")
@@ -120,7 +120,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     if len(wells_to_empty) > RACKS * TIPS:
         logger.warning(
-            f"Number of tips needed ({len(wells_to_empty)}) is larger than number of tips available ({RACKS * TIPS})."
+            f"Number of tips needed ({len(wells_to_empty)}) is larger than number of"
+            f" tips available ({RACKS * TIPS})."
         )
         logger.info("Script will prompt user to add more tip racks when needed.")
 
