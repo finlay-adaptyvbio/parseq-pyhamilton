@@ -1,4 +1,4 @@
-import logging
+import logging, itertools
 
 from pyhamilton import (
     LayoutManager,
@@ -241,17 +241,24 @@ def sort_384_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
             if int(col_index[1:]) == col
         ]
         row_indexes = [rows.index(row[0]) for row in col_indexes]
-        row_indexes_set = set(row_indexes)
 
-        pairs_set = set()
         pairs = [
-            (x, y) for x in row_indexes if (y := x + 4) in row_indexes_set and x < y
+            pair
+            for pair in itertools.combinations(row_indexes, 2)
+            if abs(pair[0] - pair[1]) >= 4
         ]
-        unique_pairs = [
-            (x, y) for x, y in pairs if not (x in pairs_set or pairs_set.add(y))
-        ]
+        pairs_sorted = sorted(pairs, key=lambda x: x[1])
+        pairs_unique = []
 
-        sorted_row_indexes = [i for t in unique_pairs for i in t]
+        while pairs_sorted:
+            pair = pairs_sorted[0]
+            pairs_sorted.remove(pair)
+            pairs_unique.append(pair)
+            pairs_sorted = [
+                p for p in pairs_sorted if p[0] not in pair and p[1] not in pair
+            ]
+
+        sorted_row_indexes = [i for t in pairs_unique for i in t]
         unsorted_row_indexes = [i for i in row_indexes if i not in sorted_row_indexes]
 
         sorted_rows = [rows[row] + str(col) for row in sorted_row_indexes]
@@ -278,17 +285,24 @@ def sort_96_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
             if int(col_index[1:]) == col
         ]
         row_indexes = [rows.index(row[0]) for row in col_indexes]
-        row_indexes_set = set(row_indexes)
 
-        pairs_set = set()
         pairs = [
-            (x, y) for x in row_indexes if (y := x + 2) in row_indexes_set and x < y
+            pair
+            for pair in itertools.combinations(row_indexes, 2)
+            if abs(pair[0] - pair[1]) >= 4
         ]
-        unique_pairs = [
-            (x, y) for x, y in pairs if not (x in pairs_set or pairs_set.add(y))
-        ]
+        pairs_sorted = sorted(pairs, key=lambda x: x[1])
+        pairs_unique = []
 
-        sorted_row_indexes = [i for t in unique_pairs for i in t]
+        while pairs_sorted:
+            pair = pairs_sorted[0]
+            pairs_sorted.remove(pair)
+            pairs_unique.append(pair)
+            pairs_sorted = [
+                p for p in pairs_sorted if p[0] not in pair and p[1] not in pair
+            ]
+
+        sorted_row_indexes = [i for t in pairs_unique for i in t]
         unsorted_row_indexes = [i for i in row_indexes if i not in sorted_row_indexes]
 
         sorted_rows = [rows[row] + str(col) for row in sorted_row_indexes]
