@@ -7,6 +7,7 @@ import helpers as hp
 
 from pyhamilton import (
     HamiltonInterface,
+    Reservoir300,
     Plate96,
     Plate384,
     Lid,  # type: ignore
@@ -99,10 +100,10 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         deck, ["C1", "C2", "C3", "C4"], Lid, [1, 1, 1, 1]
     )
 
-    master_mix_plate = dk.get_labware_list(deck, ["C5"], Plate96)[0]
-    master_mix = [(master_mix_plate, i) for i in range(96)]
-    master_mix_rack = dk.get_labware_list(deck, ["B5"], Tip96)[0]
-    master_mix_tips = [(master_mix_rack, i) for i in range(96)]
+    master_mix_reservoir = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
+    master_mix = [(master_mix_reservoir, i) for i in range(384)]
+    master_mix_rack = dk.get_labware_list(deck, ["B5"], Tip384)[0]
+    master_mix_tips = [(master_mix_rack, i) for i in range(384)]
 
     racks = dk.get_labware_list(deck, ["B1", "B2"], Tip384, [2, 2], True)
     rack_tips, rack_virtual = dk.get_labware_list(deck, ["D2"], Tip384, [2])
@@ -191,19 +192,15 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                     4, len(source_pcr_plates[state["current_pcr_plate"] :])
                 )
                 logger.debug(f"Plates to process: {pcr_plates_to_process}")
-                cmd.tip_pick_up_384(hammy, master_mix_tips, tipMode=1)
+                cmd.tip_pick_up_384(hammy, master_mix_tips, tipMode=0)
 
                 for i in range(pcr_plates_to_process):
-                    for quadrant in range(4):
-                        pcr_wells = [
-                            (active_pcr_plates[i], j)
-                            for j in dk.pos_96_in_384(quadrant)
-                        ]
+                    pcr_wells = [(active_pcr_plates[i], j) for j in range(384)]
 
-                        cmd.aspirate_384(hammy, master_mix, 18.5, liquidHeight=0.1)
-                        cmd.dispense_384(
-                            hammy, pcr_wells, 18.5, liquidHeight=8.0, dispenseMode=9
-                        )
+                    cmd.aspirate_384(hammy, master_mix, 18.5, liquidHeight=2.0)
+                    cmd.dispense_384(
+                        hammy, pcr_wells, 18.5, liquidHeight=8.0, dispenseMode=9
+                    )
 
                 cmd.tip_eject_384(hammy, master_mix_tips, 1)
 

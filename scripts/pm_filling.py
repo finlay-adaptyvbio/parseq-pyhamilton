@@ -138,10 +138,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
         # Loop over plates as long as there are still plates (source or target) to process
 
-        while (
-            state["current_source_plate"] < len(source_plates) - 1
-            or state["current_target_plate"] < len(target_plates) - 1
-        ):
+        while state["current_source_plate"] < len(source_plates) or state[
+            "current_target_plate"
+        ] < len(target_plates):
             # Build list of target and source wells for current plate
 
             logger.debug("Building well lists for current plate...")
