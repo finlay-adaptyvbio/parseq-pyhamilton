@@ -130,10 +130,20 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
         # Load tips into column holder
 
-        logger.debug("Loading tips into column holder...")
+        logger.debug("Prompt user for number of tip columns left...")
+        tip_column = hp.prompt_int("Current tip column in holder (0 for new rack)", 12)
 
-        cmd.tip_pick_up_384(hammy, column_rack_tips, tipMode=1)
-        cmd.tip_eject_384(hammy, column_holder_tips)
+        if tip_column > 0:
+            logger.debug("Skipping load step...")
+            st.update_state(state, state_file_path, "tip_column", tip_column - 1)
+
+        elif tip_column == 0:
+            logger.debug("Loading tips into column holder...")
+            cmd.tip_pick_up_384(hammy, column_rack_tips, tipMode=1)
+            cmd.tip_eject_384(hammy, column_holder_tips)
+
+        else:
+            logger.error("Invalid tip column number!")
 
         # Loop over plates as long as there are still pcr plates to process
 
