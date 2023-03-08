@@ -173,6 +173,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.reset_state(state, state_file_path, "current_column", 0)
                 st.reset_state(state, state_file_path, "current_well", 0)
                 st.reset_state(state, state_file_path, "edta", 0)
+                st.reset_state(state, state_file_path, "384_to_96", 0)
+                st.reset_state(state, state_file_path, "96_to_8", 0)
+                st.reset_state(state, state_file_path, "8_to_1", 0)
 
             # Get next pooling plate from source stack if not already done
 
@@ -244,6 +247,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 st.reset_state(state, state_file_path, "384_to_96", 1)
 
             # Discard current 96_384-tip rack if not already done
+
+            # TODO: no need to reset rack after this step or only reset at end of method.
+            # FIXME: don't increment in some cases
 
             if state["active_rack"]:
                 logger.debug("Discarding current tip rack...")
@@ -327,6 +333,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 )
 
                 st.update_state(state, state_file_path, "current_tip", 2)
+                st.update_state(state, state_file_path, "current_eppi", 1)
                 st.reset_state(state, state_file_path, "8_to_1", 1)
 
             # Move active pcr plate to destination stack if not already done
