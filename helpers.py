@@ -1,4 +1,4 @@
-import os, csv, logging
+import os, csv, logging, itertools
 import pandas as pd
 
 # Logging
@@ -42,6 +42,9 @@ def prompt_int(message: str, max: int) -> int:
             if value > max:
                 print(f"Please enter an integer smaller than {max}.")
                 continue
+            elif value < 0:
+                print("Please enter a positive integer.")
+                continue
             break
         except ValueError:
             print("Please enter an integer.")
@@ -51,6 +54,10 @@ def prompt_int(message: str, max: int) -> int:
 
 def sort_384_indexes_2channel(series: pd.Series) -> pd.Series:
     """Sort 384-well indexes by searching for most well pairs with a distance of at least 4.
+    First divide indexes by column, then sort by row. Find all pairs using itertools.combinations
+    and check if distance is at least 4. Sort pairs by second index: most abundant index will be
+    the highest in value as it will have largest difference vs other indexes. Then loop over pairs,
+    extracting the first pair and removing all other pairs containing its values until no pairs are left.
 
     Args:
         series (pd.Series): Series with 384-well indexes for one plate.
@@ -58,8 +65,6 @@ def sort_384_indexes_2channel(series: pd.Series) -> pd.Series:
     Returns:
         pd.Series: Sorted 384-well indexes as series with original DataFrame indexes.
     """
-
-    ## actually only searches for exactly 4 for now, tested with at least 4 and it works too but somehow used more operations
 
     sorted_cols = []
     unsorted_cols = []
@@ -76,17 +81,23 @@ def sort_384_indexes_2channel(series: pd.Series) -> pd.Series:
             if int(col_index[1:]) == col
         ]
         row_indexes = [rows.index(row[0]) for row in col_indexes]
-        row_indexes_set = set(row_indexes)
-
-        pairs_set = set()
         pairs = [
-            (x, y) for x in row_indexes if (y := x + 4) in row_indexes_set and x < y
+            pair
+            for pair in itertools.combinations(row_indexes, 2)
+            if abs(pair[0] - pair[1]) >= 4
         ]
-        unique_pairs = [
-            (x, y) for x, y in pairs if not (x in pairs_set or pairs_set.add(y))
-        ]
+        pairs_sorted = sorted(pairs, key=lambda x: x[1])
+        pairs_unique = []
 
-        sorted_row_indexes = [i for t in unique_pairs for i in t]
+        while pairs_sorted:
+            pair = pairs_sorted[0]
+            pairs_sorted.remove(pair)
+            pairs_unique.append(pair)
+            pairs_sorted = [
+                p for p in pairs_sorted if p[0] not in pair and p[1] not in pair
+            ]
+
+        sorted_row_indexes = [i for t in pairs_unique for i in t]
         unsorted_row_indexes = [i for i in row_indexes if i not in sorted_row_indexes]
 
         sorted_rows = [rows[row] + str(col) for row in sorted_row_indexes]
