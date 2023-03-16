@@ -388,6 +388,9 @@ if __name__ == "__main__":
         case "plate_filling":
             from scripts import plate_filling as script
 
+        case "purification":
+            from scripts import purification as script
+
         case _:
             # This shoudn't be needed but avoids type error
             logger.error(f"Method {method} not found.")
@@ -399,11 +402,11 @@ if __name__ == "__main__":
 
     try:
         script.run(deck, state, state_path, run_dir_path)
-        notify(f"Method {method} for run {run_id} completed successfully!")
+        # notify(f"Method {method} for run {run_id} completed successfully!")
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Exiting...")
-        notify(f"Method {method} for run {run_id} interrupted.")
+        # notify(f"Method {method} for run {run_id} interrupted.")
     except Exception as e:
         logger.exception(e)
-        notify(traceback.format_exc())
+        # notify(traceback.format_exc())
         raise e

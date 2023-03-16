@@ -1,0 +1,20 @@
+{
+    "complete": 0,
+    "current_pool": 0,
+    "current_tip": 0,
+    "current_rack": 0,
+    "current_ethanol_step": 0,
+    "current_ethanol_tube": 0,
+    "eppi_to_plate": 0,
+    "add_beads": 0,
+    "remove_supernatant": 0,
+    "add_wash1": 0,
+    "remove_wash1": 0,
+    "add_wash2": 0,
+    "remove_wash2": 0,
+    "add_buffer": 0,
+    "store_samples": 0,
+    "move_for_supernatant": 0,
+    "move_for_dry": 0,
+    "move_for_elute": 0
+}
