@@ -138,10 +138,11 @@ def print_deck(deck: dict):
     for col in deck.keys():
         for row in range(0, len(deck[col])):
             position = col + str(row + 1)
-            print(f"--- {position} ---")
+            if len(deck[col][row]["labware"]) > 0:
+                print(f"--- {position} ---")
 
-            for labware in deck[col][row]["labware"]:
-                print(labware.layout_name(), type(labware))
+                for labware in deck[col][row]["labware"]:
+                    print(labware.layout_name()[3:])
 
 
 def print_list(labwares: list):
@@ -203,6 +204,22 @@ def pos_96_2ch(stop: int, start: int = 0):
     pos = []
     for i in range(2):
         for j in range(start + i, stop, 2):
+            pos.append(j)
+    return pos
+
+
+def pos_96_2row_2ch(stop: int, start: int = 0):
+    pos = []
+    for i in range(4):
+        for j in range(start + i, stop, 4):
+            pos.append(j)
+    return pos
+
+
+def pos_24_2row_2ch(stop: int, start: int = 0):
+    pos = []
+    for i in range(6):
+        for j in range(start + i, stop, 6):
             pos.append(j)
     return pos
 
@@ -362,7 +379,6 @@ def get_labware(deck: dict, labware):
             for level, r in enumerate(d["labware"]):
                 if labware == r:
                     return col, row, level
-
 
 def extract_resource_from_field(field, resource, position):
     if resource == Lid:

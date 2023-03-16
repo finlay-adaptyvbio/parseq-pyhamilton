@@ -7,6 +7,19 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+class color:
+    PURPLE = "\033[95m"
+    CYAN = "\033[96m"
+    DARKCYAN = "\033[36m"
+    BLUE = "\033[94m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+    END = "\033[0m"
+
+
 def prompt_file_path(message: str) -> str:
     """Prompt user for file path and check if it exists.
 
@@ -35,6 +48,7 @@ def prompt_int(message: str, max: int) -> int:
     Returns:
         int: Integer.
     """
+    logger.debug(f"Prompting for integer: {message}")
     while True:
         prompt = input(f"{message}: ")
         try:
@@ -48,6 +62,37 @@ def prompt_int(message: str, max: int) -> int:
             break
         except ValueError:
             print("Please enter an integer.")
+
+    logger.debug(f"{message}: {value}")
+
+    return value
+
+
+def prompt_float(message: str, max: float) -> float:
+    """Prompt user for foat.
+
+    Args:
+        message (str): Message to prompt user.
+
+    Returns:
+        float: Float.
+    """
+    logger.debug(f"Prompting for float: {message}")
+    while True:
+        prompt = input(f"{message}: ")
+        try:
+            value = float(prompt)
+            if value > max:
+                print(f"Please enter a float smaller than {max}.")
+                continue
+            elif value < 0:
+                print("Please enter a positive float.")
+                continue
+            break
+        except ValueError:
+            print("Please enter a float.")
+
+    logger.debug(f"{message}: {value}")
 
     return value
 
@@ -167,16 +212,30 @@ def process_pm_csv(csv_path: str, output_dir: str, prefix: str):
     )
 
 
-def place_plates(plates: list, labwares: list, type: str, done: int):
-    done_plates = [1 for i in range(done)] + [0 for i in range(len(plates) - done)]
-    print("-" * 80)
-    print(f"Please place {type} plates in the following positions (ignore if done):")
-    print("-" * 80)
-    print(f"{'Plate':<10}{'Position':<10}{'Level':<8}{'Labware':<12}{'Done':<10}")
+def place_labware(labwares: list, type: str, names: list = []):
+    print("-" * 100)
+    print(f"Please place labware in the following position(s) (ignore if done):\n")
+    print(f"{'Name':<10}{'Position':<10}{'Level':<8}{'Labware'}")
 
-    for t in zip(plates, labwares, done_plates):
-        pos, labware, level = t[1].layout_name().split("_")
-        print(f"{t[0]:<10}{pos:<10}{level[-1]:<8}{labware:<12}{str(bool(t[2])):<10}")
+    if not names:
+        names = ["-" for _ in range(len(labwares))]
 
-    print("-" * 80)
-    input(f"Press enter when all {type} plates are in place...")
+    for t in zip(labwares, names, range(len(labwares))):
+        pos, *_ = t[0].layout_name().split("_")
+        print(f"{color.BOLD}{t[1]:<10}{pos:<10}{t[2]:<8}{type}{color.END}")
+
+    input(f"\nPress enter when labware is in place...")
+
+
+def place_eppies(type: str, names: list):
+    print("-" * 100)
+    print(
+        f"Please place following tubes in Eppendorf Carrier 24 (start top left, column"
+        f" then row):\n"
+    )
+    print(f"{'Tube':<10}{'Position':<10}{'Type'}")
+
+    for t in zip(names, range(len(names))):
+        print(f"{color.BOLD}{t[0]:<10}{t[1]+1:<10}{type}{color.END}")
+
+    input(f"\nPress enter when tubes are in place...")
