@@ -132,17 +132,19 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
             if not state["add_beads"]:
                 hp.notify(
-                    f"User action required: add {bead_volume} uL of beads to eppendorf"
-                    " carrier. "
+                    f"*User action required:* add {TUBE_VOLUME} uL of beads to"
+                    " eppendorf carrier. "
                 )
                 input(
-                    f"{hp.color.BOLD}Add 1 tube filled with {bead_volume} uL"
+                    f"{hp.color.BOLD}Add 1 tube filled with {TUBE_VOLUME} uL"
                     " beads to eppendorf carrier position 23. Press enter to continue:"
                     f" {hp.color.END  }"
                 )
 
+                st.reset_state(state, state_file_path, "bead_volume", TUBE_VOLUME)
+
                 logger.debug("Adding beads to plate...")
-                logger.debug("Mixing beads...")
+                logger.debug("Mixing beads before addition...")
 
                 cmd.tip_pick_up(hammy, [tips[state["current_tip"]]])
                 cmd.aspirate(
@@ -167,16 +169,16 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                     if state["bead_volume"] <= bead_sample_volume * 1.2:
                         logger.debug("Bead volume limit reached!")
                         hp.notify(
-                            f"User action required: add {bead_volume} uL of beads to"
-                            " bead tube."
+                            f"*User action required:* add {TUBE_VOLUME} uL of beads"
+                            " to bead tube."
                         )
                         input(
-                            f"{hp.color.BOLD} Refill bead tube with {bead_volume} uL of"
+                            f"{hp.color.BOLD}Refill bead tube with {TUBE_VOLUME} uL of"
                             f" beads. Press enter to continue: {hp.color.END}"
                         )
 
                         st.reset_state(
-                            state, state_file_path, "bead_volume", bead_volume
+                            state, state_file_path, "bead_volume", TUBE_VOLUME
                         )
 
                     cmd.aspirate(
@@ -216,7 +218,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 logger.debug("Adding pools to magnetic plate...")
 
                 hp.notify(
-                    f"**User action required**: add {pools} pooled sample tubes to"
+                    f"*User action required:* add {pools} pooled sample tubes to"
                     " eppendorf carrier."
                 )
                 input(
