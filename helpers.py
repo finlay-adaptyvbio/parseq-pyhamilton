@@ -1,4 +1,4 @@
-import os, csv, logging, itertools
+import os, csv, logging, itertools, requests
 import pandas as pd
 
 # Logging
@@ -239,3 +239,33 @@ def place_eppies(type: str, names: list):
         print(f"{color.BOLD}{t[0]:<10}{t[1]+1:<10}{type}{color.END}")
 
     input(f"\nPress enter when tubes are in place...")
+
+
+def notify(text):
+    """Send a notification to Slack
+
+    Args:
+        text (str): message to send
+
+    Returns:
+        dict: response from Slack API
+    """
+    slack_api_token = os.environ.get(
+        "SLACK_API_TOKEN"
+    )  # set as environment variable on Hamilton PC
+    slack_channel = "#hamilton-events"  # public channel
+    slack_icon_url = (  # icon downloaded from Biorender
+        "https://i.ibb.co/L59D5KZ/Group-2164.png"
+    )
+    slack_user_name = "Hamilton"
+    return requests.post(
+        "https://slack.com/api/chat.postMessage",
+        {
+            "token": slack_api_token,
+            "channel": slack_channel,
+            "text": text,
+            "icon_url": slack_icon_url,
+            "username": slack_user_name,
+            "blocks": None,
+        },
+    ).json()

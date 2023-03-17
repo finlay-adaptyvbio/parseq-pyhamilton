@@ -45,43 +45,6 @@ logging.config.dictConfig(LOGGING)
 
 logger = logging.getLogger()
 
-# Notification settings for Slack on script exit
-
-import os
-import requests
-
-slack_api_token = os.environ.get(
-    "SLACK_API_TOKEN"
-)  # set as environment variable on Hamilton PC
-slack_channel = "#hamilton-events"  # public channel
-slack_icon_url = (  # icon downloaded from Biorender
-    "https://i.ibb.co/L59D5KZ/Group-2164.png"
-)
-slack_user_name = "Hamilton"
-
-
-def notify(text):
-    """Send a notification to Slack
-
-    Args:
-        text (str): message to send
-
-    Returns:
-        dict: response from Slack API
-    """
-    return requests.post(
-        "https://slack.com/api/chat.postMessage",
-        {
-            "token": slack_api_token,
-            "channel": slack_channel,
-            "text": text,
-            "icon_url": slack_icon_url,
-            "username": slack_user_name,
-            "blocks": None,
-        },
-    ).json()
-
-
 # CLI arguments
 
 
@@ -402,11 +365,12 @@ if __name__ == "__main__":
 
     try:
         script.run(deck, state, state_path, run_dir_path)
-        # notify(f"Method {method} for run {run_id} completed successfully!")
+        hp.notify(f"Method {method} for run {run_id} completed successfully!")
     except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received. Exiting...")
-        # notify(f"Method {method} for run {run_id} interrupted.")
+        logger.warn("Keyboard interrupt received. Exiting...")
+        hp.notify(f"Method {method} for run {run_id} interrupted.")
     except Exception as e:
         logger.exception(e)
-        # notify(traceback.format_exc())
+        # hp.notify(traceback.format_exc())
+        hp.notify(f"Method {method} for run {run_id} failed.")
         raise e

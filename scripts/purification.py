@@ -20,6 +20,7 @@ logger.addHandler(logging.NullHandler())
 # Constants
 
 TIPS = 96
+TUBE_VOLUME = 1500
 
 ETHANOL = "StandardVolume_EtOH_DispenseJet_Empty"
 
@@ -32,23 +33,29 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     ratio = hp.prompt_float("Ratio of beads to sample", 1.8)
     sample = hp.prompt_float("Sample volume (uL)", 150)
+    elute_volume = hp.prompt_float("Elution volume (uL)", 50)
 
     # Calculate volumes required for purification
 
     logger.debug("Calculating volumes...")
 
-    ethanol_volume = 1500
-    elute_volume = 40
-    ethanol_tubes = math.ceil(400 * pools / 1500)
-    beads_volume = math.ceil(ratio * sample * pools) + 50
-    teb_volume = math.ceil(elute_volume * pools) + 100
+    ethanol_volume = TUBE_VOLUME
+    ethanol_tubes = math.ceil(400 * pools / TUBE_VOLUME)
     wash_volume = max(200, sample * (1 + ratio))
 
-    if beads_volume > 1500:
+    bead_volume = math.ceil(ratio * sample * pools) + 50
+    if bead_volume > TUBE_VOLUME:
         logger.warn(
-            f"{hp.color.BOLD}{hp.color.RED}More than 1500 uL of beads required, you"
-            f" will be prompted to add more beads!{hp.color.END}"
+            f"{hp.color.BOLD}{hp.color.RED}More than {TUBE_VOLUME} uL of beads"
+            f" required, you will be prompted to add more beads!{hp.color.END}"
         )
+    bead_sample_volume = sample * ratio
+
+    teb_volume = math.ceil(elute_volume * pools) + 100
+
+    # Mixing parameters
+
+    bead_mix_volume = min(bead_volume * 0.5, 250.0)
 
     # Assign labware to deck positions
 
@@ -76,8 +83,6 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     no_mag_plate = dk.get_labware_list(deck, ["C3"], Plate96)[0]
     no_mag_pools = [(no_mag_plate, i) for i in dk.pos_96_2row_2ch(96)[:24]]
-    # no_mag_wash_1 = [(no_mag_plate, i) for i in dk.pos_96_2row_2ch(96)[48:72]]
-    # no_mag_wash_2 = [(no_mag_plate, i) for i in dk.pos_96_2row_2ch(96)[72:96]]
 
     # Tip tracking
 
@@ -94,7 +99,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing labware
 
-    logger.debug("Prompt user for plate placement...")
+    logger.debug("Prompt user for labware placement...")
 
     hp.place_labware([no_mag_plate], "VWR 96 Well PCR Plate")
     hp.place_labware([rack_tips], "Hamilton NTR 96_300 µL Tip Rack")
@@ -102,16 +107,14 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     hp.place_labware([eppicarrier], "Eppendorf Carrier 24")
 
     logger.info(
-        f"Make sure {hp.color.BOLD}Alpaqua Magnum EX{hp.color.END} (magnetic plate) is"
-        f" in position {hp.color.BOLD}D3{hp.color.END}."
+        f"{hp.color.DARKCYAN}Make sure {hp.color.BOLD}Alpaqua Magnum"
+        f" EX{hp.color.END}{hp.color.DARKCYAN} (magnetic plate) is in position"
+        f" {hp.color.BOLD}D3{hp.color.END}."
     )
 
     input(f"Press enter to start method!")
 
     logger.debug("Starting Hamilton method...")
-
-    # Main script starts here
-    # TODO: reduce loops to functions to make it more readable
 
     with HamiltonInterface(simulate=True) as hammy:
         # Initialize Hamilton
@@ -122,18 +125,22 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
         while not state["complete"]:
             # Add beads to sample
-            # Prompt user to remove sample tubes and add beads to eppendorf carrier
+            # Prompt user to add beads to eppendorf carrier
             # Always mix beads before adding to sample
-
-            input(
-                f"{hp.color.BOLD}Add 1 tube filled with {1500} uL"
-                " beads to eppendorf carrier position 23. Press enter to continue:"
-                f" {hp.color.END  }"
-            )
 
             st.print_state(state)
 
             if not state["add_beads"]:
+                hp.notify(
+                    f"User action required: add {bead_volume} uL of beads to eppendorf"
+                    " carrier. "
+                )
+                input(
+                    f"{hp.color.BOLD}Add 1 tube filled with {bead_volume} uL"
+                    " beads to eppendorf carrier position 23. Press enter to continue:"
+                    f" {hp.color.END  }"
+                )
+
                 logger.debug("Adding beads to plate...")
                 logger.debug("Mixing beads...")
 
@@ -141,54 +148,57 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 cmd.aspirate(
                     hammy,
                     beads,
-                    [10.0],
+                    [0.0],
                     mixCycles=10,
-                    mixVolume=250.0,
+                    mixVolume=bead_mix_volume,
                     liquidHeight=1.0,
                 )
                 cmd.dispense(
                     hammy,
                     beads,
-                    [10.0],
+                    [0.0],
                     dispenseMode=9,
                     liquidHeight=1.0,
                 )
 
-                remaining_beads = 1500
-
                 for i in range(state["current_pool"], pools):
                     logger.debug(f"Adding beads to well {i + 1}...")
 
-                    if remaining_beads <= 200:
-                        logger.debug(
-                            "No more beads, prompting user to add more beads..."
+                    if state["bead_volume"] <= bead_sample_volume * 1.2:
+                        logger.debug("Bead volume limit reached!")
+                        hp.notify(
+                            f"User action required: add {bead_volume} uL of beads to"
+                            " bead tube."
                         )
                         input(
-                            f"{hp.color.BOLD} Refill bead tube with {1500} uL beads."
-                            f" Press enter to continue: {hp.color.END  }"
+                            f"{hp.color.BOLD} Refill bead tube with {bead_volume} uL of"
+                            f" beads. Press enter to continue: {hp.color.END}"
                         )
 
-                        remaining_beads = 1500
+                        st.reset_state(
+                            state, state_file_path, "bead_volume", bead_volume
+                        )
 
                     cmd.aspirate(
                         hammy,
                         beads,
-                        [sample * ratio - 10],
+                        [bead_sample_volume - 10],
                         mixCycles=5,
-                        mixVolume=sample * ratio,
-                        liquidHeight=1.0,
+                        mixVolume=bead_sample_volume,
+                        liquidHeight=0.1,
                     )
                     cmd.dispense(
                         hammy,
                         [no_mag_pools[i]],
-                        [sample * ratio],
+                        [bead_sample_volume],
                         dispenseMode=9,
                         liquidHeight=5.0,
                     )
 
                     st.update_state(state, state_file_path, "current_pool", 1)
-
-                    remaining_beads = remaining_beads - (sample * ratio)
+                    st.update_state(
+                        state, state_file_path, "bead_volume", -bead_sample_volume
+                    )
 
                 cmd.tip_eject(
                     hammy,
@@ -202,15 +212,20 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
             # Add pools to pcr plate on magnetic stand
 
-            print(
-                f"\n{hp.color.BOLD}Remove beads from eppendorf carrier and add sample"
-                f" tubes{hp.color.END}"
-            )
-
-            hp.place_eppies("2 mL Eppendorf", eppies)
-
             if not state["eppi_to_plate"]:
                 logger.debug("Adding pools to magnetic plate...")
+
+                hp.notify(
+                    f"**User action required**: add {pools} pooled sample tubes to"
+                    " eppendorf carrier."
+                )
+                input(
+                    f"\n{hp.color.BOLD}Remove beads from eppendorf carrier and add"
+                    f" {pools} pooled sample tubes. Press enter to continue:"
+                    f" {hp.color.END}"
+                )
+
+                hp.place_eppies("2 mL Eppendorf", eppies)
 
                 for i in range(state["current_pool"], pools):
                     logger.debug(f"Adding pool {i + 1} to magnetic plate...")
@@ -276,9 +291,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
                 st.reset_state(state, state_file_path, "move_beads", 1)
 
-            # Wait for 2 minutes to allow beads to separate
+            # Wait for 1 minute to allow beads to separate
 
-            time.sleep(120)
+            time.sleep(60)
 
             # Remove supernatant
 
@@ -297,13 +312,13 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                     cmd.aspirate(
                         hammy,
                         [mag_pools[i]],
-                        [sample * (1 + ratio)],
+                        [sample + bead_sample_volume],
                         liquidHeight=0.1,
                     )
                     cmd.dispense(
                         hammy,
                         [mag_ft[i]],
-                        [sample * (1 + ratio)],
+                        [sample + bead_sample_volume],
                         dispenseMode=9,
                         liquidHeight=10.0,
                     )
@@ -322,14 +337,14 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             # Wash beads with 70% ethanol from eppendorf carrier
             # Prompt user to add 70% ethanol tubes to eppendorf carrier
 
-            input(
-                f"{hp.color.BOLD}Add {ethanol_tubes} tube(s) filled with"
-                f" {ethanol_volume} uL 70% ethanol to eppendorf carrier. Press enter to"
-                f" continue: {hp.color.END}"
-            )
-
             if not state["add_wash1"]:
                 logger.debug("Adding ethanol to pools for wash 1...")
+
+                input(
+                    f"{hp.color.BOLD}Add {ethanol_tubes} tube(s) filled with"
+                    f" {ethanol_volume} uL 70% ethanol to eppendorf carrier. Press"
+                    f" enter to continue: {hp.color.END}"
+                )
 
                 check_tips()
 
