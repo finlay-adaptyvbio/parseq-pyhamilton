@@ -39,9 +39,10 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     logger.debug("Calculating volumes...")
 
-    ethanol_volume = TUBE_VOLUME
-    ethanol_tubes = math.ceil(400 * pools / TUBE_VOLUME)
     wash_volume = max(200, sample * (1 + ratio))
+    ethanol_tubes = math.ceil(
+        wash_volume * 2 * pools / (TUBE_VOLUME - wash_volume * 1.2)
+    )
 
     bead_volume = math.ceil(ratio * sample * pools) + 50
     if bead_volume > TUBE_VOLUME:
@@ -342,9 +343,13 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
             if not state["add_wash1"]:
                 logger.debug("Adding ethanol to pools for wash 1...")
 
+                hp.notify(
+                    f"*User action required:* add {ethanol_tube} tubes of 70% ethanol"
+                    " to eppendorf carrier."
+                )
                 input(
                     f"{hp.color.BOLD}Add {ethanol_tubes} tube(s) filled with"
-                    f" {ethanol_volume} uL 70% ethanol to eppendorf carrier. Press"
+                    f" {TUBE_VOLUME} uL 70% ethanol to eppendorf carrier. Press"
                     f" enter to continue: {hp.color.END}"
                 )
 
@@ -358,14 +363,10 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                 for i in range(state["current_pool"], pools):
                     logger.debug(f"Adding ethanol to pool {i + 1}...")
 
-                    if state["current_ethanol_step"] >= 8:
-                        st.update_state(
-                            state, state_file_path, "current_ethanol_tube", 1
-                        )
-                        ethanol_tube = [ethanol[state["current_ethanol_tube"]]]
-                        st.reset_state(
-                            state, state_file_path, "current_ethanol_step", 0
-                        )
+                    if state["ethanol_volume"] <= wash_volume * 1.2:
+                        st.update_state(state, state_file_path, "ethanol_tube", 1)
+                        ethanol_tube = [ethanol[state["ethanol_tube"]]]
+                        st.reset_state(state, state_file_path, "ethanol_volume", 0)
 
                     cmd.aspirate(
                         hammy,
@@ -384,7 +385,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
                     )
 
                     st.update_state(state, state_file_path, "current_pool", 1)
-                    st.update_state(state, state_file_path, "current_ethanol_step", 1)
+                    st.update_state(
+                        state, state_file_path, "ethanol_volume", -wash_volume
+                    )
 
                 cmd.tip_eject(
                     hammy,
