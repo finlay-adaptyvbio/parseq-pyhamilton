@@ -1,11 +1,6 @@
 *
 !*/
 
-*test*
-*__pycache__*
-.vscode
-runs/*
-
 !.gitignore
 !.gitmodules
 
@@ -13,3 +8,8 @@ runs/*
 !*.lay
 !*.md
 !*.json
+
+*test*
+*__pycache__*
+.vscode
+runs/*
