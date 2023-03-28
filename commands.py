@@ -269,7 +269,7 @@ def dispense(
 
 def tip_pick_up_384(
     ham: HamiltonInterface,
-    positions: list[tuple[Tip384, int]],
+    positions: list[tuple[Union[Tip384, Tip96], int]],
     **kw_args,
 ):
     logger.info(

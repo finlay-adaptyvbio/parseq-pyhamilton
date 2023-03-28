@@ -1,4 +1,5 @@
-import logging, itertools
+import logging, itertools, string
+import pandas as pd
 
 from pyhamilton import (
     LayoutManager,
@@ -208,12 +209,20 @@ def pos_96_2ch(stop: int, start: int = 0):
     return pos
 
 
-def pos_96_2row_2ch(stop: int, start: int = 0):
-    pos = []
-    for i in range(4):
-        for j in range(start + i, stop, 4):
-            pos.append(j)
-    return pos
+def pos_96_2row_2ch(start: int = 0, stop: int = 96):
+    index = [i for j in range(4) for i in range(j, 96, 4)]
+    return index[start:stop]
+
+
+def pos_96_2row(start: int = 0, stop: int = 96):
+    index = [[i for i in range(j, 96, 8)] for j in range(0, 8, 4)]
+    sep = int((stop - start + 1) / 2)
+    return index[0][start:sep] + index[1][start : stop - sep]
+
+
+def pos_96_1row(start: int = 0, stop: int = 96):
+    index = [i for j in range(8) for i in range(j, 96, 8)]
+    return index[start:stop]
 
 
 def pos_24_2row_2ch(stop: int, start: int = 0):
@@ -331,6 +340,29 @@ def sort_96_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
     return sorted_cols + unsorted_cols
 
 
+def sort_list(row_indexes):
+    pairs = [
+        pair
+        for pair in itertools.combinations(row_indexes, 2)
+        if abs(pair[0] - pair[1]) >= 4
+    ]
+    pairs_sorted = sorted(pairs, key=lambda x: x[1])
+    pairs_unique = []
+
+    while pairs_sorted:
+        pair = pairs_sorted[0]
+        pairs_sorted.remove(pair)
+        pairs_unique.append(pair)
+        pairs_sorted = [
+            p for p in pairs_sorted if p[0] not in pair and p[1] not in pair
+        ]
+
+    sorted_row_indexes = [i for t in pairs_unique for i in t]
+    unsorted_row_indexes = [i for i in row_indexes if i not in sorted_row_indexes]
+
+    return sorted_row_indexes + unsorted_row_indexes
+
+
 def get_labware_list(
     deck: dict,
     positions: list[str],
@@ -380,6 +412,7 @@ def get_labware(deck: dict, labware):
                 if labware == r:
                     return col, row, level
 
+
 def extract_resource_from_field(field, resource, position):
     if resource == Lid:
         if field.startswith(position) and field.find("_lid") > 0:
@@ -425,3 +458,88 @@ def extract_resource_from_field(field, resource, position):
 
     else:
         return False
+
+
+default_index_96 = pd.DataFrame(
+    [[i for i in range(j, 96, 8)] for j in range(8)],
+    index=list(string.ascii_uppercase)[:8],
+    columns=range(1, 13),
+)
+
+default_index_384 = pd.DataFrame(
+    [[i for i in range(j, 384, 16)] for j in range(16)],
+    index=list(string.ascii_uppercase)[:16],
+    columns=range(1, 25),
+)
+
+
+class frame_96:
+    def __init__(self, rack: Union[Plate96, Tip96], positions: list[str]) -> None:
+        self.rack = rack
+        self.positions = positions
+        self.frame = pd.DataFrame(
+            index=list(string.ascii_uppercase)[:8], columns=range(1, 13)
+        )
+        for position in positions:
+            letter, number = position[0], int(position[1:])
+            self.frame.loc[letter, number] = 1
+        self.frame = self.frame.fillna(0)
+
+        self.original = self.frame.copy()
+
+        self.current_wells = len(positions)
+        self.current_well = 0
+
+    def reset_frame(self):
+        self.frame = self.original
+
+    def print_frame(self):
+        print(self.frame)
+
+    def get_tips_2ch(self, n: int) -> list[tuple[Union[Plate96, Tip96], int]]:
+        column = default_index_96.T[self.frame.sum(axis=0) >= n].first_valid_index()
+        row = self.frame.T.loc[column] == 1
+        index = sort_list(default_index_96.T.loc[column, row].tolist())[:n]
+        self.frame[default_index_96.isin(index)] = 0
+
+        tips = [(self.rack, tip) for tip in index]
+        return tips
+
+    def get_wells_2ch(self, n: int) -> list[tuple[Union[Plate96, Tip96], int]]:
+        if self.current_well == self.current_wells:
+            self.current_well = 0
+            self.reset_frame()
+
+        column = default_index_96.T[self.frame.sum(axis=0) >= n].first_valid_index()
+        row = self.frame.T.loc[column] == 1
+        index = sort_list(default_index_96.T.loc[column, row].tolist())[:n]
+        self.frame[default_index_96.isin(index)] = 0
+        self.current_well += n
+
+        wells = [(self.rack, tip) for tip in index]
+        return wells
+
+    def get_wells_384mph(self, n: int) -> list[tuple[Union[Plate96, Tip96], int]]:
+        row = default_index_96[self.frame.sum(axis=1) >= n].tail(1).first_valid_index()
+        column = self.frame.loc[row] == 1
+        index = default_index_96.loc[row, column].tolist()[-n:]
+        self.frame[default_index_96.isin(index)] = 0
+
+        wells = [(self.rack, tip) for tip in index]
+        return wells
+
+
+class rack_stack:
+    def __init__(self, stack) -> None:
+        self.stack = stack
+        self.starting_racks = len(stack)
+        self.remaining_racks = len(stack)
+
+    def get_rack(self):
+        current_rack = self.starting_racks - self.remaining_racks
+        rack = self.stack[current_rack]
+        self.remaining_racks -= 1
+        return rack
+
+    def reset_rack(self, current_rack):
+        self.current_rack = current_rack

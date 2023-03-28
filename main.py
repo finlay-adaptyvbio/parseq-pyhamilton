@@ -367,7 +367,7 @@ if __name__ == "__main__":
         script.run(deck, state, state_path, run_dir_path)
         hp.notify(f"Method {method} for run {run_id} completed successfully!")
     except KeyboardInterrupt:
-        logger.warn("Keyboard interrupt received. Exiting...")
+        logger.warning("Keyboard interrupt received. Exiting...")
         hp.notify(f"Method {method} for run {run_id} interrupted.")
     except Exception as e:
         logger.exception(e)
