@@ -340,11 +340,11 @@ def sort_96_indexes_2channel(unsorted_indexes: list[str]) -> list[str]:
     return sorted_cols + unsorted_cols
 
 
-def sort_list(row_indexes):
+def sort_list(row_indexes, sep):
     pairs = [
         pair
         for pair in itertools.combinations(row_indexes, 2)
-        if abs(pair[0] - pair[1]) >= 4
+        if abs(pair[0] - pair[1]) >= sep
     ]
     pairs_sorted = sorted(pairs, key=lambda x: x[1])
     pairs_unique = []
@@ -473,147 +473,135 @@ default_index_384 = pd.DataFrame(
 )
 
 
-class frame_96:
-    def __init__(self, rack: Union[Plate96, Tip96], positions: list[str]) -> None:
+class tip_384:
+    def __init__(
+        self, rack: Tip384, positions: list[str], current_tip: int = 0
+    ) -> None:
         self.rack = rack
         self.positions = positions
-        self.frame = pd.DataFrame(
-            index=list(string.ascii_uppercase)[:8], columns=range(1, 13)
-        )
-        for position in positions:
-            letter, number = position[0], int(position[1:])
-            self.frame.loc[letter, number] = 1
-        self.frame = self.frame.fillna(0)
-
-        self.original = self.frame.copy()
-
-        self.current_wells = len(positions)
-        self.current_well = 0
-
-    def reset_frame(self):
-        self.frame = self.original
-
-    def _frame(self):
-        return self.frame
-
-    def get_tips_2ch(self, n: int) -> list[tuple[Union[Plate96, Tip96], int]]:
-        column = default_index_96.T[self.frame.sum(axis=0) >= n].first_valid_index()
-
-        try:
-            row = self.frame.T.loc[column] == 1
-        except KeyError as e:
-            logger.error(f"Not enough tips in {self.rack.layout_name()}")
-            raise e
-        index = sort_list(default_index_96.T.loc[column, row].tolist())[:n]
-        self.frame[default_index_96.isin(index)] = 0
-
-        tips = [(self.rack, tip) for tip in index]
-        return tips
-
-    def get_wells_2ch(self, n: int) -> list[tuple[Union[Plate96, Tip96], int]]:
-        if self.current_well == self.current_wells:
-            self.current_well = 0
-            self.reset_frame()
-
-        column = default_index_96.T[self.frame.sum(axis=0) >= n].first_valid_index()
-
-        try:
-            row = self.frame.T.loc[column] == 1
-        except KeyError as e:
-            logger.error(f"Not enough wells in {self.rack.layout_name()}")
-            raise e
-
-        index = sort_list(default_index_96.T.loc[column, row].tolist())[:n]
-        self.frame[default_index_96.isin(index)] = 0
-        self.current_well += n
-
-        wells = [(self.rack, well) for well in index]
-        return wells
-
-    def get_tips_384mph(self, n: int) -> list[tuple[Union[Plate96, Tip96], int]]:
-        row = default_index_96[self.frame.sum(axis=1) >= n].last_valid_index()
-
-        try:
-            column = self.frame.loc[row] == 1
-        except KeyError as e:
-            logger.error(f"Not enough wells in {self.rack.layout_name()}")
-            raise e
-        index = default_index_96.loc[row, column].tolist()[-n:]
-        self.frame[default_index_96.isin(index)] = 0
-        self.current_well += n
-
-        wells = [(self.rack, tip) for tip in index]
-        return wells
-
-    def get_wells_384mph(self, n: int) -> list[tuple[Union[Plate96, Tip96], int]]:
-        if self.current_well == self.current_wells:
-            self.current_well = 0
-            self.reset_frame()
-
-        row = default_index_96[self.frame.sum(axis=1) >= n].first_valid_index()
-
-        try:
-            column = self.frame.loc[row] == 1
-        except KeyError as e:
-            logger.error(f"Not enough wells in {self.rack.layout_name()}")
-            raise e
-        index = default_index_96.loc[row, column].tolist()[-n:]
-        self.frame[default_index_96.isin(index)] = 0
-        self.current_well += n
-
-        wells = [(self.rack, tip) for tip in index]
-        return wells
-
-
-class frame_384:
-    def __init__(self, rack: Union[Plate384, Tip384], positions: list[str]) -> None:
-        self.rack = rack
-        self.positions = positions
-        self.frame = pd.DataFrame(
+        self._frame = pd.DataFrame(
             index=list(string.ascii_uppercase)[:16], columns=range(1, 25)
         )
         for position in positions:
             letter, number = position[0], int(position[1:])
-            self.frame.loc[letter, number] = 1
-        self.frame = self.frame.fillna(0)
+            self._frame.loc[letter, number] = 1
 
-        self.original = self.frame.copy()
+        self.original = self._frame.copy()
 
-        self.current_wells = len(positions)
-        self.current_well = 0
+        self.current_tips = len(positions)
+        self.current_tip = current_tip
 
     def reset_frame(self):
-        self.frame = self.original
+        self._frame = self.original
 
-    def _frame(self):
-        return self.frame
+    def frame(self):
+        return self._frame.fillna(0)
 
-    def get_wells_2ch(self, n: int) -> list[tuple[Union[Plate384, Tip384], int]]:
+    def tips(self):
+        return self._frame.sum().sum()
+
+    def get_rows_384mph(self, rows: int = 1) -> list[tuple[Tip384, int]]:
+        row = self._frame.T[self._frame.T.sum(axis=1) >= rows].last_valid_index()
+        try:
+            mask = self._frame.loc[:, row] == 1
+        except KeyError as e:
+            logger.error(f"Not enough tips in {self.rack.layout_name()}")
+            exit()
+        index = default_index_384.loc[:, row][mask].tolist()[-rows:]
+
+        self._frame[default_index_384.isin(index)] = pd.NA
+
+        tips = [(self.rack, tip) for tip in index]
+
+        return tips
+
+    def get_columns_384mph(self, columns: int = 1) -> list[tuple[Tip384, int]]:
+        column = self._frame[self._frame.sum(axis=1) >= columns].last_valid_index()
+        try:
+            mask = self._frame.loc[column, :] == 1
+        except KeyError as e:
+            logger.error(f"Not enough tips in {self.rack.layout_name()}")
+            exit()
+        index = default_index_384.loc[column, :][mask].tolist()[-columns:]
+
+        self._frame[default_index_384.isin(index)] = pd.NA
+
+        tips = [(self.rack, tip) for tip in index]
+
+        return tips
+
+
+class plate_384:
+    def __init__(
+        self, plate: Plate384, positions: list[str], current_well: int = 0
+    ) -> None:
+        self.plate = plate
+        self.positions = positions
+        self._frame = pd.DataFrame(
+            index=list(string.ascii_uppercase)[:16], columns=range(1, 25)
+        )
+        for position in positions:
+            letter, number = position[0], int(position[1:])
+            self._frame.loc[letter, number] = 1
+
+        self.original = self._frame.copy()
+
+        self.current_wells = len(positions)
+        self.current_well = current_well
+
+    def reset_frame(self):
+        self._frame = self.original.copy()
+
+    def frame(self):
+        return self._frame.fillna(0)
+
+    def wells(self):
+        return self._frame.sum().sum()
+
+    def get_wells_2ch(self, n: int = 2) -> list[tuple[Plate384, int]]:
+        """Get wells from a 384 well plate in 2 channel mode."""
         if self.current_well == self.current_wells:
             self.current_well = 0
             self.reset_frame()
 
-        column = default_index_384.T[self.frame.sum(axis=0) >= n].first_valid_index()
+        column = default_index_384.T[self._frame.sum(axis=0) >= n].first_valid_index()
 
-        try:
-            row = self.frame.T.loc[column] == 1
-        except KeyError as e:
-            logger.error(f"Not enough wells in {self.rack.layout_name()}")
-            raise e
+        for _ in range(2):
+            try:
+                row = self._frame.T.loc[column] == 1
+            except KeyError as e:
+                logger.debug(
+                    f"Column with {n} wells not found in {self.plate.layout_name()},"
+                    " trying again with 1 well."
+                )
+                column = default_index_384.T[
+                    self._frame.sum(axis=0) >= 1
+                ].first_valid_index()
+                continue
+            else:
+                break
+        else:
+            exit()
 
-        index = sort_list(default_index_384.T.loc[column, row].tolist())[:n]
-        self.frame[default_index_384.isin(index)] = 0
+        index = sort_list(default_index_384.T.loc[column, row].tolist(), 4)[:n]
+        self._frame[default_index_384.isin(index)] = 0
         self.current_well += n
 
-        wells = [(self.rack, well) for well in index]
+        wells = [(self.plate, well) for well in index]
         return wells
 
-    def get_tips_384mph(
+    def get_wells_384mph(
         self, rows: int = 1, columns: int = 1
-    ) -> list[tuple[Union[Plate384, Tip384], int]]:
-        row_frame = self.frame[self.frame.sum(axis=1) >= rows]
+    ) -> list[tuple[Plate384, int]]:
+        if self.current_well == self.current_wells:
+            self.current_well = 0
+            self.reset_frame()
+
+        row_frame = self._frame[self._frame.sum(axis=1) >= columns].dropna(
+            axis=1, how="any"
+        )
         column_frame = row_frame.T[(row_frame.T.sum(axis=1) >= rows)].T
-        mask = column_frame.iloc[-rows:, -columns:] == 1
+        mask = column_frame.iloc[:rows, :columns] == 1
         index = (
             default_index_384[mask]
             .convert_dtypes()
@@ -621,29 +609,24 @@ class frame_384:
             .dropna(axis=0, how="all")
             .values.flatten()
         )
-        self.frame[default_index_384.isin(index)] = 0
-
-        tips = [(self.rack, tip) for tip in index]
-
-        return tips
-
-    def get_wells_row_384mph(self, n: int) -> list[tuple[Union[Plate384, Tip384], int]]:
-        if self.current_well == self.current_wells:
-            self.current_well = 0
-            self.reset_frame()
-
-        row = default_index_384[self.frame.sum(axis=1) >= n].first_valid_index()
-
         try:
-            column = self.frame.loc[row] == 1
-        except KeyError as e:
-            logger.error(f"Not enough wells in {self.rack.layout_name()}")
-            raise e
-        index = default_index_384.loc[row, column].tolist()[-n:]
-        self.frame[default_index_384.isin(index)] = 0
-        self.current_well += n
+            index[-1]
+        except IndexError as e:
+            logger.error(f"Not enough wells in {self.plate.layout_name()}")
+            exit()
+        self._frame[default_index_384.isin(index)] = pd.NA
+        self.current_well += rows * columns
 
-        wells = [(self.rack, tip) for tip in index]
+        wells = [(self.plate, well) for well in index]
+
+        return wells
+
+    def static_wells_reservoir(self):
+        """Get static wells from a reservoir."""
+        wells = [
+            (self.plate, well)
+            for well in default_index_384.iloc[[0, 4], [23]].values.flatten()
+        ]
         return wells
 
 

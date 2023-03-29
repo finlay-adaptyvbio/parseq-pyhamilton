@@ -96,7 +96,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     waste = [(waste_reservoir, position) for position in range(182, 187, CHANNELS * 2)]
     ethanol = [
-        (ethanol_reservoir, position) for position in range(368, 373, CHANNELS * 2)
+        (ethanol_reservoir, position) for position in range(368, 372, CHANNELS * 2)
     ]
 
     # Inform user of labware positions, ask for confirmation after placing plates
