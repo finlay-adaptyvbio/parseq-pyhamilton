@@ -113,10 +113,8 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     logger.debug("Prompt user for plate placement...")
 
-    hp.place_plates(pcr_plates, source_pcr_plates, "pcr", state["current_pcr_plate"])
-    hp.place_plates(
-        pcr_plates, source_pooling_plates, "pooling", state["current_pooling_plate"]
-    )
+    hp.place_labware(source_pcr_plates, "PCR")
+    hp.place_labware(source_pooling_plates, "Pooling")
 
     logger.info("Starting Hamilton method...")
 
@@ -135,7 +133,7 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
         if tip_column > 0:
             logger.debug("Skipping load step...")
-            st.update_state(state, state_file_path, "tip_column", tip_column - 1)
+            st.reset_state(state, state_file_path, "current_tip_column", tip_column - 1)
 
         elif tip_column == 0:
             logger.debug("Loading tips into column holder...")
@@ -192,18 +190,18 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
                 st.reset_state(state, state_file_path, "active_pooling_plate", 1)
 
-            # Add EDTA to pcr plate if not already done
+            # # Add EDTA to pcr plate if not already done
 
-            if not state["edta"]:
-                logger.info("Adding EDTA to pcr plate...")
-                cmd.tip_pick_up_384(hammy, edta_tips)
-                cmd.aspirate_384(hammy, edta, 20.0, liquidHeight=2.0)
-                cmd.dispense_384(
-                    hammy, active_pcr_wells, 20.0, liquidHeight=11.0, dispenseMode=9
-                )
-                cmd.tip_eject_384(hammy, edta_tips, 1)
+            # if not state["edta"]:
+            #     logger.info("Adding EDTA to pcr plate...")
+            #     cmd.tip_pick_up_384(hammy, edta_tips)
+            #     cmd.aspirate_384(hammy, edta, 20.0, liquidHeight=2.0)
+            #     cmd.dispense_384(
+            #         hammy, active_pcr_wells, 20.0, liquidHeight=11.0, dispenseMode=9
+            #     )
+            #     cmd.tip_eject_384(hammy, edta_tips, 1)
 
-                st.reset_state(state, state_file_path, "edta", 1)
+            #     st.reset_state(state, state_file_path, "edta", 1)
 
             # Get next 96_384-tip rack if not already done
 

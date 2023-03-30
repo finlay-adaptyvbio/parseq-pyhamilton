@@ -533,9 +533,15 @@ class tip_384:
 
 class plate_384:
     def __init__(
-        self, plate: Plate384, positions: list[str], current_well: int = 0
+        self, plate: Plate384, positions: list[str] = [], current_well: int = 0
     ) -> None:
         self.plate = plate
+        if not positions:
+            positions = [
+                f"{letter}{number}"
+                for letter in list(string.ascii_uppercase)[:16]
+                for number in range(1, 25)
+            ]
         self.positions = positions
         self._frame = pd.DataFrame(
             index=list(string.ascii_uppercase)[:16], columns=range(1, 25)
@@ -621,12 +627,13 @@ class plate_384:
 
         return wells
 
-    def static_wells_reservoir(self):
-        """Get static wells from a reservoir."""
+    def static_wells(self, well_list: list[str]):
+        """Get specific wells from input list."""
         wells = [
-            (self.plate, well)
-            for well in default_index_384.iloc[[0, 4], [23]].values.flatten()
+            (self.plate, default_index_384.loc[well[0], int(well[1:])])
+            for well in well_list
         ]
+
         return wells
 
 

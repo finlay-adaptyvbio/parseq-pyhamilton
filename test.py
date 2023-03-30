@@ -68,4 +68,4 @@ if __name__ == "__main__":
     print(test_frame.frame())
     test_frame.reset_frame()
     print(test_frame.frame())
-    print(test_frame.static_wells_reservoir())
+    print(test_frame.static_wells(["A1", "A2"]))
