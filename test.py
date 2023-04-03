@@ -1,14 +1,14 @@
+#!/bin/env python3
+
 from pyhamilton import (
     HamiltonInterface,
     Plate96,
     Tip96,
-    Reservoir300,
-    EppiCarrier24,
+    # Reservoir300,  # type: ignore
+    # EppiCarrier24,  # type: ignore
 )
 
-import commands as cmd
-import deck as dk
-import helpers as hp
+import commands, helpers, deck, labware
 
 import logging, logging.config, time, csv
 
@@ -22,7 +22,9 @@ LOGGING = {
             "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
-        "simple": {"format": f"{hp.color.RED}%(levelname)s{hp.color.END} %(message)s"},
+        "simple": {
+            "format": f"{helpers.color.RED}%(levelname)s{helpers.color.END} %(message)s"
+        },
     },
     "handlers": {
         "default": {
@@ -54,11 +56,11 @@ with open(csv_path, "r") as f:
 
 l = [well[1] for well in wells]
 
-deck = dk.get_deck(layout_path)
+layout = deck.get_deck(layout_path)
 
 if __name__ == "__main__":
-    test_plate = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
-    test_frame = dk.plate_384(
+    test_plate = deck.get_labware_list(layout, ["C5"], Reservoir300)[0]
+    test_frame = labware.plate_384(
         test_plate,
         l,
     )
