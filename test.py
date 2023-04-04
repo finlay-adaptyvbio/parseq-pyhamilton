@@ -1,11 +1,9 @@
-#!/bin/env python3
-
 from pyhamilton import (
     HamiltonInterface,
     Plate96,
     Tip96,
-    # Reservoir300,  # type: ignore
-    # EppiCarrier24,  # type: ignore
+    Reservoir300,  # type: ignore
+    EppiCarrier24,  # type: ignore
 )
 
 import commands, helpers, deck, labware
@@ -45,9 +43,7 @@ logging.config.dictConfig(LOGGING)
 logger = logging.getLogger()
 
 layout_path = "C:\\Users\\Adaptyvbio\\Documents\\PyHamilton\\adaptyv-pyhamilton\\layouts\\purification.lay"
-csv_path = (
-    "C:\\Users\\Adaptyvbio\\Documents\\PyHamilton\\adaptyv-pyhamilton\\temp\\cherry.csv"
-)
+csv_path = "C:\\Users\\Adaptyvbio\\Downloads\\cherry.csv"
 
 with open(csv_path, "r") as f:
     reader = csv.reader(f)
@@ -59,9 +55,9 @@ l = [well[1] for well in wells]
 layout = deck.get_deck(layout_path)
 
 if __name__ == "__main__":
-    test_plate = deck.get_labware_list(layout, ["C5"], Reservoir300)[0]
-    test_frame = labware.plate_384(
-        test_plate,
+    test_frame = labware.reservoir_300(
+        layout,
+        "C5",
         l,
     )
     print(test_frame.frame())

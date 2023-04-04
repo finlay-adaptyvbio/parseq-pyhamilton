@@ -1,4 +1,4 @@
-import logging, itertools, string
+import logging, itertools, string, sys
 import pandas as pd
 
 from pyhamilton import (
@@ -75,10 +75,10 @@ DECK = {
 }
 
 default_index_24 = pd.DataFrame(
-    [[i for i in range(j, 24, 4)] for j in range(4)],
-    index=list(string.ascii_uppercase)[:4],
-    columns=range(1, 7),
-)
+    [[i for i in range(j, 24, 6)] for j in range(6)],
+    columns=list(string.ascii_uppercase)[:4],
+    index=range(1, 7),
+).T
 
 default_index_96 = pd.DataFrame(
     [[i for i in range(j, 96, 8)] for j in range(8)],
@@ -128,6 +128,57 @@ def index_to_string_24(position: int) -> str:
     alphabet = "ABCD"
     x, y = int(position) // 4, int(position) % 4
     return alphabet[y] + str(x + 1)
+
+
+def pos_row_column_384(n: int = 384) -> list:
+    return [
+        f"{letter}{number}"
+        for number in range(1, 25)
+        for letter in list(string.ascii_uppercase)[:16]
+    ][:n]
+
+
+def pos_column_row_384(n: int = 384) -> list:
+    pos = [
+        f"{letter}{number}"
+        for letter in list(string.ascii_uppercase)[:16]
+        for number in range(1, 25)
+    ][:n]
+    return pos
+
+
+def pos_row_column_96(n: int = 96) -> list:
+    return [
+        f"{letter}{number}"
+        for number in range(1, 13)
+        for letter in list(string.ascii_uppercase)[:8]
+    ][:n]
+
+
+def pos_column_row_96(n: int = 96) -> list:
+    pos = [
+        f"{letter}{number}"
+        for letter in list(string.ascii_uppercase)[:8]
+        for number in range(1, 13)
+    ][:n]
+    return pos
+
+
+def pos_row_column_24(n: int = 24) -> list:
+    return [
+        f"{letter}{number}"
+        for number in range(1, 7)
+        for letter in list(string.ascii_uppercase)[:4]
+    ][:n]
+
+
+def pos_column_row_24(n: int = 24) -> list:
+    pos = [
+        f"{letter}{number}"
+        for letter in list(string.ascii_uppercase)[:4]
+        for number in range(1, 7)
+    ][:n]
+    return pos
 
 
 def pos_96_in_384(quadrant: int):
@@ -569,6 +620,36 @@ class tip_96:
         tips = [(self.rack, tip) for tip in default_index_96.values.flatten()]
         return tips
 
+    def get_tips_2ch(self, n: int = 2, remove: bool = True) -> list[tuple[Tip96, int]]:
+        """Get tips from a 96-tip rack in 2 channel mode."""
+        column = default_index_96.T[self._frame.sum(axis=0) >= n].first_valid_index()
+
+        for _ in range(2):
+            try:
+                row = self._frame.T.loc[column] == 1
+            except KeyError as e:
+                logger.debug(
+                    f"Column with {n} tips not found in {self.plate.layout_name()},"
+                    " trying again with 1 tip."
+                )
+                column = default_index_96.T[
+                    self._frame.sum(axis=0) >= 1
+                ].first_valid_index()
+                continue
+            else:
+                break
+        else:
+            logger.error(f"Not enough tips in {self.plate.layout_name()}.")
+            sys.exit()
+
+        index = sort_list(default_index_96.T.loc[column, row].tolist(), 2)[:n]
+
+        if remove:
+            self._frame[default_index_96.isin(index)] = pd.NA
+            self.current_tip += n
+
+        return [(self.rack, well) for well in index]
+
     def get_rows_384mph(
         self, rows: int = 1, remove: bool = True
     ) -> list[tuple[Tip96, int]]:
@@ -583,9 +664,7 @@ class tip_96:
         if remove:
             self._frame[default_index_96.isin(index)] = pd.NA
 
-        tips = [(self.rack, tip) for tip in index]
-
-        return tips
+        return [(self.rack, tip) for tip in index]
 
     def get_columns_384mph(
         self, columns: int = 1, remove: bool = True
@@ -601,125 +680,128 @@ class tip_96:
         if remove:
             self._frame[default_index_96.isin(index)] = pd.NA
 
-        tips = [(self.rack, tip) for tip in index]
-
-        return tips
+        return [(self.rack, tip) for tip in index]
 
 
 class plate_96:
-    def __init__(
+    def __init__(self, deck, plate: str) -> None:
+        self.plate = dk.get_labware_list(deck, [plate], Plate96)[0]
+        self.default_wells = self.Frame(self.plate)
+
+    def wells(
         self,
-        deck,
-        plate: str,
         positions: Union[list[str], list[int]] = [],
         current_well: int = 0,
-    ) -> None:
-        self.plate = dk.get_labware_list(deck, [plate], Plate96)[0]
-        self._frame = pd.DataFrame(
-            index=list(string.ascii_uppercase)[:8], columns=range(1, 13)
-        )
+    ):
+        return self.Frame(self.plate, positions, current_well)
 
-        if not positions:
-            self.positions = [i for i in range(96)]
-        else:
-            self.positions = positions
-
-        if isinstance(self.positions, list) and all(
-            isinstance(i, int) for i in self.positions
-        ):
-            self.positions = [index_to_string_96(i) for i in self.positions]
-
-        for position in self.positions:
-            letter, number = position[0], int(position[1:])
-            self._frame.loc[letter, number] = 1
-
-        self.original = self._frame.copy()
-
-        self.current_wells = len(positions)
-        self.current_well = current_well
-
-    def reset_frame(self):
-        self._frame = self.original.copy()
-
-    def frame(self):
-        return self._frame.fillna(0)
-
-    def wells(self):
-        return self._frame.sum().sum()
-
-    def get_wells_2ch(self, n: int = 2) -> list[tuple[Plate96, int]]:
-        """Get wells from a 96 well plate in 2 channel mode."""
-        if self.current_well == self.current_wells:
-            self.current_well = 0
-            self.reset_frame()
-
-        column = default_index_96.T[self._frame.sum(axis=0) >= n].first_valid_index()
-
-        for _ in range(2):
-            try:
-                row = self._frame.T.loc[column] == 1
-            except KeyError as e:
-                logger.debug(
-                    f"Column with {n} wells not found in {self.plate.layout_name()},"
-                    " trying again with 1 well."
-                )
-                column = default_index_96.T[
-                    self._frame.sum(axis=0) >= 1
-                ].first_valid_index()
-                continue
+    class Frame:
+        def __init__(
+            self,
+            plate: Plate96,
+            positions: Union[list[str], list[int]] = [],
+            current_well: int = 0,
+        ) -> None:
+            self.plate = plate
+            self.frame = pd.DataFrame(
+                index=list(string.ascii_uppercase)[:8], columns=range(1, 13)
+            )
+            if not positions:
+                index = [i for i in range(96)]
             else:
-                break
-        else:
-            logger.error(f"Not enough wells in {self.plate.layout_name()}.")
-            exit()
+                index = positions
 
-        index = sort_list(default_index_96.T.loc[column, row].tolist(), 2)[:n]
-        self._frame[default_index_96.isin(index)] = 0
-        self.current_well += n
+            if isinstance(index, list) and all(isinstance(i, int) for i in index):
+                index = [index_to_string_96(i) for i in index]
 
-        wells = [(self.plate, well) for well in index]
-        return wells
+            for idx in index:
+                letter, number = idx[0], int(idx[1:])
+                self.frame.loc[letter, number] = 1
 
-    def get_wells_384mph(
-        self, rows: int = 1, columns: int = 1
-    ) -> list[tuple[Plate96, int]]:
-        """Get wells from a 96 well plate in 384 multi-probe head mode."""
-        if self.current_well == self.current_wells:
-            self.current_well = 0
-            self.reset_frame()
+            self.original = self.frame.copy()
+            self.current_wells = len(positions)
+            self.current_well = current_well
 
-        row_frame = self._frame[self._frame.sum(axis=1) >= columns].dropna(
-            axis=1, how="any"
-        )
-        column_frame = row_frame.T[(row_frame.T.sum(axis=1) >= rows)].T
-        mask = column_frame.iloc[:rows, :columns] == 1
-        index = (
-            default_index_96[mask]
-            .convert_dtypes()
-            .dropna(axis=1, how="all")
-            .dropna(axis=0, how="all")
-            .values.flatten()
-        )
-        try:
-            index[-1]
-        except IndexError as e:
-            logger.error(f"Not enough wells in {self.plate.layout_name()}")
-            exit()
-        self._frame[default_index_96.isin(index)] = pd.NA
-        self.current_well += rows * columns
+        def reset_frame(self):
+            self.frame = self.original.copy()
 
-        wells = [(self.plate, well) for well in index]
+        def get_frame(self):
+            return self.frame.fillna(0)
 
-        return wells
+        def total_wells(self):
+            return self.frame.sum().sum()
 
-    def static_wells(self, well_list: list[str]):
-        """Get specific wells from input list."""
-        wells = [
-            (self.plate, default_index_96.loc[well[0], int(well[1:])])
-            for well in well_list
-        ]
+        def get_wells_2ch(self, n: int = 2) -> list[tuple[Plate96, int]]:
+            """Get wells from a 96 well plate in 2 channel mode."""
+            if self.current_well == self.current_wells:
+                self.current_well = 0
+                self.reset_frame()
 
-        return wells
+            column = default_index_96.T[self.frame.sum(axis=0) >= n].first_valid_index()
+
+            for _ in range(2):
+                try:
+                    row = self.frame.T.loc[column] == 1
+                except KeyError as e:
+                    logger.debug(
+                        f"Column with {n} wells not found in"
+                        f" {self.plate.layout_name()}, trying again with 1 well."
+                    )
+                    column = default_index_96.T[
+                        self.frame.sum(axis=0) >= 1
+                    ].first_valid_index()
+                    continue
+                else:
+                    break
+            else:
+                logger.error(f"Not enough wells in {self.plate.layout_name()}.")
+                exit()
+
+            index = sort_list(default_index_96.T.loc[column, row].tolist(), 2)[:n]
+            self.frame[default_index_96.isin(index)] = pd.NA
+            self.current_well += n
+
+            return [(self.plate, well) for well in index]
+
+        def get_wells_384mph(
+            self, rows: int = 1, columns: int = 1, remove: bool = True
+        ) -> list[tuple[Plate96, int]]:
+            """Get wells from a 96 well plate in 384 multi-probe head mode."""
+            if self.current_well == self.current_wells:
+                self.current_well = 0
+                self.reset_frame()
+
+            rowframe = self.frame[self.frame.sum(axis=1) >= columns].dropna(
+                axis=1, how="any"
+            )
+            columnframe = rowframe.T[(rowframe.T.sum(axis=1) >= rows)].T
+            mask = columnframe.iloc[:rows, :columns] == 1
+            index = (
+                default_index_96[mask]
+                .convert_dtypes()
+                .dropna(axis=1, how="all")
+                .dropna(axis=0, how="all")
+                .values.flatten()
+            )
+            try:
+                index[-1]
+            except IndexError as e:
+                logger.error(f"Not enough wells in {self.plate.layout_name()}")
+                exit()
+
+            if remove:
+                self.frame[default_index_96.isin(index)] = pd.NA
+                self.current_well += rows * columns
+
+            return [(self.plate, well) for well in index]
+
+        def static_wells(self, well_list: list[str]):
+            """Get specific wells from input list."""
+
+            return [
+                (self.plate, default_index_96.loc[well[0], int(well[1:])])
+                for well in well_list
+            ]
 
 
 class carrier_24:
@@ -730,71 +812,88 @@ class carrier_24:
         current_tube: int = 0,
     ) -> None:
         self.carrier = dk.get_labware_list(deck, ["C1"], EppiCarrier24)[0]
-        self._frame = pd.DataFrame(
-            index=list(string.ascii_uppercase)[:4], columns=range(1, 7)
-        )
+        self.default_tubes = self.Frame(self.carrier)
 
-        self.positions = [index_to_string_24(i) for i in range(tubes)]
+    def tubes(self, positions: list[str] = [], current_tube: int = 0):
+        return self.Frame(self.carrier, positions, current_tube)
 
-        for position in self.positions:
-            letter, number = position[0], int(position[1:])
-            self._frame.loc[letter, number] = 1
+    class Frame:
+        def __init__(
+            self,
+            carrier: EppiCarrier24,
+            positions: list[str] = [],
+            current_tube: int = 0,
+        ):
+            self.carrier = carrier
 
-        self.original = self._frame.copy()
+            self.frame = pd.DataFrame(
+                index=list(string.ascii_uppercase)[:4], columns=range(1, 7)
+            )
 
-        self.current_tubes = tubes
-        self.current_tube = current_tube
-
-    def reset_frame(self):
-        self._frame = self.original.copy()
-
-    def frame(self):
-        return self._frame.fillna(0)
-
-    def wells(self):
-        return self._frame.sum().sum()
-
-    def get_tubes_2ch(self, n: int = 2) -> list[tuple[EppiCarrier24, int]]:
-        """Get tubes from a 24 tube carrier in 2 channel mode."""
-        if self.current_tube == self.current_tubes:
-            self.current_tube = 0
-            self.reset_frame()
-
-        column = default_index_24.T[self._frame.sum(axis=0) >= n].first_valid_index()
-
-        for _ in range(2):
-            try:
-                row = self._frame.T.loc[column] == 1
-            except KeyError as e:
-                logger.debug(
-                    f"Column with {n} tubes not found in {self.carrier.layout_name()},"
-                    " trying again with 1 tube."
-                )
-                column = default_index_24.T[
-                    self._frame.sum(axis=0) >= 1
-                ].first_valid_index()
-                continue
+            if not positions:
+                index = [i for i in range(24)]
             else:
-                break
-        else:
-            logger.error(f"Not enough tubes in {self.carrier.layout_name()}.")
-            exit()
+                index = positions
 
-        index = sort_list(default_index_24.T.loc[column, row].tolist(), 2)[:n]
-        self._frame[default_index_24.isin(index)] = 0
-        self.current_tube += n
+            if isinstance(index, list) and all(isinstance(i, int) for i in index):
+                index = [index_to_string_24(i) for i in index]
 
-        tubes = [(self.carrier, well) for well in index]
-        return tubes
+            for idx in index:
+                letter, number = idx[0], int(idx[1:])
+                self.frame.loc[letter, number] = 1
 
-    def static_tubes(self, well_list: list[str]) -> list[tuple[EppiCarrier24, int]]:
-        """Get specific tubes from input list."""
-        tubes = [
-            (self.carrier, default_index_24.loc[well[0], int(well[1:])])
-            for well in well_list
-        ]
+            self.original = self.frame.copy()
+            self.current_tubes = len(positions)
+            self.current_tube = current_tube
 
-        return tubes
+        def reset_frame(self):
+            self.frame = self.original.copy()
+
+        def get_frame(self):
+            return self.frame.fillna(0)
+
+        def wells(self):
+            return self.frame.sum().sum()
+
+        def get_tubes_2ch(self, n: int = 2) -> list[tuple[EppiCarrier24, int]]:
+            """Get tubes from a 24 tube carrier in 2 channel mode."""
+            if self.current_tube == self.current_tubes:
+                self.current_tube = 0
+                self.reset_frame()
+
+            column = default_index_24.T[self.frame.sum(axis=0) >= n].first_valid_index()
+
+            for _ in range(2):
+                try:
+                    row = self.frame.T.loc[column] == 1
+                except KeyError as e:
+                    logger.debug(
+                        f"Column with {n} tubes not found in"
+                        f" {self.carrier.layout_name()}, trying again with 1 tube."
+                    )
+                    column = default_index_24.T[
+                        self.frame.sum(axis=0) >= 1
+                    ].first_valid_index()
+                    continue
+                else:
+                    break
+            else:
+                logger.error(f"Not enough tubes in {self.carrier.layout_name()}.")
+                exit()
+
+            index = sort_list(default_index_24.T.loc[column, row].tolist(), 2)[:n]
+            self.frame[default_index_24.isin(index)] = pd.NA
+            self.current_tube += n
+
+            return [(self.carrier, well) for well in index]
+
+        def static_tubes(self, well_list: list[str]):
+            """Get specific tubes from input list."""
+
+            return [
+                (self.carrier, default_index_24.loc[well[0], int(well[1:])])
+                for well in well_list
+            ]
 
 
 class stack:
@@ -802,7 +901,7 @@ class stack:
         self,
         deck: dict,
         positions: str | list[str],
-        labware_type: Union[Plate96, Tip96, Plate384, Tip384],
+        labware_type,  #: Union[Plate96, Tip96, Plate384, Tip384],
         n_deck: int | list[int],
         n_labware: int = 2,
         reverse: bool = False,

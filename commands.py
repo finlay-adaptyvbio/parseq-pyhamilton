@@ -157,15 +157,18 @@ def tip_pick_up(
 
 def tip_eject(
     ham: HamiltonInterface,
-    positions: list[tuple[Tip96, int]],
+    positions: list[tuple[Tip96, int]] = [],
     waste: bool = False,
     **kw_args,
 ):
+    if positions:
+        labware = positions[0][0].layout_name()
+    else:
+        labware = "None"
+
     logger.info(
-        f"Command: {'tip_eject'} | Labware:"
-        f" {positions[0][0].layout_name()} | Positions:"
-        f" {[p[0].position_id(p[1]) for p in positions]} | Waste:"
-        f" {waste}"
+        f"Command: {'tip_eject'} | Labware: {labware} | Positions:"
+        f" {[p[0].position_id(p[1]) for p in positions]} | Waste: {waste}"
     )
 
     if waste:
@@ -277,7 +280,7 @@ def tip_pick_up_384(
         f" {positions[0][0].layout_name()} | Positions: {len(positions)}"
     )
 
-    labwarePositions = compound_pos_str(positions)
+    labwarePositions = compound_pos_str(positions[:1])
 
     cid = ham.send_command(
         PICKUP384,
@@ -290,13 +293,18 @@ def tip_pick_up_384(
 
 def tip_eject_384(
     ham: HamiltonInterface,
-    positions: list[tuple[Tip384, int]],
+    positions: list[tuple[Tip384, int]] = [],
     mode: int = 0,
     **kw_args,
 ):
+    if positions:
+        labware = positions[0][0].layout_name()
+    else:
+        labware = "None"
+
     logger.info(
         f"Command: {'tip_eject_384'} | Labware:"
-        f" {positions[0][0].layout_name()} | Positions: {len(positions)} |"
+        f" {labware} | Positions: {len(positions)} |"
         f" Mode: {mode}"
     )
 
@@ -336,7 +344,7 @@ def aspirate_384(
     if "liquidClass" not in kw_args:
         kw_args.update({"liquidClass": DEFAULT_LIQUID_CLASS_384MPH})
 
-    labwarePositions = compound_pos_str(positions)
+    labwarePositions = compound_pos_str(positions[:1])
 
     cid = ham.send_command(
         ASPIRATE384,
