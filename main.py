@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, argparse, requests, time, datetime, shutil, traceback
+import os, argparse, sys, time, datetime, shutil
 import logging, logging.config
 
 import deck as dk
@@ -361,16 +361,24 @@ if __name__ == "__main__":
 
     deck = dk.get_deck(layout_path)
 
-    # Run method
-
-    try:
-        script.run(deck, state, state_path, run_dir_path)
-        hp.notify(f"Method {method} for run {run_id} completed successfully!")
-    except KeyboardInterrupt:
-        logger.warning("Keyboard interrupt received. Exiting...")
-        hp.notify(f"Method {method} for run {run_id} interrupted.")
-    except Exception as e:
-        logger.exception(e)
-        # hp.notify(traceback.format_exc())
-        hp.notify(f"Method {method} for run {run_id} failed.")
-        raise e
+    # Run method, on failure notify and restart (max 3 retries)
+    for attempt in range(3):
+        try:
+            script.run(deck, state, state_path, run_dir_path)
+        except KeyboardInterrupt:
+            logger.warning("Keyboard interrupt received. Exiting...")
+            hp.notify(f"Method {method} for run {run_id} interrupted.")
+            sys.exit()
+        except Exception as e:
+            logger.exception(e)
+            hp.notify(
+                f"Method {method} for run {run_id} failed. Restarting"
+                f" ({attempt + 1}/3)..."
+            )
+            continue
+        else:
+            hp.notify(f"Method {method} for run {run_id} completed successfully!")
+            break
+    else:
+        hp.notify(f"Method {method} for run {run_id} failed 3 times. Exiting...")
+        sys.exit()
