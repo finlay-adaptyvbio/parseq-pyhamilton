@@ -580,107 +580,123 @@ class tip_96:
         self,
         deck: dict,
         rack: str,
-        positions: Union[list[str], list[int]] = [],
-        current_tip: int = 0,
     ) -> None:
         self.rack = dk.get_labware_list(deck, [rack], Tip96)[0]
-        self._frame = pd.DataFrame(
-            index=list(string.ascii_uppercase)[:8], columns=range(1, 13)
-        )
 
-        if not positions:
-            self.positions = [i for i in range(96)]
-        else:
-            self.positions = positions
+    def tips(
+        self,
+        positions: Union[list[str], list[int]] = [],
+        current_tip: int = 0,
+    ):
+        return self.Frame(self.rack, positions, current_tip)
 
-        if isinstance(self.positions, list) and all(
-            isinstance(i, int) for i in self.positions
-        ):
-            self.positions = [index_to_string_96(i) for i in self.positions]
+    class Frame:
+        def __init__(
+            self,
+            rack: Tip96,
+            positions: Union[list[str], list[int]] = [],
+            current_tip: int = 0,
+        ) -> None:
+            self.rack = rack
+            self.frame = pd.DataFrame(
+                index=list(string.ascii_uppercase)[:8], columns=range(1, 13)
+            )
 
-        for position in self.positions:
-            letter, number = position[0], int(position[1:])
-            self._frame.loc[letter, number] = 1
-
-        self.original = self._frame.copy()
-
-        self.current_tips = len(positions)
-        self.current_tip = current_tip
-
-    def reset_frame(self):
-        self._frame = self.original.copy()
-
-    def frame(self):
-        return self._frame.fillna(0)
-
-    def tips(self):
-        return self._frame.sum().sum()
-
-    def get_all_tips(self) -> list[tuple[Tip96, int]]:
-        tips = [(self.rack, tip) for tip in default_index_96.values.flatten()]
-        return tips
-
-    def get_tips_2ch(self, n: int = 2, remove: bool = True) -> list[tuple[Tip96, int]]:
-        """Get tips from a 96-tip rack in 2 channel mode."""
-        column = default_index_96.T[self._frame.sum(axis=0) >= n].first_valid_index()
-
-        for _ in range(2):
-            try:
-                row = self._frame.T.loc[column] == 1
-            except KeyError as e:
-                logger.debug(
-                    f"Column with {n} tips not found in {self.plate.layout_name()},"
-                    " trying again with 1 tip."
-                )
-                column = default_index_96.T[
-                    self._frame.sum(axis=0) >= 1
-                ].first_valid_index()
-                continue
+            if not positions:
+                self.positions = [i for i in range(96)]
             else:
-                break
-        else:
-            logger.error(f"Not enough tips in {self.plate.layout_name()}.")
-            sys.exit()
+                self.positions = positions
 
-        index = sort_list(default_index_96.T.loc[column, row].tolist(), 2)[:n]
+            if isinstance(self.positions, list) and all(
+                isinstance(i, int) for i in self.positions
+            ):
+                self.positions = [index_to_string_96(i) for i in self.positions]
 
-        if remove:
-            self._frame[default_index_96.isin(index)] = pd.NA
-            self.current_tip += n
+            for position in self.positions:
+                letter, number = position[0], int(position[1:])
+                self.frame.loc[letter, number] = 1
 
-        return [(self.rack, well) for well in index]
+            self.original = self.frame.copy()
 
-    def get_rows_384mph(
-        self, rows: int = 1, remove: bool = True
-    ) -> list[tuple[Tip96, int]]:
-        row = self._frame.T[self._frame.T.sum(axis=1) >= rows].last_valid_index()
-        try:
-            mask = self._frame.loc[:, row] == 1
-        except KeyError as e:
-            logger.error(f"Not enough tips in {self.rack.layout_name()}")
-            exit()
-        index = default_index_96.loc[:, row][mask].tolist()[-rows:]
+            self.current_tips = len(positions)
+            self.current_tip = current_tip
 
-        if remove:
-            self._frame[default_index_96.isin(index)] = pd.NA
+        def reset_frame(self):
+            self.frame = self.original.copy()
 
-        return [(self.rack, tip) for tip in index]
+        def get_frame(self):
+            return self.frame.fillna(0)
 
-    def get_columns_384mph(
-        self, columns: int = 1, remove: bool = True
-    ) -> list[tuple[Tip96, int]]:
-        column = self._frame[self._frame.sum(axis=1) >= columns].last_valid_index()
-        try:
-            mask = self._frame.loc[column, :] == 1
-        except KeyError as e:
-            logger.error(f"Not enough tips in {self.rack.layout_name()}")
-            exit()
-        index = default_index_96.loc[column, :][mask].tolist()[-columns:]
+        def tips(self):
+            return self.frame.sum().sum()
 
-        if remove:
-            self._frame[default_index_96.isin(index)] = pd.NA
+        def get_all_tips(self) -> list[tuple[Tip96, int]]:
+            tips = [(self.rack, tip) for tip in default_index_96.values.flatten()]
+            return tips
 
-        return [(self.rack, tip) for tip in index]
+        def get_tips_2ch(
+            self, n: int = 2, remove: bool = True
+        ) -> list[tuple[Tip96, int]]:
+            """Get tips from a 96-tip rack in 2 channel mode."""
+            column = default_index_96.T[self.frame.sum(axis=0) >= n].first_valid_index()
+
+            for _ in range(2):
+                try:
+                    row = self.frame.T.loc[column] == 1
+                except KeyError as e:
+                    logger.debug(
+                        f"Column with {n} tips not found in {self.plate.layout_name()},"
+                        " trying again with 1 tip."
+                    )
+                    column = default_index_96.T[
+                        self.frame.sum(axis=0) >= 1
+                    ].first_valid_index()
+                    continue
+                else:
+                    break
+            else:
+                logger.error(f"Not enough tips in {self.plate.layout_name()}.")
+                sys.exit()
+
+            index = sort_list(default_index_96.T.loc[column, row].tolist(), 2)[:n]  # type: ignore
+
+            if remove:
+                self.frame[default_index_96.isin(index)] = pd.NA
+                self.current_tip += n
+
+            return [(self.rack, well) for well in index]
+
+        def get_rows_384mph(
+            self, rows: int = 1, remove: bool = True
+        ) -> list[tuple[Tip96, int]]:
+            row = self.frame.T[self.frame.T.sum(axis=1) >= rows].last_valid_index()
+            try:
+                mask = self.frame.loc[:, row] == 1
+            except KeyError as e:
+                logger.error(f"Not enough tips in {self.rack.layout_name()}")
+                exit()
+            index = default_index_96.loc[:, row][mask].tolist()[-rows:]
+
+            if remove:
+                self.frame[default_index_96.isin(index)] = pd.NA
+
+            return [(self.rack, tip) for tip in index]
+
+        def get_columns_384mph(
+            self, columns: int = 1, remove: bool = True
+        ) -> list[tuple[Tip96, int]]:
+            column = self.frame[self.frame.sum(axis=1) >= columns].last_valid_index()
+            try:
+                mask = self.frame.loc[column, :] == 1
+            except KeyError as e:
+                logger.error(f"Not enough tips in {self.rack.layout_name()}")
+                exit()
+            index = default_index_96.loc[column, :][mask].tolist()[-columns:]  # type: ignore
+
+            if remove:
+                self.frame[default_index_96.isin(index)] = pd.NA
+
+            return [(self.rack, tip) for tip in index]
 
 
 class plate_96:
@@ -712,10 +728,10 @@ class plate_96:
                 index = positions
 
             if isinstance(index, list) and all(isinstance(i, int) for i in index):
-                index = [index_to_string_96(i) for i in index]
+                index = [index_to_string_96(i) for i in index]  # type: ignore
 
             for idx in index:
-                letter, number = idx[0], int(idx[1:])
+                letter, number = idx[0], int(idx[1:])  # type: ignore
                 self.frame.loc[letter, number] = 1
 
             self.original = self.frame.copy()
@@ -757,7 +773,7 @@ class plate_96:
                 logger.error(f"Not enough wells in {self.plate.layout_name()}.")
                 exit()
 
-            index = sort_list(default_index_96.T.loc[column, row].tolist(), 2)[:n]
+            index = sort_list(default_index_96.T.loc[column, row].tolist(), 2)[:n]  # type: ignore
             self.frame[default_index_96.isin(index)] = pd.NA
             self.current_well += n
 
@@ -836,10 +852,10 @@ class carrier_24:
                 index = positions
 
             if isinstance(index, list) and all(isinstance(i, int) for i in index):
-                index = [index_to_string_24(i) for i in index]
+                index = [index_to_string_24(i) for i in index]  # type: ignore
 
             for idx in index:
-                letter, number = idx[0], int(idx[1:])
+                letter, number = idx[0], int(idx[1:])  # type: ignore
                 self.frame.loc[letter, number] = 1
 
             self.original = self.frame.copy()
@@ -881,7 +897,7 @@ class carrier_24:
                 logger.error(f"Not enough tubes in {self.carrier.layout_name()}.")
                 exit()
 
-            index = sort_list(default_index_24.T.loc[column, row].tolist(), 2)[:n]
+            index = sort_list(default_index_24.T.loc[column, row].tolist(), 2)[:n]  # type: ignore
             self.frame[default_index_24.isin(index)] = pd.NA
             self.current_tube += n
 
