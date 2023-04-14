@@ -1,9 +1,11 @@
-import logging, math, time
+import logging, math, time, os, csv
+import pandas as pd
 
 import commands as cmd
 import deck as dk
 import state as st
 import helpers as hp
+import labware as lw
 
 from pyhamilton import (
     HamiltonInterface,
@@ -26,66 +28,60 @@ ETHANOL = "StandardVolume_EtOH_DispenseJet_Empty"
 
 
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
-    # Pool information and variables
+    # Sample info
 
-    pools = hp.prompt_int("Pools to purify", 24)
-    eppies = [f"P{i}" for i in range(1, pools + 1)]
+    fragment_size = hp.prompt_int("Fragment size (bp)", 1000)
 
-    ratio = hp.prompt_float("Ratio of beads to sample", 1.8)
-    sample = hp.prompt_float("Sample volume (uL)", 150)
-    elute_volume = hp.prompt_float("Elution volume (uL)", 50)
+    # Concentrations and normalization calculations
 
-    # Calculate volumes required for purification
+    logger.debug("Reading concentrations...")
 
-    logger.debug("Calculating volumes...")
+    sample_concentrations_path = os.path.join(run_dir_path, "sample_concentrations.csv")
 
-    ethanol_volume = TUBE_VOLUME
-    ethanol_tubes = math.ceil(400 * pools / TUBE_VOLUME)
-    wash_volume = max(200, sample * (1 + ratio))
+    sample_concentrations = pd.read_csv(
+        sample_concentrations_path, names=["Sample", "C [ng/uL]"]
+    )
+    sample_concentrations["bp"] = fragment_size
+    sample_concentrations["MW [Da]"] = sample_concentrations["bp"] * 617.96 + 36.04
+    sample_concentrations["C [nM]"] = (
+        sample_concentrations["C [ng/uL]"] / sample_concentrations["MW [Da]"] * 1e6
+    )
+    sample_concentrations["moles [fmol]"] = 200
+    sample_concentrations["Sample V [uL]"] = (
+        sample_concentrations["moles [fmol]"] / sample_concentrations["C [nM]"]
+    )
+    sample_concentrations["Water V [uL]"] = (
+        12.5 - sample_concentrations["Sample V [uL]"]
+    )
 
-    bead_volume = math.ceil(ratio * sample * pools) + 50
-    if bead_volume > TUBE_VOLUME:
-        logger.warn(
-            f"{hp.color.BOLD}{hp.color.RED}More than {TUBE_VOLUME} uL of beads"
-            f" required, you will be prompted to add more beads!{hp.color.END}"
-        )
-    bead_sample_volume = sample * ratio
+    # Volume calculations
 
-    teb_volume = math.ceil(elute_volume * pools) + 100
-
-    # Mixing parameters
-
-    bead_mix_volume = min(bead_volume * 0.5, 250.0)
+    n_samples = sample_concentrations["Sample"].count()
+    n_ethanol_tubes = int((math.ceil(n_samples * 300 / 1800) + 1) / 2.0 * 2)
+    bead_volume_end_prep = 15 * n_samples
+    bead_volume_barcode = 9 * n_samples
+    bead_volume_ligation = 20
+    
 
     # Assign labware to deck positions
 
     logger.debug("Assigning labware...")
 
-    eppicarrier = dk.get_labware_list(deck, ["C1"], EppiCarrier24)[0]
-    source_eppies = [(eppicarrier, i) for i in dk.pos_24_2row_2ch(24)[:pools]]
-    dest_eppies = [(eppicarrier, i) for i in dk.pos_24_2row_2ch(24)[:pools]]
-    beads = [(eppicarrier, 17)]
-    teb = [(eppicarrier, 23)]
-    ethanol = [
-        (eppicarrier, position) for position in dk.pos_24_2row_2ch(24)[:ethanol_tubes]
-    ]
-    ethanol_tube = [ethanol[state["current_ethanol_tube"]]]
+    carrier = lw.carrier_24(deck)
+    plate = lw.plate_96(deck, "C3")
+    mag = lw.plate_96(deck, "D3")
 
-    racks = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip96, [4, 4, 4], True)
-    rack_tips, rack_virtual = dk.get_labware_list(deck, ["F5"], Tip96, [2])
-    tips = [(rack_tips, i) for i in dk.pos_96_2ch(96)]
+    # Reagents & samples
 
-    mag_plate = dk.get_labware_list(deck, ["D3"], Plate96)[0]
-    mag_pools = [(mag_plate, i) for i in dk.pos_96_2row_2ch(96)[:24]]
-    mag_ft = [(mag_plate, i) for i in dk.pos_96_2row_2ch(96)[24:48]]
-    mag_wash_1 = [(mag_plate, i) for i in dk.pos_96_2row_2ch(96)[48:72]]
-    mag_wash_2 = [(mag_plate, i) for i in dk.pos_96_2row_2ch(96)[72:96]]
+    samples = carrier.tubes([t for t in lw.pos_column_row_24(n_samples)])
+    ethanol = carrier.tubes([t for t in lw.pos_column_row_24(n_ethanol_tubes)])
+    beads = carrier.tubes(["D6"])
 
-    no_mag_plate = dk.get_labware_list(deck, ["C3"], Plate96)[0]
-    no_mag_pools = [(no_mag_plate, i) for i in dk.pos_96_2row_2ch(96)[:24]]
+    end_prep_enzyme = carrier.tubes(["C6"])
+    end_prep_buffer = carrier.tubes(["B6"])
+    end_prep_mm = plate.wells(["A12"])
 
-
-    
+    blunt_ta_ligase_mm = carrier.tubes(["A6"])
 
     # Tip tracking
 

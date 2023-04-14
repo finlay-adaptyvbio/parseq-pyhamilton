@@ -824,8 +824,6 @@ class carrier_24:
     def __init__(
         self,
         deck: dict,
-        tubes: int = 24,
-        current_tube: int = 0,
     ) -> None:
         self.carrier = dk.get_labware_list(deck, ["C1"], EppiCarrier24)[0]
         self.default_tubes = self.Frame(self.carrier)

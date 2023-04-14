@@ -10,6 +10,8 @@ import commands, helpers, deck, labware
 
 import logging, logging.config, time, csv
 
+import pandas as pd
+
 # Logging settings
 
 LOGGING = {
@@ -43,27 +45,33 @@ logging.config.dictConfig(LOGGING)
 logger = logging.getLogger()
 
 layout_path = "C:\\Users\\Adaptyvbio\\Documents\\PyHamilton\\adaptyv-pyhamilton\\layouts\\purification.lay"
-csv_path = "C:\\Users\\Adaptyvbio\\Downloads\\cherry.csv"
-
-with open(csv_path, "r") as f:
-    reader = csv.reader(f)
-    rows = [row[0].split(" ") for row in reader]
-    wells = [row[0].split(".") for row in rows]
-
-l = [well[1] for well in wells]
+csv_path = "C:\\Users\\Adaptyvbio\\Downloads\\test.csv"
 
 layout = deck.get_deck(layout_path)
 
 if __name__ == "__main__":
-    test_frame = labware.reservoir_300(
-        layout,
-        "C5",
-        l,
+    fragment_size = helpers.prompt_int("Fragment size (bp)", 1000)
+
+    # Concentrations and normalization calculations
+
+    logger.debug("Reading concentrations...")
+
+    sample_concentrations_path = csv_path
+
+    sample_concentrations = pd.read_csv(
+        sample_concentrations_path, names=["Sample", "C [ng/uL]"]
     )
-    print(test_frame.frame())
-    while test_frame.wells() > 0:
-        pipet_wells = test_frame.get_wells_2ch()
-    print(test_frame.frame())
-    test_frame.reset_frame()
-    print(test_frame.frame())
-    print(test_frame.static_wells(["A1", "A2"]))
+    sample_concentrations["bp"] = fragment_size
+    sample_concentrations["MW [Da]"] = sample_concentrations["bp"] * 617.96 + 36.04
+    sample_concentrations["C [nM]"] = (
+        sample_concentrations["C [ng/uL]"] / sample_concentrations["MW [Da]"] * 1e6
+    )
+    sample_concentrations["moles [fmol]"] = 200
+    sample_concentrations["Sample V [uL]"] = (
+        sample_concentrations["moles [fmol]"] / sample_concentrations["C [nM]"]
+    )
+    sample_concentrations["Water V [uL]"] = (
+        12.5 - sample_concentrations["Sample V [uL]"]
+    )
+
+    print(sample_concentrations)
