@@ -86,6 +86,12 @@ default_index_96 = pd.DataFrame(
     columns=range(1, 13),
 )
 
+default_index_96_r = pd.DataFrame(
+    [[i for i in range(j, 96, 8)][::-1] for j in range(8)],
+    index=list(string.ascii_uppercase)[:8],
+    columns=range(1, 13),
+)
+
 default_index_384 = pd.DataFrame(
     [[i for i in range(j, 384, 16)] for j in range(16)],
     index=list(string.ascii_uppercase)[:16],
@@ -126,7 +132,7 @@ def string_to_index_24(position: str) -> int:
 
 def index_to_string_24(position: int) -> str:
     alphabet = "ABCD"
-    x, y = int(position) // 4, int(position) % 4
+    x, y = int(position) % 6, int(position) // 6
     return alphabet[y] + str(x + 1)
 
 
@@ -699,6 +705,34 @@ class tip_96:
 
             return [(self.rack, tip) for tip in index]
 
+        def get_tips_384mph(
+            self, rows: int = 1, columns: int = 1, remove: bool = True
+        ) -> list[tuple[Tip96, int]]:
+            """Get tips from a 96 tip rack in 384 multi-probe head mode."""
+
+            rowframe = self.frame[self.frame.sum(axis=1) >= columns].dropna(
+                axis=1, how="any"
+            )
+            columnframe = rowframe.T[(rowframe.T.sum(axis=1) >= rows)].T
+            mask = columnframe.iloc[:rows, :columns] == 1
+            index = sorted(
+                default_index_96_r[mask]
+                .convert_dtypes()
+                .dropna(axis=1, how="all")
+                .dropna(axis=0, how="all")
+                .values.flatten(),
+            )
+            try:
+                index[-1]
+            except IndexError as e:
+                logger.error(f"Not enough wells in {self.rack.layout_name()}")
+                exit()
+
+            if remove:
+                self.frame[default_index_96_r.isin(index)] = pd.NA
+
+            return [(self.rack, well) for well in index]
+
 
 class plate_96:
     def __init__(self, deck, plate: str) -> None:
@@ -748,7 +782,7 @@ class plate_96:
         def total_wells(self):
             return self.frame.sum().sum()
 
-        def get_wells_2ch(self, n: int = 2) -> list[tuple[Plate96, int]]:
+        def get_wells_2ch(self, n: int = 2, remove=True) -> list[tuple[Plate96, int]]:
             """Get wells from a 96 well plate in 2 channel mode."""
             if self.current_well == self.current_wells:
                 self.current_well = 0
@@ -775,8 +809,10 @@ class plate_96:
                 exit()
 
             index = sort_list(default_index_96.T.loc[column, row].tolist(), 2)[:n]  # type: ignore
-            self.frame[default_index_96.isin(index)] = pd.NA
-            self.current_well += n
+
+            if remove:
+                self.frame[default_index_96.isin(index)] = pd.NA
+                self.current_well += n
 
             return [(self.plate, well) for well in index]
 
@@ -870,7 +906,9 @@ class carrier_24:
         def tubes(self):
             return self.frame.sum().sum()
 
-        def get_tubes_2ch(self, n: int = 2) -> list[tuple[EppiCarrier24, int]]:
+        def get_tubes_2ch(
+            self, n: int = 2, remove=True
+        ) -> list[tuple[EppiCarrier24, int]]:
             """Get tubes from a 24 tube carrier in 2 channel mode."""
             if self.current_tube == self.current_tubes:
                 self.current_tube = 0
@@ -897,8 +935,10 @@ class carrier_24:
                 exit()
 
             index = sort_list(default_index_24.T.loc[column, row].tolist(), 2)[:n]  # type: ignore
-            self.frame[default_index_24.isin(index)] = pd.NA
-            self.current_tube += n
+
+            if remove:
+                self.frame[default_index_24.isin(index)] = pd.NA
+                self.current_tube += n
 
             return [(self.carrier, well) for well in index]
 

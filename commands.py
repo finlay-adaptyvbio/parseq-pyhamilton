@@ -36,6 +36,8 @@ DEFAULT_GRIP_TOOL_SEQUENCE = "CORE_Grip"
 DEFAULT_LIQUID_CLASS_2CH = "StandardVolume_Water_DispenseJet_Empty"
 DEFAULT_LIQUID_CLASS_384MPH = "50ulTip_conductive_384COREHead_Water_DispenseJet_Empty"
 
+HEAD_PATTERN = "1" + "0" * (95)
+
 # TODO: Add docstrings
 
 
@@ -61,7 +63,7 @@ def compound_pos_str(pos_tuples):
 def grip_get(
     ham: HamiltonInterface,
     labware: Union[Plate96, Plate384, Lid],
-    mode: int,
+    mode: int = 0,
     **kw_args,
 ):
     logger.info(
@@ -96,7 +98,7 @@ def grip_get(
 def grip_place(
     ham: HamiltonInterface,
     labware: Union[Plate96, Plate384, Lid],
-    mode: int,
+    mode: int = 0,
     eject: bool = False,
     **kw_args,
 ):
@@ -206,7 +208,10 @@ def grip_eject(
 
 def aspirate(
     ham: HamiltonInterface,
-    positions: list[tuple[Union[Plate96, Plate384, Reservoir300, EppiCarrier24], int]],
+    positions: list[tuple[Plate96, int]]
+    | list[tuple[Plate384, int]]
+    | list[tuple[EppiCarrier24, int]]
+    | list[tuple[Reservoir300, int]],
     volumes: list[float],
     **kw_args,
 ):
@@ -239,7 +244,10 @@ def aspirate(
 
 def dispense(
     ham: HamiltonInterface,
-    positions: list[tuple[Union[Plate96, Plate384, Reservoir300, EppiCarrier24], int]],
+    positions: list[tuple[Plate96, int]]
+    | list[tuple[Plate384, int]]
+    | list[tuple[EppiCarrier24, int]]
+    | list[tuple[Reservoir300, int]],
     volumes: list[float],
     **kw_args,
 ):
@@ -285,6 +293,10 @@ def tip_pick_up_384(
     cid = ham.send_command(
         PICKUP384,
         labwarePositions=labwarePositions,
+        tipMode=1,
+        reducedPatternMode=1,
+        headPatternAsVariable=3,
+        headPatternVariable=HEAD_PATTERN,
         **kw_args,
     )
 

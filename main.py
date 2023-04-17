@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 import os, argparse, sys, time, datetime, shutil
 import logging, logging.config
 
@@ -353,6 +351,18 @@ if __name__ == "__main__":
 
         case "purification":
             from scripts import purification as script
+
+        case "lib_nanopore":
+            from scripts import lib_nanopore as script
+
+            if get_input_files:
+                sample_concentrations_path = hp.prompt_file_path(
+                    f"Path to sample_concentrations.csv for run {run_id}"
+                )
+                shutil.copy(
+                    sample_concentrations_path,
+                    os.path.join(run_dir_path, f"{method}_concentrations.csv"),
+                )
 
         case _:
             # This shoudn't be needed but avoids type error

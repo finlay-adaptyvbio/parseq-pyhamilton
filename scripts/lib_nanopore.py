@@ -25,6 +25,10 @@ TIPS = 96
 TUBE_VOLUME = 1800
 
 ETHANOL = "StandardVolume_EtOH_DispenseJet_Empty"
+ALIQUOT_300 = "StandardVolume_Water_DispenseJet_Part"
+EMPTY_50 = "Tip_50ul_Water_DispenseJet_Empty"
+ALIQUOT_50 = "Tip_50ul_Water_DispenseJet_Part"
+MIX_50 = "Tip_50ul_Water_DispenseSurface_Empty"
 
 
 def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
@@ -34,7 +38,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Concentrations and normalization calculations
 
-    sample_concentrations_path = os.path.join(run_dir_path, "sample_concentrations.csv")
+    sample_concentrations_path = os.path.join(
+        run_dir_path, "lib_nanopore_concentrations.csv"
+    )
 
     sample_concentrations = pd.read_csv(
         sample_concentrations_path, names=["Sample", "C [ng/uL]"]
@@ -55,22 +61,28 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
     # Volume calculations
 
     n_samples = sample_concentrations["Sample"].count()
+    n_ethanol_tubes = int((math.ceil(n_samples * 300 / TUBE_VOLUME) + 1) / 2.0 * 2)
+
     sample_volumes = sample_concentrations["Sample V [uL]"].tolist()
     water_volumes = sample_concentrations["Water V [uL]"].tolist()
-    water_volume = [float(sum(water_volumes))]
-    n_ethanol_tubes = int((math.ceil(n_samples * 300 / TUBE_VOLUME) + 1) / 2.0 * 2)
+    water_volume = [(sum(water_volumes) // 50 + 1) * 50.0]
+    end_prep_mm_volumes = [2.5] * n_samples
+    end_prep_mm_volume = [(sum(end_prep_mm_volumes) // 5 + 1) * 5.0]
+    end_prep_bead_volumes = [15.0] * n_samples
+    end_prep_bead_volume = [(sum(end_prep_bead_volumes) // 15 + 1) * 15.0]
     edta_volume = 2 * n_samples
-    bead_volume_end_prep = 15 * n_samples
     bead_volume_barcode = 8 * n_samples
     bead_volume_ligation = 20
 
     # Assign labware to deck positions
 
     carrier = lw.carrier_24(deck)
-    plate = lw.plate_96(deck, "C3")
-    mag = lw.plate_96(deck, "D3")
-    tips_50 = lw.tip_96(deck, "F5")
-    tips_300 = lw.tip_96(deck, "B1")
+    c3 = lw.plate_96(deck, "C3")
+    d3 = lw.plate_96(deck, "D3")
+    d1 = lw.plate_96(deck, "D1")
+    tips_300 = lw.tip_96(deck, "F1")
+    tips_50 = lw.tip_96(deck, "F2")
+    tips_384_96 = lw.tip_96(deck, "A4")
 
     # Reagents & samples
 
@@ -90,11 +102,6 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     # Inform user of labware positions, ask for confirmation after placing labware
 
-    hp.place_labware([no_mag_plate], "VWR 96 Well PCR Plate")
-    hp.place_labware([rack_tips], "Hamilton NTR 96_300 µL Tip Rack")
-    hp.place_labware(racks, "Hamilton NTR 96_300 µL Tip Rack")
-    hp.place_labware([eppicarrier], "Eppendorf Carrier 24")
-
     logger.info(f"Make sure Alpaqua Magnum EX (magnetic plate) is in position D3.")
 
     input(f"Press enter to start method!")
@@ -107,42 +114,138 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         # Main loop
 
         while not state["complete"]:
-            # Normalize samples
-
-            if not state["normalize"]:
-                while sample_volumes:
-                    v = [sample_volumes.pop(0)]
-                    cmd.tip_pick_up(hammy, tips_50.default_tips.get_tips_2ch(1))
-                    cmd.aspirate(hammy, samples.get_tubes_2ch(1, remove=True), v)
-                    cmd.dispense(
-                        hammy, plate.default_wells.get_wells_2ch(1, remove=True), v
-                    )
-                    cmd.tip_eject(
-                        hammy, tips_50.default_tips.get_tips_2ch(1), waste=True
-                    )
-
-                plate.default_wells.reset()
-
-                cmd.tip_pick_up(hammy, tips_50.default_tips.get_tips_2ch(1))
-                cmd.aspirate(hammy, water.get_tubes_2ch(1), water_volume)
+            # Add water for normalization
+            if not state["normalize_water"]:
+                cmd.tip_pick_up(
+                    hammy, tips_300.default_tips.get_tips_2ch(1, remove=False)
+                )
+                cmd.aspirate(
+                    hammy,
+                    water.get_tubes_2ch(1),
+                    water_volume,
+                    liquidClass=ALIQUOT_300,
+                )
 
                 while water_volumes:
-                    v = [water_volumes.pop(0)]
-                    cmd.dispense(hammy, plate.default_wells.get_wells_2ch(1), v)
+                    cmd.dispense(
+                        hammy,
+                        c3.default_wells.get_wells_2ch(1),
+                        [water_volumes.pop(0)],
+                        liquidClass=ALIQUOT_300,
+                    )
 
-                cmd.tip_eject(hammy, tips_50.default_tips.get_tips_2ch(1), waste=True)
+                cmd.tip_eject(hammy, tips_300.default_tips.get_tips_2ch(1), waste=False)
 
-            # Remove samples from carrier & add end prep reagents
+                c3.default_wells.reset()
 
-            # Add end prep master mix to samples
+            # Add end prep master mix to water
+            if not state["end_prep"]:
+                cmd.tip_pick_up(
+                    hammy, tips_50.default_tips.get_tips_2ch(1, remove=False)
+                )
+                cmd.aspirate(
+                    hammy,
+                    end_prep_mm.get_tubes_2ch(1),
+                    end_prep_mm_volume,
+                    liquidClass=ALIQUOT_50,
+                )
+                while end_prep_mm_volumes:
+                    cmd.dispense(
+                        hammy,
+                        c3.default_wells.get_wells_2ch(1),
+                        [end_prep_mm_volumes.pop(0)],
+                        liquidClass=ALIQUOT_50,
+                    )
+                cmd.tip_eject(hammy, tips_50.default_tips.get_tips_2ch(1), waste=False)
+
+                c3.default_wells.reset()
+
+            # Remove end prep reagents & add sample tubes to carrier
+            hp.notify(
+                f"*User action required:* Remove end-prep reagents & add sample tubes"
+                f" to carrier."
+            )
+            input(f"{hp.color.BOLD}Press enter to continue: {hp.color.END}")
+
+            # Add samples to end prep master mix
+            if not state["normalize_samples"]:
+                while sample_volumes:
+                    v = [sample_volumes.pop(0)]
+                    cmd.tip_pick_up(
+                        hammy, tips_50.default_tips.get_tips_2ch(1, remove=False)
+                    )
+                    cmd.aspirate(hammy, samples.get_tubes_2ch(1), v, liquidClass=MIX_50)
+                    cmd.dispense(
+                        hammy,
+                        c3.default_wells.get_wells_2ch(1),
+                        v,
+                        liquidClass=MIX_50,
+                        mixCycles=5,
+                        mixVolume=7.5,
+                    )
+                    cmd.tip_eject(
+                        hammy, tips_50.default_tips.get_tips_2ch(1), waste=False
+                    )
+
+                c3.default_wells.reset()
 
             # Incubate samples
+            hp.notify(
+                f"*User action required:* Incubate end-prep plate in thermocycler."
+            )
+            input(f"{hp.color.BOLD}Press enter to continue: {hp.color.END}")
 
             # Add beads to samples
+            if not state["add_beads"]:
+                while end_prep_bead_volumes:
+                    v = [end_prep_bead_volumes.pop(0)]
+                    cmd.tip_pick_up(
+                        hammy, tips_50.default_tips.get_tips_2ch(1, remove=False)
+                    )
+                    cmd.aspirate(
+                        hammy,
+                        beads.get_tubes_2ch(1),
+                        v,
+                        liquidClass=MIX_50,
+                    )
+                    cmd.dispense(
+                        hammy,
+                        c3.default_wells.get_wells_2ch(1),
+                        v,
+                        liquidClass=MIX_50,
+                        mixCycles=5,
+                        mixVolume=15.0,
+                    )
+                    cmd.tip_eject(
+                        hammy, tips_50.default_tips.get_tips_2ch(1), waste=False
+                    )
+
+                c3.default_wells.reset()
 
             # Incubate samples & mix
+            cmd.grip_get(hammy, c3.plate)
+            cmd.grip_place(hammy, d1.plate)
+            # time.sleep(60 * 3)
 
             # Move to magnent & remove supernatant
+            cmd.grip_get(hammy, d1.plate)
+            cmd.grip_place(hammy, d3.plate)
+
+            if not state["end_prep_cleanup_supernatant"]:
+                cmd.tip_pick_up_384(
+                    hammy, tips_384_96.default_tips.get_tips_384mph(8, 2)
+                )
+                cmd.aspirate_384(
+                    hammy,
+                    d3.default_wells.get_wells_384mph(8, 2),
+                    30.0,
+                )
+                cmd.dispense_384(
+                    hammy,
+                    d3.default_wells.get_wells_384mph(8, 2),
+                    30.0,
+                )
+                cmd.tip_eject_384(hammy, mode=1)
 
             # Wash samples
 
