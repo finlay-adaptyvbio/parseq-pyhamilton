@@ -303,7 +303,7 @@ class tip_384:
         self.current_tips = len(positions)
         self.current_tip = current_tip
 
-    def reset_frame(self):
+    def reset(self):
         self._frame = self.original.copy()
 
     def frame(self):
@@ -375,7 +375,7 @@ class plate_384:
         self.current_wells = len(positions)
         self.current_well = current_well
 
-    def reset_frame(self):
+    def reset(self):
         self._frame = self.original.copy()
 
     def frame(self):
@@ -388,7 +388,7 @@ class plate_384:
         """Get wells from a 384 well plate in 2 channel mode."""
         if self.current_well == self.current_wells:
             self.current_well = 0
-            self.reset_frame()
+            self.reset()
 
         column = default_index_384.T[self._frame.sum(axis=0) >= n].first_valid_index()
 
@@ -423,7 +423,7 @@ class plate_384:
         """Get wells from a 384 well plate in 384 multi-probe head mode."""
         if self.current_well == self.current_wells:
             self.current_well = 0
-            self.reset_frame()
+            self.reset()
 
         row_frame = self._frame[self._frame.sum(axis=1) >= columns].dropna(
             axis=1, how="any"
@@ -491,7 +491,7 @@ class reservoir_300:
         self.current_wells = len(positions)
         self.current_well = current_well
 
-    def reset_frame(self):
+    def reset(self):
         self._frame = self.original.copy()
 
     def frame(self):
@@ -504,7 +504,7 @@ class reservoir_300:
         """Get wells from a 384 well plate in 2 channel mode."""
         if self.current_well == self.current_wells:
             self.current_well = 0
-            self.reset_frame()
+            self.reset()
 
         column = default_index_384.T[self._frame.sum(axis=0) >= n].first_valid_index()
 
@@ -539,7 +539,7 @@ class reservoir_300:
         """Get wells from a 384 well plate in 384 multi-probe head mode."""
         if self.current_well == self.current_wells:
             self.current_well = 0
-            self.reset_frame()
+            self.reset()
 
         row_frame = self._frame[self._frame.sum(axis=1) >= columns].dropna(
             axis=1, how="any"
@@ -582,6 +582,7 @@ class tip_96:
         rack: str,
     ) -> None:
         self.rack = dk.get_labware_list(deck, [rack], Tip96)[0]
+        self.default_tips = self.Frame(self.rack)
 
     def tips(
         self,
@@ -621,7 +622,7 @@ class tip_96:
             self.current_tips = len(positions)
             self.current_tip = current_tip
 
-        def reset_frame(self):
+        def reset(self):
             self.frame = self.original.copy()
 
         def get_frame(self):
@@ -738,7 +739,7 @@ class plate_96:
             self.current_wells = len(positions)
             self.current_well = current_well
 
-        def reset_frame(self):
+        def reset(self):
             self.frame = self.original.copy()
 
         def get_frame(self):
@@ -751,7 +752,7 @@ class plate_96:
             """Get wells from a 96 well plate in 2 channel mode."""
             if self.current_well == self.current_wells:
                 self.current_well = 0
-                self.reset_frame()
+                self.reset()
 
             column = default_index_96.T[self.frame.sum(axis=0) >= n].first_valid_index()
 
@@ -785,7 +786,7 @@ class plate_96:
             """Get wells from a 96 well plate in 384 multi-probe head mode."""
             if self.current_well == self.current_wells:
                 self.current_well = 0
-                self.reset_frame()
+                self.reset()
 
             rowframe = self.frame[self.frame.sum(axis=1) >= columns].dropna(
                 axis=1, how="any"
@@ -860,20 +861,20 @@ class carrier_24:
             self.current_tubes = len(positions)
             self.current_tube = current_tube
 
-        def reset_frame(self):
+        def reset(self):
             self.frame = self.original.copy()
 
         def get_frame(self):
             return self.frame.fillna(0)
 
-        def wells(self):
+        def tubes(self):
             return self.frame.sum().sum()
 
         def get_tubes_2ch(self, n: int = 2) -> list[tuple[EppiCarrier24, int]]:
             """Get tubes from a 24 tube carrier in 2 channel mode."""
             if self.current_tube == self.current_tubes:
                 self.current_tube = 0
-                self.reset_frame()
+                self.reset()
 
             column = default_index_24.T[self.frame.sum(axis=0) >= n].first_valid_index()
 
@@ -901,12 +902,12 @@ class carrier_24:
 
             return [(self.carrier, well) for well in index]
 
-        def static_tubes(self, well_list: list[str]):
+        def static_tubes(self, tube_list: list[str]):
             """Get specific tubes from input list."""
 
             return [
-                (self.carrier, default_index_24.loc[well[0], int(well[1:])])
-                for well in well_list
+                (self.carrier, default_index_24.loc[tube[0], int(tube[1:])])
+                for tube in tube_list
             ]
 
 
