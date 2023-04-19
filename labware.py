@@ -455,7 +455,7 @@ class plate_384:
 
         return wells
 
-    def static_wells(self, well_list: list[str]):
+    def static(self, well_list: list[str]):
         """Get specific wells from input list."""
         wells = [
             (self.plate, default_index_384.loc[well[0], int(well[1:])])
@@ -571,7 +571,7 @@ class reservoir_300:
 
         return wells
 
-    def static_wells(self, well_list: list[str]):
+    def static(self, well_list: list[str]):
         """Get specific wells from input list."""
         wells = [
             (self.plate, default_index_384.loc[well[0], int(well[1:])])
@@ -848,7 +848,7 @@ class plate_96:
 
             return [(self.plate, well) for well in index]
 
-        def static_wells(self, well_list: list[str]):
+        def static(self, well_list: list[str]) -> list[tuple[Plate96, int]]:
             """Get specific wells from input list."""
 
             return [

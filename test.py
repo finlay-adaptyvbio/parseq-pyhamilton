@@ -3,7 +3,7 @@ from pyhamilton import HamiltonInterface
 import logging, logging.config, math, time, os, csv
 import pandas as pd
 
-import commands as cmd
+# import commands as cmd
 import deck as dk
 import state as st
 import helpers as hp
@@ -119,11 +119,5 @@ if __name__ == "__main__":
     t = tips_384_96.default_tips.get_tips_384mph(8, 2)
     print(t)
 
-    with HamiltonInterface(simulate=True) as hammy:
-        # Initialize Hamilton
 
-        cmd.initialize(hammy)
-
-        # Main loop
-        t = tips_384_96.default_tips.get_tips_384mph(8, 2)
         
