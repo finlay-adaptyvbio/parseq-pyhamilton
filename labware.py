@@ -87,7 +87,7 @@ default_index_96 = pd.DataFrame(
 )
 
 default_index_96_r = pd.DataFrame(
-    [[i for i in range(j, 96, 8)][::-1] for j in range(8)],
+    [[i for i in range(j, 96, 8)][::-1] for j in range(8)][::-1],
     index=list(string.ascii_uppercase)[:8],
     columns=range(1, 13),
 )
