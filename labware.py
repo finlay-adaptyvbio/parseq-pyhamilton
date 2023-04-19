@@ -673,38 +673,6 @@ class tip_96:
 
             return [(self.rack, well) for well in index]
 
-        def get_rows_384mph(
-            self, rows: int = 1, remove: bool = True
-        ) -> list[tuple[Tip96, int]]:
-            row = self.frame.T[self.frame.T.sum(axis=1) >= rows].last_valid_index()
-            try:
-                mask = self.frame.loc[:, row] == 1
-            except KeyError as e:
-                logger.error(f"Not enough tips in {self.rack.layout_name()}")
-                exit()
-            index = default_index_96.loc[:, row][mask].tolist()[-rows:]
-
-            if remove:
-                self.frame[default_index_96.isin(index)] = pd.NA
-
-            return [(self.rack, tip) for tip in index]
-
-        def get_columns_384mph(
-            self, columns: int = 1, remove: bool = True
-        ) -> list[tuple[Tip96, int]]:
-            column = self.frame[self.frame.sum(axis=1) >= columns].last_valid_index()
-            try:
-                mask = self.frame.loc[column, :] == 1
-            except KeyError as e:
-                logger.error(f"Not enough tips in {self.rack.layout_name()}")
-                exit()
-            index = default_index_96.loc[column, :][mask].tolist()[-columns:]  # type: ignore
-
-            if remove:
-                self.frame[default_index_96.isin(index)] = pd.NA
-
-            return [(self.rack, tip) for tip in index]
-
         def get_tips_384mph(
             self, rows: int = 1, columns: int = 1, remove: bool = True
         ) -> list[tuple[Tip96, int]]:
@@ -850,9 +818,9 @@ class plate_96:
 
         def static(self, well_list: list[str]) -> list[tuple[Plate96, int]]:
             """Get specific wells from input list."""
-
+            index = default_index_96
             return [
-                (self.plate, default_index_96.loc[well[0], int(well[1:])])
+                (self.plate, default_index_96.at[well[0], int(well[1:])])
                 for well in well_list
             ]
 

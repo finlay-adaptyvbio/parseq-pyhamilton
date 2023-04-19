@@ -23,7 +23,6 @@ from pyhamilton import (
 )
 
 from pyhamilton.oemerr import PositionError
-from typing import Union
 
 # Logging
 
@@ -62,7 +61,7 @@ def compound_pos_str(pos_tuples):
 
 def grip_get(
     ham: HamiltonInterface,
-    labware: Union[Plate96, Plate384, Lid],
+    labware: Plate96 | Plate384 | Lid,
     mode: int = 0,
     **kw_args,
 ):
@@ -97,7 +96,7 @@ def grip_get(
 
 def grip_place(
     ham: HamiltonInterface,
-    labware: Union[Plate96, Plate384, Lid],
+    labware: Plate96 | Plate384 | Lid,
     mode: int = 0,
     eject: bool = False,
     **kw_args,
@@ -280,7 +279,7 @@ def dispense(
 
 def tip_pick_up_384(
     ham: HamiltonInterface,
-    positions: list[tuple[Union[Tip384, Tip96], int]],
+    positions: list[tuple[Tip96, int]] | list[tuple[Tip384, int]],
     **kw_args,
 ):
     logger.info(
@@ -343,7 +342,9 @@ def tip_eject_384(
 
 def aspirate_384(
     ham: HamiltonInterface,
-    positions: list[tuple[Union[Plate96, Plate384, Reservoir300], int]],
+    positions: list[tuple[Plate96, int]]
+    | list[tuple[Plate384, int]]
+    | list[tuple[Reservoir300, int]],
     volume: float,
     **kw_args,
 ):
@@ -370,7 +371,9 @@ def aspirate_384(
 
 def dispense_384(
     ham: HamiltonInterface,
-    positions: list[tuple[Union[Plate96, Plate384, Reservoir300], int]],
+    positions: list[tuple[Plate96, int]]
+    | list[tuple[Plate384, int]]
+    | list[tuple[Reservoir300, int]],
     volume: float,
     **kw_args,
 ):
@@ -397,7 +400,7 @@ def dispense_384(
 
 def grip_get_tip_rack(
     ham: HamiltonInterface,
-    labware: Union[Tip96, Tip384],
+    labware: Tip96 | Tip384,
     **kw_args,
 ):
     logger.info(f"Command: {'grip_get_tip_rack'} | Labware: {labware.layout_name()}")
@@ -427,7 +430,7 @@ def grip_get_tip_rack(
 
 def grip_place_tip_rack(
     ham: HamiltonInterface,
-    labware: Union[Tip96, Tip384],
+    labware: Tip96 | Tip384,
     waste: bool = False,
     eject: bool = False,
     **kw_args,

@@ -1,9 +1,9 @@
 {
     "complete": 0,
-    "end_prep_add_water": 0,
-    "end_prep_add_mm": 0,
-    "end_prep_add_samples": 0,
-    "end_prep_add_beads": 0,
+    "end_prep_add_water": 1,
+    "end_prep_add_mm": 1,
+    "end_prep_add_samples": 1,
+    "end_prep_add_beads": 1,
     "end_prep_cleanup_supernatant": 0,
     "end_prep_cleanup_wash": 0,
     "end_prep_cleanup_elute": 0,
