@@ -8,6 +8,7 @@ import deck as dk
 import state as st
 import helpers as hp
 import labware as lw
+import commands as cmd
 
 # Logging settings
 
@@ -41,6 +42,7 @@ logger = logging.getLogger()
 
 layout_path = "C:\\Users\\Adaptyvbio\\Documents\\PyHamilton\\adaptyv-pyhamilton\\layouts\\lib_nanopore.lay"
 csv_path = "C:\\Users\\Adaptyvbio\\Downloads\\test.csv"
+db_path = "C:\\Users\\Adaptyvbio\\Documents\\PyHamilton\\adaptyv-pyhamilton\\labware"
 
 deck = dk.get_deck(layout_path)
 
@@ -116,8 +118,14 @@ if __name__ == "__main__":
     elution_buffer = carrier.tubes(["A6"])
     fragment_buffer = carrier.tubes(["B6"])
 
-    t = tips_384_96.default_tips.get_tips_384mph(8, 2)
-    print(t)
+    with HamiltonInterface(simulate=True) as hammy:
+        # Initialize Hamilton
+        cmd.initialize(hammy)
 
+        cmd.tip_pick_up_384(hammy, tips_384_96.default.mph384(8, 2))
+        st.save_labware_state(db_path, "tips_384_96", tips_384_96)
+        l = st.load_labware_state(db_path, "tips_384_96")
+        cmd.tip_pick_up_384(hammy, l.default.mph384(8, 2))
 
-        
+        print(tips_384_96.default.frame)
+        print(l.default.frame)

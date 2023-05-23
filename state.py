@@ -1,4 +1,4 @@
-import json, logging
+import json, logging, shelve
 
 # Logging
 
@@ -73,3 +73,20 @@ def print_state(state):
 
 def dump_state(state):
     print(json.dumps(state, indent=4))
+
+
+def save_labware_state(path, key, value):
+    with shelve.open(path) as shelf:
+        shelf[key] = value
+
+
+def load_labware_state(path, key):
+    try:
+        with shelve.open(path, "r") as shelf:
+            return shelf[key]
+    except (FileNotFoundError, IsADirectoryError) as e:
+        logger.exception(e)
+        raise e
+    except KeyError as e:
+        logger.exception(e)
+        raise e
