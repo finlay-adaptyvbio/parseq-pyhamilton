@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
 
     logger.debug("Getting number of plates from prompt...")

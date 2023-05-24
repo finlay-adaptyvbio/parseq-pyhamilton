@@ -32,7 +32,7 @@ ALIQUOT_50 = "Tip_50ul_Water_DispenseJet_Part"
 MIX_50 = "Tip_50ul_Water_DispenseSurface_Empty"
 
 
-def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
     # Sample info
     fragment_size = hp.prompt_int("Fragment size (bp)", 1000)
 

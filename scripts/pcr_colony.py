@@ -32,7 +32,7 @@ CHANNELS_384_96 = (("10" * 12) + ("0" * 24)) * 8
 MIXING = "50ulTip_conductive_384COREHead_Water_DispenseSurface_Empty"
 
 
-def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
 
     logger.debug("Getting number of plates from prompt...")

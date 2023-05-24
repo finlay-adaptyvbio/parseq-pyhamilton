@@ -32,7 +32,7 @@ ETHANOL_ASPIRATE = "StandardVolume_EtOH_DispenseJet_Empty"
 ETHANOL_DISPENSE = "StandardVolume_EtOH_DispenseJet_Part"
 
 
-def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
     # Get wells and plates to empty from csv files
 

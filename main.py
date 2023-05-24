@@ -1,4 +1,4 @@
-import os, argparse, sys, time, datetime, shutil
+import os, argparse, sys, time, datetime, shutil, shelve
 import logging, logging.config
 
 import deck as dk
@@ -112,9 +112,14 @@ if __name__ == "__main__":
 
                 layout_path = os.path.join(run_dir_path, f"{method}.lay")
                 state_path = os.path.join(run_dir_path, f"{method}.json")
+                labware_path = os.path.join(run_dir_path, f"{method}")
 
                 logger.info(f"Using default layout for {method} method.")
                 shutil.copy(os.path.join(layout_dir_path, f"{method}.lay"), layout_path)
+
+                deck = dk.get_deck(layout_path)
+                deck = dk.add_dataframes(deck)
+                st.save_deck_state(labware_path, deck)
 
                 logger.info(f"Using default state for {method} method.")
                 shutil.copy(os.path.join(state_dir_path, f"{method}.json"), state_path)
@@ -173,13 +178,29 @@ if __name__ == "__main__":
                                 )
                                 try:
                                     with open(layout_path, "r") as f:
-                                        logger.debug(f"State path: {layout_path}")
+                                        logger.debug(f"Layout path: {layout_path}")
                                         pass
                                 except FileNotFoundError as e:
                                     logger.exception(e)
                                     raise ValueError(
                                         "Layout file not found for {method} method. Was"
                                         " the correct method specified?"
+                                    )
+
+                                logger.info(
+                                    f"Recovering labware for {method} method of run"
+                                    f" {run_id}..."
+                                )
+                                labware_path = os.path.join(run_dir_path, f"{method}")
+                                try:
+                                    with open(f"{labware_path}.dat", "r") as f:
+                                        logger.debug(f"Labware path: {labware_path}")
+                                        pass
+                                except FileNotFoundError as e:
+                                    logger.exception(e)
+                                    raise ValueError(
+                                        "Labware file not found for {method} method."
+                                        " Was the correct method specified?"
                                     )
 
                                 get_input_files = False
@@ -216,6 +237,7 @@ if __name__ == "__main__":
                                 state_path = os.path.join(
                                     run_dir_path, f"{method}.json"
                                 )
+                                labware_path = os.path.join(run_dir_path, f"{method}")
 
                                 logger.info(
                                     f"Using default layout for {method} method."
@@ -224,6 +246,10 @@ if __name__ == "__main__":
                                     os.path.join(layout_dir_path, f"{method}.lay"),
                                     layout_path,
                                 )
+
+                                deck = dk.get_deck(layout_path)
+                                deck = dk.add_dataframes(deck)
+                                st.save_deck_state(labware_path, deck)
 
                                 logger.info(f"Using default state for {method} method.")
                                 shutil.copy(
@@ -246,12 +272,17 @@ if __name__ == "__main__":
                         run_dir_path = os.path.join(runs_dir_path, run_id)
                         layout_path = os.path.join(run_dir_path, f"{method}.lay")
                         state_path = os.path.join(run_dir_path, f"{method}.json")
+                        labware_path = os.path.join(run_dir_path, f"{method}")
 
                         logger.info(f"Using default layout for {method} method.")
                         shutil.copy(
                             os.path.join(layout_dir_path, f"{method}.lay"),
                             layout_path,
                         )
+
+                        deck = dk.get_deck(layout_path)
+                        deck = dk.add_dataframes(deck)
+                        st.save_deck_state(labware_path, deck)
 
                         logger.info(f"Using default state for {method} method.")
                         shutil.copy(
@@ -364,17 +395,19 @@ if __name__ == "__main__":
                     os.path.join(run_dir_path, f"{method}_concentrations.csv"),
                 )
 
+        case "test":
+            from scripts import test as script
+
         case _:
             # This shoudn't be needed but avoids type error
             logger.error(f"Method {method} not found.")
             parser.error(f"Method {method} not found.")
 
-    deck = dk.get_deck(layout_path)
-
     # Run method, on failure notify and restart (max 3 retries)
     for attempt in range(3):
         try:
-            script.run(deck, state, state_path, run_dir_path)
+            with shelve.open(labware_path, writeback=True) as shelf:
+                script.run(shelf, state, state_path, run_dir_path)
         except KeyboardInterrupt:
             logger.warning("Keyboard interrupt received. Exiting...")
             hp.notify(f"Method {method} for run {run_id} interrupted.")

@@ -27,7 +27,7 @@ CHANNEL_1 = "10"
 CHANNEL_2 = "01"
 
 
-def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
     # Get plates and well map from csv files
 

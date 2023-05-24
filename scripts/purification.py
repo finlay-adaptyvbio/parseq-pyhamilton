@@ -25,7 +25,7 @@ TUBE_VOLUME = 1500
 ETHANOL = "StandardVolume_EtOH_DispenseJet_Empty"
 
 
-def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
     # Pool information and variables
 
     pools = hp.prompt_int("Pools to purify", 24)

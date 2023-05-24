@@ -29,7 +29,7 @@ CHANNEL_2 = "01"
 LIQUID_CLASS = "Tip_50ul_Water_DispenseJet_Empty"
 
 
-def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
     # Get plates and well map from csv files
 
     logger.info("Parsing plates and wells to pick...")

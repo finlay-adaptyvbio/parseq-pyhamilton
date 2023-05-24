@@ -1,20 +1,12 @@
-import logging
+import logging, shelve
 
 import commands as cmd
 import deck as dk
-import state as st
 import helpers as hp
+import labware as lw
+import state as st
 
-from pyhamilton import (
-    HamiltonInterface,
-    Lid,  # type: ignore
-    Plate96,
-    Plate384,
-    Tip96,
-    Tip384,  # type: ignore
-    Reservoir300,  # type: ignore
-    EppiCarrier24,  # type: ignore
-)
+from pyhamilton import HamiltonInterface
 
 # Logging
 
@@ -30,7 +22,7 @@ TIPS_384 = 384
 CHANNELS_384_96_8 = "1" + ("0" * 11)
 
 
-def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
+def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
     # Plate information and variables
 
     logger.debug("Getting number of plates from prompt...")
@@ -41,85 +33,60 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
     logger.debug(f"Plates to pool: {pcr_plates}")
 
-    # Assign labware to deck positions
+    # Delete unused labware
+
+    for t in list(zip(shelf["E"][0]["labware"], shelf["E"][0]["frame"]))[::-1]:
+        if isinstance(t[1], lw.lid):
+            shelf["E"][0]["labware"].remove(t[0])
+            shelf["E"][0]["frame"].remove(t[1])
+    for k in shelf["E"][0]:
+        del shelf["E"][0][k][plates:]
+    shelf["E"][0]["frame"] = shelf["E"][0]["frame"][::-1]
+    for t in list(zip(shelf["E"][1]["labware"], shelf["E"][1]["frame"]))[::-1]:
+        if isinstance(t[1], lw.lid):
+            shelf["E"][1]["labware"].remove(t[0])
+            shelf["E"][1]["frame"].remove(t[1])
+    for k in shelf["E"][1]:
+        del shelf["E"][1][k][plates:]
+    shelf["E"][1]["frame"] = shelf["E"][1]["frame"][::-1]
+    for k in shelf["F"][0]:
+        del shelf["F"][0][k][plates:]
+    for k in shelf["F"][1]:
+        del shelf["F"][1][k][plates:]
+
+    # labware aliases
 
     logger.info("Assigning labware...")
 
-    source_pcr_plates = dk.get_labware_list(
-        deck,
-        ["E1"],
-        Plate384,
-        [8],
-        True,
-    )[-len(pcr_plates) :]
+    src_pcr_plates = shelf["E"][0]["frame"]
+    dest_pcr_plates = shelf["E"][1]["frame"]
+    src_pooling_plates = shelf["F"][0]["frame"]
+    dest_pooling_plates = shelf["F"][1]["frame"]
 
-    dest_pcr_plates = dk.get_labware_list(
-        deck,
-        ["E2"],
-        Plate384,
-        [8],
-        False,
-    )[0 : len(pcr_plates)]
+    edta_reservoir = shelf["C"][4]["frame"][0]
+    edta_rack = shelf["B"][4]["frame"][0]
 
-    source_pooling_plates = dk.get_labware_list(
-        deck,
-        ["F1"],
-        Plate96,
-        [8],
-        True,
-    )[-len(pcr_plates) :]
+    active_pcr_plate = shelf["C"][3]["frame"][0]
+    active_pcr_lid = shelf["C"][3]["frame"][1]
+    temp_pcr_lid = shelf["C"][1]["frame"][0]
 
-    dest_pooling_plates = dk.get_labware_list(
-        deck,
-        ["F2"],
-        Plate96,
-        [8],
-        False,
-    )[0 : len(pcr_plates)]
+    active_pooling_plate = shelf["C"][2]["frame"][0]
 
-    edta_reservoir = dk.get_labware_list(deck, ["C5"], Reservoir300)[0]
-    edta = [(edta_reservoir, i) for i in range(384)]
+    carrier = shelf["C"][0]["frame"][0]
 
-    edta_rack = dk.get_labware_list(deck, ["B5"], Tip384)[0]
-    edta_tips = [(edta_rack, i) for i in range(384)]
-
-    active_pcr_plate = dk.get_labware_list(deck, ["C4"], Plate384)[0]
-    active_pcr_wells = [(active_pcr_plate, i) for i in range(384)]
-    active_pcr_lid = dk.get_labware_list(deck, ["C4"], Lid)[0]
-    temp_pcr_lid = dk.get_labware_list(deck, ["C2"], Lid)[0]
-
-    active_pooling_plate = dk.get_labware_list(deck, ["C3"], Plate96)[0]
-    active_pooling_wells = [(active_pooling_plate, i) for i in range(96)]
-    active_pooling_wells_8ch = [(active_pooling_plate, i) for i in range(8)]
-    active_pooling_wells_2ch = [(active_pooling_plate, i) for i in dk.pos_96_2ch(8)]
-
-    eppicarrier = dk.get_labware_list(deck, ["C1"], EppiCarrier24)[0]
-    eppies = [(eppicarrier, i) for i in range(24)]
-
-    column_rack = dk.get_labware_list(deck, ["A3"], Tip96)[0]
-    column_rack_tips = [(column_rack, i) for i in range(96)]
-
-    column_holder = dk.get_labware_list(deck, ["A4"], Tip96)[0]
-    column_holder_tips = [(column_holder, i) for i in range(96)]
-
-    rack_300 = dk.get_labware_list(deck, ["F5"], Tip96)[0]
-    tips_300 = [(rack_300, i) for i in dk.pos_96_2ch(96)]
-
-    racks_96 = dk.get_labware_list(deck, ["B1", "B2", "B3"], Tip96, [3, 3, 3], True)
-    rack_96_tips, rack_96_virtual = dk.get_labware_list(deck, ["D2"], Tip96, [2])
-    tips_96 = [(rack_96_tips, i) for i in range(96)]
+    tips_384_96 = shelf["A"][2]["frame"][0]
+    tips_holder_384_96 = shelf["A"][3]["frame"][0]
+    tips_300 = shelf["F"][4]["frame"][0]
+    racks_300 = [shelf["B"][i]["frame"] for i in range(3)]
+    active_rack_300, transport_rack_300 = shelf["D"][1]["frame"]
 
     # Inform user of labware positions, ask for confirmation after placing plates
 
     logger.debug("Prompt user for plate placement...")
 
-    hp.place_labware(source_pcr_plates, "PCR")
-    hp.place_labware(source_pooling_plates, "Pooling")
-
     logger.info("Starting Hamilton method...")
 
     # Main script starts here
-    # TODO: reduce loops to functions to make it more readable
 
     with HamiltonInterface(simulate=True) as hammy:
         # Initialize Hamilton
@@ -133,12 +100,12 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
 
         if tip_column > 0:
             logger.debug("Skipping load step...")
-            st.reset_state(state, state_file_path, "current_tip_column", tip_column - 1)
+            tips_holder_384_96.fill(lw.pos_row_column_96(8 * tip_column))
 
         elif tip_column == 0:
             logger.debug("Loading tips into column holder...")
-            cmd.tip_pick_up_384(hammy, column_rack_tips, tipMode=1)
-            cmd.tip_eject_384(hammy, column_holder_tips)
+            cmd.tip_pick_up_384(hammy, tips_384_96.full(), tipMode=1)
+            cmd.tip_eject_384(hammy, tips_holder_384_96.full())
 
         else:
             logger.error("Invalid tip column number!")
@@ -146,9 +113,9 @@ def run(deck: dict, state: dict, state_file_path: str, run_dir_path: str):
         # Loop over plates as long as there are still pcr plates to process
 
         logger.debug(f"Current pcr plate: {state['current_pcr_plate']}")
-        logger.debug(f"No. of pcr plates: {len(source_pcr_plates)}")
+        logger.debug(f"No. of pcr plates: {len(src_pcr_plates)}")
 
-        while state["current_pcr_plate"] < len(source_pcr_plates):
+        while src_pcr_plates:
             # Get next pcr plate from source stack if not already done
 
             if not state["active_pcr_plate"]:
