@@ -13,6 +13,18 @@ from pyhamilton import (
 
 import deck as dk
 
+# Class mapping
+
+TYPES = {
+    Plate384: "plate_384",
+    Plate96: "plate_96",
+    Tip384: "tip_384",
+    Tip96: "tip_96",
+    Reservoir300: "reservoir_300",
+    EppiCarrier24: "carrier_24",
+    Lid: "lid",
+}
+
 # Logging
 
 logger = logging.getLogger(__name__)
@@ -234,6 +246,11 @@ def sort_list(indexes, sep):
 
 
 # Labware classes
+
+
+def assign_labware(labware):
+    labware_class = TYPES[type(labware)]
+    return globals()[labware_class]()
 
 
 class tip_384:

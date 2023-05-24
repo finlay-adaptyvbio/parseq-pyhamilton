@@ -75,9 +75,14 @@ def dump_state(state):
     print(json.dumps(state, indent=4))
 
 
-def save_labware_state(path, key, value):
+def save_labware_state(path, deck):
     with shelve.open(path) as shelf:
-        shelf[key] = value
+        shelf.update(deck)
+    
+
+def update_labware_state(path, key, value):
+    with shelve.open(path) as shelf:
+        shelf[key]
 
 
 def load_labware_state(path, key):

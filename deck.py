@@ -1,6 +1,8 @@
 import logging, itertools, string
 import pandas as pd
 
+import labware as lw
+
 from pyhamilton import (
     LayoutManager,
     ResourceType,
@@ -14,7 +16,6 @@ from pyhamilton import (
 )
 
 from pyhamilton.oemerr import ResourceUnavailableError
-from typing import Union
 
 # Logging
 
@@ -33,44 +34,44 @@ TYPES = {
 
 DECK = {
     "A": [
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
     ],
     "B": [
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
     ],
     "C": [
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
     ],
     "D": [
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
     ],
     "E": [
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
     ],
     "F": [
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
-        {"level": None, "labware": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
+        {"labware": None, "frame": None},
     ],
 }
 
@@ -89,7 +90,7 @@ def get_deck(layout_file_path: str) -> dict:
 def parse_layout_file(deck: dict, lmgr: LayoutManager) -> dict:
     logger.debug(f"Parsing layout file...")
     for col in deck.keys():
-        for row in range(0, len(deck[col])):
+        for row in range(len(deck[col])):
             position = col + str(row + 1)
             resource_list = []
 
@@ -134,6 +135,19 @@ def clean_deck(deck: dict) -> dict:
     return deck
 
 
+def add_dataframes(deck: dict) -> dict:
+    logger.debug(f"Adding dataframes to labware...")
+    for col in deck.keys():
+        for row in range(len(deck[col])):
+            frames = []
+            for labware in deck[col][row]["labware"]:
+                frame = lw.assign_labware(labware)
+                frames.append(frame)
+            deck[col][row]["frame"] = frames
+
+    return deck
+
+
 def print_deck(deck: dict):
     logger.debug(f"Printing deck...")
     for col in deck.keys():
@@ -146,39 +160,6 @@ def print_deck(deck: dict):
                     print(labware.layout_name()[3:])
 
 
-def print_list(labwares: list):
-    for labware in labwares:
-        print(labware.layout_name())
-
-
-def assign_to_stack(deck: dict, position: str, stack: list):
-    level = len(stack) + 1
-    col, row = pos(position)
-    deck[col][row - 1]["labware"] = stack
-    deck[col][row - 1]["level"] = (0, level)
-
-
-def pos(position: str) -> tuple:
-    return position[0], int(position[1])
-
-
-def pos_96_in_384(quadrant: int):
-    pos = []
-    if quadrant == 1:
-        q1, q2 = 1, 0
-    elif quadrant == 2:
-        q1, q2 = 0, 1
-    elif quadrant == 3:
-        q1, q2 = 1, 1
-    else:
-        q1, q2 = 0, 0
-
-    for i in range(0 + q1, 24 + q1, 2):
-        for j in range(1 + q2, 17 + q2, 2):
-            pos.append(j + i * 16 - 1)
-    return pos
-
-
 def get_labware_list(
     deck: dict,
     positions: list[str],
@@ -188,7 +169,7 @@ def get_labware_list(
 ):
     labwares_merged = []
     for idx, position in enumerate(positions):
-        col, row = pos(position)
+        col, row = position[0], int(position[1])
         labwares = [
             labware
             for labware in deck[col][row - 1]["labware"]
@@ -201,32 +182,6 @@ def get_labware_list(
         labwares_merged.extend(labwares)
 
     return labwares_merged
-
-
-def assign_labels(deck: dict, position: str):
-    col, row = pos(position)
-    names = []
-    for labware in deck[col][row - 1]["labware"]:
-        if isinstance(labware, (Plate96, Plate384)):
-            while True:
-                label = input(f"Label for {labware.layout_name()}: ")
-
-                try:
-                    names.append(str(label))
-                except:
-                    continue
-
-                break
-
-    deck[col][row - 1]["names"] = names
-
-
-def get_labware(deck: dict, labware):
-    for col, l in deck.items():
-        for row, d in enumerate(l):
-            for level, r in enumerate(d["labware"]):
-                if labware == r:
-                    return col, row, level
 
 
 def extract_resource_from_field(field, resource, position):
