@@ -212,7 +212,7 @@ def process_pm_csv(csv_path: str, output_dir: str, prefix: str):
     )
 
 
-def place_labware(labwares: list, type: str, names: list = []):
+def place_labware(labwares: list, type: str, names: list[str] = []):
     print("-" * 100)
     print(f"Please place labware in the following position(s) (ignore if done):\n")
     print(f"{'Name':<10}{'Position':<10}{'Level':<8}{'Labware'}")
@@ -220,7 +220,8 @@ def place_labware(labwares: list, type: str, names: list = []):
     if not names:
         names = ["-" for _ in range(len(labwares))]
 
-    for t in zip(labwares, names, range(len(labwares))):
+    for t in zip(labwares, names, list(range(len(labwares)))):
+        assert isinstance(t, tuple)  # FIXME: hack to avoid type errors
         pos, *_ = t[0].layout_name().split("_")
         print(f"{color.BOLD}{t[1]:<10}{pos:<10}{t[2]:<8}{type}{color.END}")
 
@@ -236,6 +237,7 @@ def place_eppies(type: str, names: list):
     print(f"{'Tube':<10}{'Position':<10}{'Type'}")
 
     for t in zip(names, range(len(names))):
+        assert isinstance(t, tuple)  # FIXME: hack to avoid type errors
         print(f"{color.BOLD}{t[0]:<10}{t[1]+1:<10}{type}{color.END}")
 
     input(f"\nPress enter when tubes are in place...")

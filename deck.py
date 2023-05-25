@@ -156,9 +156,7 @@ def print_deck(deck: dict):
             if len(deck[col][row]["labware"]) > 0:
                 print(f"--- {position} ---")
 
-                for labware, frame in zip(
-                    deck[col][row]["labware"], deck[col][row]["frame"]
-                ):
+                for labware in deck[col][row]["labware"]:
                     print(f"{labware.layout_name()[3:]}")
 
 

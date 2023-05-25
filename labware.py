@@ -2,13 +2,13 @@ import logging, itertools, string, sys
 import pandas as pd
 
 from pyhamilton import (
-    Lid,
+    Lid,  # type: ignore
     Plate96,
     Plate384,
     Tip96,
-    Tip384,
-    Reservoir300,
-    EppiCarrier24,
+    Tip384,  # type: ignore
+    Reservoir300,  # type: ignore
+    EppiCarrier24,  # type: ignore
 )
 
 import deck as dk
@@ -222,7 +222,7 @@ def pos_96_rev():
 # Optimized sorting for 2 channel pipettes
 
 
-def sort_list(indexes, sep):
+def sort_list(indexes: list[int], sep: int):
     pairs = [
         pair
         for pair in itertools.combinations(indexes, 2)
