@@ -117,20 +117,20 @@ def pos_column_row_384(n: int = 384) -> list:
     return pos
 
 
-def pos_row_column_96(n: int = 96) -> list:
+def pos_row_column_96(n: int = 96, skip: int = 0) -> list:
     return [
         f"{letter}{number}"
         for number in range(1, 13)
         for letter in list(string.ascii_uppercase)[:8]
-    ][:n]
+    ][skip:skip+n]
 
 
-def pos_column_row_96(n: int = 96) -> list:
+def pos_column_row_96(n: int = 96, skip: int = 0) -> list:
     pos = [
         f"{letter}{number}"
         for letter in list(string.ascii_uppercase)[:8]
         for number in range(1, 13)
-    ][:n]
+    ][skip:skip+n]
     return pos
 
 
@@ -151,16 +151,16 @@ def pos_column_row_24(n: int = 24) -> list:
     return pos
 
 
-def pos_96_in_384(quadrant: int):
+def pos_96_in_384(q: int) -> list[int]:
     pos = []
-    if quadrant == 1:
-        q1, q2 = 1, 0
-    elif quadrant == 2:
-        q1, q2 = 0, 1
-    elif quadrant == 3:
-        q1, q2 = 1, 1
-    else:
+    if q == 1:
         q1, q2 = 0, 0
+    elif q == 2:
+        q1, q2 = 0, 1
+    elif q == 3:
+        q1, q2 = 1, 0
+    else:
+        q1, q2 = 1, 1
 
     for i in range(0 + q1, 24 + q1, 2):
         for j in range(1 + q2, 17 + q2, 2):
@@ -361,16 +361,41 @@ class plate_384:
             index[-1]
         except IndexError as e:
             logger.error(f"Not enough wells in {self.plate.layout_name()}")
-            exit()
+            sys.exit()
 
         if remove:
             self.df[default_index_384.isin(index)] = pd.NA
 
         return [(self.plate, i) for i in index]
 
+    def quadrant(self, remove: bool = True) -> list[tuple[Plate384, int]]:
+        index, quadrant_df = None, None
+        for q in range(1, 5):
+            index = pos_96_in_384(q)
+            mask = default_index_384.isin(index)
+            quadrant_df = self.df[mask]
+            if quadrant_df.sum().sum() == 96:
+                break
+
+        try:
+            assert index is not None
+            assert quadrant_df is not None
+        except AssertionError:
+            logger.error(f"Not enough wells in {self.plate.layout_name()}")
+            sys.exit()
+
+        if remove:
+            self.df[quadrant_df == 1] = pd.NA
+
+        return [(self.plate, i) for i in index]
+
     def static(self, index: list[str]) -> list[tuple[Plate384, int]]:
         """Get specific plate wells from input list."""
         return [(self.plate, default_index_384.at[i[0], int(i[1:])]) for i in index]
+
+    def full(self):
+        """Get all available positions."""
+        return [(self.plate, i) for i in default_index_384.values.flatten()]
 
 
 class reservoir_300:
@@ -718,7 +743,6 @@ class carrier_24:
 
     def static(self, index: list[str]):
         """Get specific tubes from input list."""
-
         return [(self.carrier, default_index_24.loc[i[0], int(i[1:])]) for i in index]
 
 
