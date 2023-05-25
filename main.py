@@ -321,6 +321,7 @@ if __name__ == "__main__":
     logger.debug(f"{'Layout:':<8}{layout_path}")
 
     # Get necessary input files depending on method and copy to temp dir
+    # script = __import__(method)
 
     match method:
         case "pooling":
@@ -410,7 +411,7 @@ if __name__ == "__main__":
                 script.run(shelf, state, state_path, run_dir_path)
         except KeyboardInterrupt:
             logger.warning("Keyboard interrupt received. Exiting...")
-            hp.notify(f"Method {method} for run {run_id} interrupted.")
+            hp.notify(f"Method {method} for run {run_id} interrupted by user.")
             sys.exit()
         except Exception as e:
             logger.exception(e)
