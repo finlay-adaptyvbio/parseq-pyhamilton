@@ -116,7 +116,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
 
     # Helper functions
     def mix_beads():
-        cmd.tip_pick_up(hammy, tips_300.default.ch2(1, remove=False))
+        cmd.tip_pick_up(hammy, tips_300.ch2(1, remove=False))
         cmd.aspirate(
             hammy,
             beads.ch2(1, remove=False),

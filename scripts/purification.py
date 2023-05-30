@@ -1,715 +1,354 @@
-import logging, math, time
+import os, logging, math, time, shelve
 
 import commands as cmd
 import deck as dk
-import state as st
 import helpers as hp
 import labware as lw
+import state as st
 
-from pyhamilton import (
-    HamiltonInterface,
-    Tip96,
-)
+from pyhamilton import HamiltonInterface
 
 # Logging
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-# Constants
-
-CHANNELS = 2
-TIPS = 96
-TUBE_VOLUME = 1500
-
+# Liquid classes
 ETHANOL = "StandardVolume_EtOH_DispenseJet_Empty"
+MIX_300 = "StandardVolume_Water_DispenseSurface_Empty"
+ALIQUOT_300 = "StandardVolume_Water_DispenseJet_Part"
 
 
-def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
+def run(
+    shelf: shelve.Shelf[list[dict[str, list]]],
+    deck: dict,
+    state: dict,
+    run_dir_path: str,
+):
+    # File paths
+    state_file_path = os.path.join(run_dir_path, "cherry_state.json")
+
     # Pool information and variables
-
     pools = hp.prompt_int("Pools to purify", 24)
-    eppies = [f"P{i}" for i in range(1, pools + 1)]
-
-    ratio = hp.prompt_float("Ratio of beads to sample", 1.8)
-    sample = hp.prompt_float("Sample volume (uL)", 150)
-    elute_volume = hp.prompt_float("Elution volume (uL)", 50)
+    bead_ratio = 1.0  # hp.prompt_float("Ratio of beads to sample", 1.8)
+    sample_volume = 75.0  # hp.prompt_float("Sample volume (uL)", 150)
+    elute_volume = 20.0  # hp.prompt_float("Elution volume (uL)", 50)
 
     # Calculate volumes required for purification
-
-    logger.debug("Calculating volumes...")
-
-    wash_volume = max(200, sample * (1 + ratio))
-    ethanol_tubes = math.ceil(
-        wash_volume * 2 * pools / (TUBE_VOLUME - wash_volume * 1.2)
-    )
-
-    bead_volume = math.ceil(ratio * sample * pools) + 50
-    if bead_volume > TUBE_VOLUME:
-        logger.warn(
-            f"{hp.color.BOLD}{hp.color.RED}More than {TUBE_VOLUME} uL of beads"
-            f" required, you will be prompted to add more beads!{hp.color.END}"
-        )
-    bead_sample_volume = sample * ratio
-
-    teb_volume = math.ceil(elute_volume * pools) + 100
-
-    # Mixing parameters
-
-    bead_mix_volume = min(bead_volume * 0.5, 250.0)
+    wash_volume = max(200, sample_volume * (1 + bead_ratio))
+    teb_volume = math.ceil(elute_volume * pools) * 1.2
+    bead_volume = sample_volume * bead_ratio
 
     # Calculate number of tips required
+    tips = math.ceil((pools * 6 + 3) / 96) * 96
+    columns = min(1, math.ceil(pools / 8))
 
-    logger.debug("Calculating tips...")
+    # Labware aliases
+    carrier = shelf["C"][0]["frame"][0]
 
-    tips = math.ceil((pools * 6 + 3) / TIPS) * TIPS
-    columns = (math.ceil(pools / CHANNELS), math.floor(pools / CHANNELS))
+    tips_96in384_50 = shelf["A"][2]["frame"][0]
+    tips_holder_96in384_50 = shelf["A"][3]["frame"][0]
+    tips_96_300 = shelf["F"][4]["frame"][0]
 
-    # Assign labware to deck positions
+    racks_384_50 = shelf["B"][0]["frame"]
+    racks_96_300 = shelf["B"][1]["frame"]
 
-    logger.debug("Assigning labware...")
+    magnet = shelf["D"][2]["frame"][0]
+    plate = shelf["C"][2]["frame"][0]
 
-    carrier = lw.carrier_24(deck)
-    samples = carrier.tubes(lw.pos_row_column_24(pools))
-    beads = carrier.tubes(["D6"]).get_tubes_2ch(1)
-    teb = carrier.tubes(["C6"]).get_tubes_2ch(1)
+    # Plate indexes
+    sample_index = [i for i in lw.pos_row_column_96(pools)]
+    supernatant_index = [i for i in lw.pos_row_column_96(pools, pools)]
+    wash1_index = [i for i in lw.pos_row_column_96(pools, pools * 2)]
+    wash2_index = [i for i in lw.pos_row_column_96(pools, pools * 3)]
+    ethanol_index = [i for i in lw.pos_96_in_384(1)[: 8 * columns]]
 
-    ethanol = lw.reservoir_300(deck, "C5")
+    # Sample tube df and static positions
+    carrier.fill([i for i in lw.pos_row_column_24(pools)])
+    plate.fill(sample_index)
+    beads = carrier.static(["C6"])
+    teb = carrier.static(["D6"])
+    ethanol = shelf["C"][4]["frame"][0].static(ethanol_index)
 
-    tips_for_frame = lw.tip_96(deck, "A3")
-    frame = lw.tip_96(deck, "A4")
+    # Mixing parameters
+    bead_mix_volume = min(bead_volume * 0.5, 300.0)
 
-    stack_384mph = lw.stack(deck, "B1", Tip96, 4, reverse=True)
-    stacks_2ch = lw.stack(deck, "B2", Tip96, 4, reverse=True)
+    # Helper functions
+    def mix_beads():
+        cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
+        cmd.aspirate(
+            hammy,
+            beads,
+            [0.0],
+            liquidClass=MIX_300,
+            mixCycles=10,
+            mixVolume=bead_mix_volume,
+        )
+        cmd.dispense(hammy, beads, [0.0], liquidClass=MIX_300)
 
-    tips_300 = lw.tip_96(deck, "F5")
-
-    mag_plate = lw.plate_96(deck, "D3")
-    mag_pools = mag_plate.wells(lw.pos_96_2row_2ch(0, pools))
-    mag_ft = mag_plate.wells(lw.pos_96_2row_2ch(24, 24 + pools))
-    mag_wash1 = mag_plate.wells(lw.pos_96_2row_2ch(48, 48 + pools))
-    mag_wash2 = mag_plate.wells(lw.pos_96_2row_2ch(72, 72 + pools))
-    no_mag_plate = lw.plate_96(deck, "C3")
-    no_mag_pools = no_mag_plate.wells([i for i in lw.pos_96_2row_2ch(0, 24)][:pools])
-
-    # Inform user of labware positions, ask for confirmation after placing labware
-
-    logger.debug("Prompt user for labware placement...")
-
-    hp.place_labware([no_mag_plate.plate], "VWR 96 Well PCR Plate")
-    hp.place_labware([tips_300.rack], "Hamilton NTR 96_300 µL Tip Rack")
-    hp.place_labware([eppies.carrier], "Eppendorf Carrier 24")
-
-    logger.info(
-        "Make sure Alpaqua Magnum"
-        " EX (magnetic plate) is in position"
-        f" {hp.color.BOLD}D3{hp.color.END}."
-    )
+    def check_tip_holder():
+        if tips_holder_96in384_50.total() == 0:
+            cmd.tip_pick_up_384(hammy, tips_96in384_50.full())
+            cmd.tip_eject_384(hammy, tips_holder_96in384_50.full())
+        tips_holder_96in384_50.reset()
 
     input(f"Press enter to start method!")
 
-    logger.debug("Starting Hamilton method...")
-
+    # Main script starts here
     with HamiltonInterface(simulate=True) as hammy:
         # Initialize Hamilton
-
         cmd.initialize(hammy)
 
+        # Load tips into column holder
+        tip_column = hp.prompt_int("Current tip column in holder (0 for new rack)", 12)
+
+        if tip_column > 0:
+            tips_holder_96in384_50.fill(lw.pos_row_column_96(8 * tip_column))
+        elif tip_column == 0:
+            cmd.tip_pick_up_384(hammy, tips_96in384_50.full())
+            cmd.tip_eject_384(hammy, tips_holder_96in384_50.full())
+        else:
+            logger.warning("Invalid tip column number!")
+
         # Loop over pools as long as there are still pools to process
-
-        while not state["complete"]:
+        while not all(v == 1 for v in state.values()):
             # Add beads to 96-well plate
-            # Prompt user to add beads to eppendorf carrier
-            # Always mix beads before adding to 96-well plate
-
-            st.print_state(state)
-
             if not state["add_beads"]:
-                hp.notify(
-                    f"*User action required:* add {TUBE_VOLUME} uL of beads to"
-                    " eppendorf carrier. "
-                )
-                input(
-                    f"{hp.color.BOLD}Add 1 tube filled with {TUBE_VOLUME} uL"
-                    " beads to eppendorf carrier position 23. Press enter to continue:"
-                    f" {hp.color.END}"
-                )
+                # Prompt user to add beads to carrier
+                input(f"Add bead tube to carrier in position C6.")
 
-                st.reset_state(state, state_file_path, "bead_volume", TUBE_VOLUME)
+                mix_beads()
 
-                logger.debug("Adding beads to plate...")
-                logger.debug("Mixing beads before addition...")
-
-                cmd.tip_pick_up(hammy, tips_300.get_tips_2ch())
-                cmd.aspirate(
-                    hammy,
-                    beads,
-                    [0.0],
-                    mixCycles=10,
-                    mixVolume=bead_mix_volume,
-                    liquidHeight=1.0,
-                )
-                cmd.dispense(
-                    hammy,
-                    beads,
-                    [0.0],
-                    dispenseMode=9,
-                    liquidHeight=1.0,
-                )
-
-                for i in range(state["current_pool"], pools):
-                    logger.debug(f"Adding beads to well {i + 1}...")
-
-                    if state["bead_volume"] <= bead_sample_volume * 1.2:
-                        logger.debug("Bead volume limit reached!")
-                        hp.notify(
-                            f"*User action required:* add {TUBE_VOLUME} uL of beads"
-                            " to bead tube."
-                        )
-                        input(
-                            f"{hp.color.BOLD}Refill bead tube with {TUBE_VOLUME} uL of"
-                            f" beads. Press enter to continue: {hp.color.END}"
-                        )
-
-                        st.reset_state(
-                            state, state_file_path, "bead_volume", TUBE_VOLUME
-                        )
-
+                # Loop over wells, aspirating max bead volume and dispensing consecutively
+                while plate.total() > 0:
+                    # Max amount of consecutive dispenses
+                    cycles = min(math.floor(300 / (bead_volume * 1.2)), plate.total())
                     cmd.aspirate(
                         hammy,
                         beads,
-                        [bead_sample_volume - 10],
-                        mixCycles=5,
-                        mixVolume=bead_sample_volume,
-                        liquidHeight=0.1,
+                        [bead_volume * cycles * 1.2],
+                        liquidClass=ALIQUOT_300,
                     )
+                    for _ in range(cycles):
+                        cmd.dispense(
+                            hammy, beads, [bead_volume], liquidClass=ALIQUOT_300
+                        )
                     cmd.dispense(
-                        hammy,
-                        no_mag_pools.get_wells_2ch(1),
-                        [bead_sample_volume],
-                        dispenseMode=9,
-                        liquidHeight=5.0,
+                        hammy, beads, [bead_volume * cycles * 0.2], dispenseMode=9
                     )
+                cmd.tip_eject(hammy, waste=True)
 
-                    st.update_state(state, state_file_path, "current_pool", 1)
-                    st.update_state(
-                        state, state_file_path, "bead_volume", -bead_sample_volume
-                    )
-
-                cmd.tip_eject(
-                    hammy,
-                    waste=True,
-                )
-
-                no_mag_pools.reset_frame()
-                st.update_state(state, state_file_path, "current_tip", 1)
+                plate.reset()
                 st.reset_state(state, state_file_path, "add_beads", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
 
-            # Add pools to 96-well plate
+            # Add samples to 96-well plate
+            if not state["add_samples"]:
+                input(f"Add sample tubes to carrier in positions: {sample_index}.")
 
-            if not state["eppi_to_plate"]:
-                logger.debug("Adding pools to 96-well plate...")
-
-                hp.notify(
-                    f"*User action required:* add {pools} pooled sample tubes to"
-                    " eppendorf carrier."
-                )
-                print(f"\n{samples.frame()}")
-                input(
-                    f"\n{hp.color.BOLD}Remove beads from eppendorf carrier and add"
-                    f" {pools} pooled sample tubes as shown in scheme. Press enter to"
-                    f" continue: {hp.color.END}"
-                )
-
-                for i in range(state["current_pool"], pools, CHANNELS):
-                    logger.debug(
-                        f"Adding pools {i + 1, i + CHANNELS} to magnetic plate..."
-                    )
-
-                    cmd.tip_pick_up(
-                        hammy,
-                        tips_300.get_tips_2ch(),
-                    )
+                while carrier.total() > 0:
+                    channels = min(carrier.total(), 2)
+                    cmd.tip_pick_up(hammy, tips_96_300.ch2(channels))
                     cmd.aspirate(
                         hammy,
-                        samples.get_tubes_2ch(),
-                        [sample - 10],
+                        carrier.ch2(channels),
+                        [sample_volume],
                         mixCycles=3,
-                        mixVolume=200.0,
+                        mixVolume=100.0,
                         liquidHeight=3.0,
                     )
-                    cmd.dispense(
-                        hammy,
-                        no_mag_pools.get_wells_2ch(),
-                        [sample],
-                        dispenseMode=9,
-                        liquidHeight=5.0,
-                    )
-                    cmd.tip_eject(
-                        hammy,
-                        waste=True,
-                    )
+                    cmd.dispense(hammy, plate.ch2(channels), [sample_volume])
+                    cmd.tip_eject(hammy, waste=True)
 
-                    st.update_state(state, state_file_path, "current_tip", 1)
-                    st.update_state(state, state_file_path, "current_pool", 1)
+                plate.reset()
+                carrier.reset()
+                st.reset_state(state, state_file_path, "add_samples", 1)
 
-                no_mag_pools.reset_frame()
+            # Mix beads and samples
+            if not state["mix_beads"]:
+                check_tip_holder()
 
-                for i in range(len(columns)):
-                    head_pattern = "1" + "0" * (95)
-                    cmd.tip_pick_up_384(
-                        hammy,
-                        frame.get_columns_384mph(columns[i]),
-                        tipMode=1,
-                        reducedPatternMode=1,
-                        headPatternAsVariable=3,
-                        headPatternVariable=head_pattern,
-                    )
-                    cmd.aspirate_384(
-                        hammy,
-                        no_mag_pools.get_wells_384mph(columns=columns[i], remove=False),
-                        0.0,
-                        liquidHeight=0.1,
-                        mixCycles=10,
-                        mixVolume=50.0,
-                    )
-                    cmd.dispense_384(
-                        hammy,
-                        no_mag_plate.get_wells_384mph(columns=columns[i], remove=False),
-                        0.0,
-                        dispenseMode=9,
-                        liquidHeight=0.1,
-                    )
-                    cmd.tip_eject_384(
-                        hammy,
-                        mode=1,
-                    )
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                cmd.aspirate_384(
+                    hammy,
+                    plate.static(sample_index),
+                    0.0,
+                    liquidHeight=0.1,
+                    mixCycles=10,
+                    mixVolume=50.0,
+                )
+                cmd.dispense_384(
+                    hammy,
+                    plate.static(sample_index),
+                    0.0,
+                    liquidHeight=0.1,
+                    dispenseMode=9,
+                )
+                cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "eppi_to_plate", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.reset_state(state, state_file_path, "mix_beads", 1)
 
-            # Incubate at RT for 5 minutes
-
-            # time.sleep(300)
+            # Incubate at RT for 2 minutes
+            time.sleep(60 * 2)
 
             # Move plate to magnetic plate
-
-            if not state["move_for_supernatant"]:
-                logger.debug("Moving plate to magnetic plate...")
-
+            if not state["move_beads"]:
                 cmd.grip_get(
                     hammy,
-                    no_mag_plate.plate,
-                    1,
+                    plate.plate,
                     gripWidth=81.0,
                     gripHeight=9.0,
                 )
-                cmd.grip_place(hammy, mag_plate.plate, 1)
+                cmd.grip_place(hammy, magnet.plate)
 
                 st.reset_state(state, state_file_path, "move_beads", 1)
 
             # Wait for 1 minute to allow beads to separate
-
-            # time.sleep(60)
+            time.sleep(60)
 
             # Remove supernatant
-
             if not state["remove_supernatant"]:
-                logger.debug("Removing supernatant...")
+                check_tip_holder()
 
-                cycles = math.ceil((sample + bead_sample_volume) / 50)
+                cycles = math.ceil((sample_volume + bead_volume) / 50)
 
-                for j in range(len(columns)):
-                    cmd.tip_pick_up_384(
-                        hammy,
-                        frame.get_columns_384mph(columns[j]),
-                        tipMode=1,
-                        reducedPatternMode=1,
-                        headPatternAsVariable=3,
-                        headPatternVariable=head_pattern,
-                    )
-
-                    if j == 1:
-                        mag_plate.get_wells_384mph(rows=4 * j, columns=columns[j])
-
-                    for i in range(cycles):
-                        logger.debug(f"Removing supernatant from pool {i + 1}...")
-
-                        cmd.aspirate_384(
-                            hammy,
-                            mag_plate.get_wells_384mph(columns=columns[j]),
-                            50.0,
-                            liquidHeight=0.1,
-                        )
-                        cmd.dispense_384(
-                            hammy,
-                            mag_plate.get_wells_384mph(columns=columns[j]),
-                            50.0,
-                            dispenseMode=9,
-                            liquidHeight=10.0,
-                        )
-                        mag_plate.reset_frame()
-
-                    cmd.tip_eject_384(
-                        hammy,
-                        mode=1,
-                    )
-
-                    st.update_state(state, state_file_path, "current_pool", columns[j])
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                for _ in range(cycles):
+                    cmd.aspirate_384(hammy, magnet.static(sample_index), 50.0)
+                    cmd.dispense_384(hammy, magnet.static(supernatant_index), 50.0)
+                cmd.tip_eject_384(hammy, mode=2)
 
                 st.reset_state(state, state_file_path, "remove_supernatant", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
-
-            # Wash beads with 70% ethanol from eppendorf carrier
-            # Prompt user to add 70% ethanol tubes to eppendorf carrier
-
-            # if not state["add_wash1"]:
-            #     logger.debug("Adding ethanol to pools for wash 1...")
-
-            #     hp.notify(
-            #         f"*User action required:* add {ethanol_tube} tubes of 70% ethanol"
-            #         " to eppendorf carrier."
-            #     )
-            #     input(
-            #         f"{hp.color.BOLD}Add {ethanol_tubes} tube(s) filled with"
-            #         f" {TUBE_VOLUME} uL 70% ethanol to eppendorf carrier. Press"
-            #         f" enter to continue: {hp.color.END}"
-            #     )
-
-            #     check_tips()
-
-            #     cmd.tip_pick_up(
-            #         hammy,
-            #         [tips[state["current_tip"]]],
-            #     )
-
-            #     for i in range(state["current_pool"], pools):
-            #         logger.debug(f"Adding ethanol to pool {i + 1}...")
-
-            #         if state["ethanol_volume"] <= wash_volume * 1.2:
-            #             st.update_state(state, state_file_path, "ethanol_tube", 1)
-            #             ethanol_tube = [ethanol[state["ethanol_tube"]]]
-            #             st.reset_state(state, state_file_path, "ethanol_volume", 0)
-
-            #         cmd.aspirate(
-            #             hammy,
-            #             ethanol_tube,
-            #             [wash_volume],
-            #             liquidHeight=1.0,
-            #             liquidClass=ETHANOL,
-            #         )
-            #         cmd.dispense(
-            #             hammy,
-            #             [mag_pools[i]],
-            #             [wash_volume],
-            #             dispenseMode=9,
-            #             liquidHeight=12.0,
-            #             liquidClass=ETHANOL,
-            #         )
-
-            #         st.update_state(state, state_file_path, "current_pool", 1)
-            #         st.update_state(
-            #             state, state_file_path, "ethanol_volume", -wash_volume
-            #         )
-
-            #     cmd.tip_eject(
-            #         hammy,
-            #         [tips[state["current_tip"]]],
-            #         waste=True,
-            #     )
-            #     st.update_state(state, state_file_path, "current_tip", 1)
-
-            #     st.reset_state(state, state_file_path, "add_wash1", 1)
-            #     st.reset_state(state, state_file_path, "current_pool", 0)
-
-            # # FIXME: not necessary as removing from all wells > 30 s
-            # # Incubate 30 seconds
-
-            # time.sleep(30)
-
-            # # Remove ethanol for wash 1
-
-            # if not state["remove_wash1"]:
-            #     logger.debug("Removing ethanol for wash 1...")
-
-            #     for i in range(state["current_pool"], pools):
-            #         logger.debug(f"Removing ethanol from pool {i + 1}...")
-
-            #         check_tips()
-
-            #         cmd.tip_pick_up(
-            #             hammy,
-            #             [tips[state["current_tip"]]],
-            #         )
-            #         cmd.aspirate(
-            #             hammy,
-            #             [mag_pools[i]],
-            #             [wash_volume],
-            #             liquidHeight=0.1,
-            #             liquidClass=ETHANOL,
-            #         )
-            #         cmd.dispense(
-            #             hammy,
-            #             [mag_wash_1[i]],
-            #             [wash_volume],
-            #             dispenseMode=9,
-            #             liquidHeight=10.0,
-            #             liquidClass=ETHANOL,
-            #         )
-            #         cmd.tip_eject(
-            #             hammy,
-            #             [tips[state["current_tip"]]],
-            #             waste=True,
-            #         )
-
-            #         st.update_state(state, state_file_path, "current_tip", 1)
-            #         st.update_state(state, state_file_path, "current_pool", 1)
-
-            #     st.reset_state(state, state_file_path, "remove_wash1", 1)
-            #     st.reset_state(state, state_file_path, "current_pool", 0)
-
-            # # Wash beads with 70% ethanol from eppendorf carrier
-
-            # if not state["add_wash2"]:
-            #     logger.debug("Adding ethanol to pools for wash 2...")
-
-            #     check_tips()
-
-            #     cmd.tip_pick_up(
-            #         hammy,
-            #         [tips[state["current_tip"]]],
-            #     )
-
-            #     for i in range(state["current_pool"], pools):
-            #         logger.debug(f"Adding ethanol to pool {i + 1}...")
-
-            #         if state["current_ethanol_step"] >= 8:
-            #             st.update_state(
-            #                 state, state_file_path, "current_ethanol_tube", 1
-            #             )
-            #             ethanol_tube = [ethanol[state["current_ethanol_tube"]]]
-            #             st.reset_state(
-            #                 state, state_file_path, "current_ethanol_step", 0
-            #             )
-
-            #         cmd.aspirate(
-            #             hammy,
-            #             ethanol_tube,
-            #             [wash_volume],
-            #             liquidHeight=1.0,
-            #             liquidClass=ETHANOL,
-            #         )
-            #         cmd.dispense(
-            #             hammy,
-            #             [mag_pools[i]],
-            #             [wash_volume],
-            #             dispenseMode=9,
-            #             liquidHeight=12.0,
-            #             liquidClass=ETHANOL,
-            #         )
-
-            #         st.update_state(state, state_file_path, "current_pool", 1)
-            #         st.update_state(state, state_file_path, "current_ethanol_step", 1)
-
-            #     cmd.tip_eject(
-            #         hammy,
-            #         [tips[state["current_tip"]]],
-            #         waste=True,
-            #     )
-            #     st.update_state(state, state_file_path, "current_tip", 1)
-
-            #     st.reset_state(state, state_file_path, "add_wash2", 1)
-            #     st.reset_state(state, state_file_path, "current_pool", 0)
-
-            # # FIXME: not necessary as removing from all wells > 30 s
-            # # Incubate 30 seconds
-
-            # time.sleep(30)
-
-            # # Remove ethanol for wash 2
-
-            # if not state["remove_wash2"]:
-            #     logger.debug("Removing ethanol for wash 2...")
-
-            #     for i in range(state["current_pool"], pools):
-            #         logger.debug(f"Removing ethanol from pool {i + 1}...")
-
-            #         check_tips()
-
-            #         cmd.tip_pick_up(
-            #             hammy,
-            #             [tips[state["current_tip"]]],
-            #         )
-            #         cmd.aspirate(
-            #             hammy,
-            #             [mag_pools[i]],
-            #             [wash_volume + 50],
-            #             liquidHeight=0.1,
-            #             liquidClass=ETHANOL,
-            #         )
-            #         cmd.dispense(
-            #             hammy,
-            #             [mag_wash_2[i]],
-            #             [wash_volume + 50],
-            #             dispenseMode=9,
-            #             liquidHeight=10.0,
-            #             liquidClass=ETHANOL,
-            #         )
-            #         cmd.tip_eject(
-            #             hammy,
-            #             [tips[state["current_tip"]]],
-            #             waste=True,
-            #         )
-
-            #         st.update_state(state, state_file_path, "current_tip", 1)
-            #         st.update_state(state, state_file_path, "current_pool", 1)
-
-            #     st.reset_state(state, state_file_path, "remove_wash2", 1)
-            #     st.reset_state(state, state_file_path, "current_pool", 0)
-
-            # # Move plate away from magnet
-
-            # if not state["move_for_dry"]:
-            #     logger.debug("Moving plate away from magnet...")
-
-            #     cmd.grip_get(
-            #         hammy,
-            #         mag_plate,
-            #         1,
-            #         gripWidth=81.0,
-            #         gripHeight=9.0,
-            #     )
-            #     cmd.grip_place(hammy, no_mag_plate, 1)
-
-            #     st.reset_state(state, state_file_path, "move_pure", 1)
-
-            # # Dry beads for 5-10 minutes
-
-            # time.sleep(300)
-
-            # # Add 21 uL of elution buffer to each pool
-            # input(
-            #     f"{hp.color.BOLD}Add 1 tube filled with {teb_volume} uL TE Buffer"
-            #     " to eppendorf carrier position 24. Press enter to"
-            #     f" continue: {hp.color.END  }"
-            # )
-
-            # if not state["add_buffer"]:
-            #     logger.debug("Adding buffer to pools...")
-
-            #     for i in range(state["current_pool"], pools):
-            #         logger.debug(f"Adding buffer to pool {i + 1}...")
-
-            #         check_tips()
-
-            #         cmd.tip_pick_up(
-            #             hammy,
-            #             [tips[state["current_tip"]]],
-            #         )
-            #         cmd.aspirate(
-            #             hammy,
-            #             teb,
-            #             [elute_volume],
-            #             liquidHeight=1.0,
-            #         )
-            #         cmd.dispense(
-            #             hammy,
-            #             [no_mag_pools[i]],
-            #             [elute_volume],
-            #             dispenseMode=9,
-            #             liquidHeight=2.0,
-            #         )
-            #         cmd.aspirate(
-            #             hammy,
-            #             [no_mag_pools[i]],
-            #             [0],
-            #             liquidHeight=0.1,
-            #             mixCycles=10,
-            #             mixVolume=elute_volume * 0.5,
-            #         )
-
-            #         cmd.tip_eject(
-            #             hammy,
-            #             [tips[state["current_tip"]]],
-            #             waste=True,
-            #         )
-
-            #         st.update_state(state, state_file_path, "current_tip", 1)
-            #         st.update_state(state, state_file_path, "current_pool", 1)
-
-            #     st.reset_state(state, state_file_path, "add_buffer", 1)
-            #     st.reset_state(state, state_file_path, "current_pool", 0)
-
-            # # Incubate 1 minute
-
-            # time.sleep(60)
-
-            # # Move plate back to magnet
-
-            # if not state["move_for_elute"]:
-            #     logger.debug("Moving plate back to magnet...")
-
-            #     cmd.grip_get(
-            #         hammy,
-            #         no_mag_plate,
-            #         1,
-            #         gripWidth=81.0,
-            #         gripHeight=9.0,
-            #     )
-            #     cmd.grip_place(hammy, mag_plate, 1)
-
-            #     st.reset_state(state, state_file_path, "move_to_elute", 1)
-
-            # # Incubate 1 minute
-
-            # time.sleep(60)
-
-            # # Store purified samples in low volume sample tubes
-            # # Prompt user to add sample tubes to eppendorf carrier
-
-            # input(
-            #     f"{hp.color.BOLD}Add {pools} sample collection tubes to eppendorf"
-            #     f" carrier. Press enter to continue: {hp.color.END  }"
-            # )
-
-            # if not state["store_samples"]:
-            #     logger.debug("Storing purified samples...")
-
-            #     for i in range(state["current_pool"], pools):
-            #         logger.debug(f"Storing sample {i + 1}...")
-
-            #         check_tips()
-
-            #         cmd.tip_pick_up(
-            #             hammy,
-            #             [tips[state["current_tip"]]],
-            #         )
-            #         cmd.aspirate(
-            #             hammy,
-            #             [mag_pools[i]],
-            #             [elute_volume - 5],
-            #             liquidHeight=0.1,
-            #         )
-            #         cmd.dispense(
-            #             hammy,
-            #             [dest_eppies[i]],
-            #             [elute_volume],
-            #             dispenseMode=9,
-            #             liquidHeight=23.0,
-            #         )
-            #         cmd.tip_eject(
-            #             hammy,
-            #             [tips[state["current_tip"]]],
-            #             waste=True,
-            #         )
-
-            #         st.update_state(state, state_file_path, "current_tip", 1)
-            #         st.update_state(state, state_file_path, "current_pool", 1)
-
-            #     st.reset_state(state, state_file_path, "store_samples", 1)
-            #     st.reset_state(state, state_file_path, "current_pool", 0)
-
-            st.reset_state(state, state_file_path, "complete", 1)
+
+            # Wash beads with 70% ethanol
+            if not state["wash1"]:
+                check_tip_holder()
+
+                cycles = math.ceil(wash_volume / 50)
+
+                # Add ethanol
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                for _ in range(cycles):
+                    cmd.aspirate_384(hammy, ethanol, 50.0)
+                    cmd.dispense_384(hammy, magnet.static(sample_index), 50.0)
+
+                # Incubate 30 seconds
+                time.sleep(30)
+
+                # Remove ethanol
+                for _ in range(cycles):
+                    cmd.aspirate_384(hammy, magnet.static(sample_index), 50.0)
+                    cmd.dispense_384(hammy, magnet.static(wash1_index), 50.0)
+                cmd.tip_eject_384(hammy, mode=2)
+
+                st.reset_state(state, state_file_path, "wash1", 1)
+
+            # Wash beads with 70% ethanol
+            if not state["wash2"]:
+                check_tip_holder()
+
+                cycles = math.ceil(wash_volume / 50)
+
+                # Add ethanol
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                for _ in range(cycles):
+                    cmd.aspirate_384(hammy, ethanol, 50.0)
+                    cmd.dispense_384(hammy, magnet.static(sample_index), 50.0)
+
+                # Incubate 30 seconds
+                time.sleep(30)
+
+                # Remove ethanol
+                for _ in range(cycles):
+                    cmd.aspirate_384(hammy, magnet.static(sample_index), 50.0)
+                    cmd.dispense_384(hammy, magnet.static(wash1_index), 50.0)
+                cmd.tip_eject_384(hammy, mode=2)
+
+                st.reset_state(state, state_file_path, "wash2", 1)
+
+            # Move plate away from magnet
+            if not state["move_wash"]:
+                cmd.grip_get(hammy, magnet.plate, gripWidth=81.0, gripHeight=9.0)
+                cmd.grip_place(hammy, plate.plate, 1)
+
+                st.reset_state(state, state_file_path, "move_wash", 1)
+
+            # Dry beads for 2 minutes
+            time.sleep(60 * 2)
+
+            # Add elution buffer to sample wells
+            if not state["add_buffer"]:
+                # Prompt user to add buffer to carrier
+                input(f"Add buffer tube to carrier in position D6.")
+
+                # Loop over wells, aspirating max bead volume and dispensing consecutively
+                while plate.total() > 0:
+                    # Max amount of consecutive dispenses
+                    cycles = min(math.floor(300 / (elute_volume * 1.2)), plate.total())
+                    cmd.aspirate(
+                        hammy,
+                        teb,
+                        [elute_volume * cycles * 1.2],
+                        liquidClass=ALIQUOT_300,
+                    )
+                    for _ in range(cycles):
+                        cmd.dispense(
+                            hammy, teb, [elute_volume], liquidClass=ALIQUOT_300
+                        )
+                    cmd.dispense(
+                        hammy, teb, [elute_volume * cycles * 0.2], dispenseMode=9
+                    )
+                cmd.tip_eject(hammy, waste=True)
+
+                plate.reset()
+                st.reset_state(state, state_file_path, "add_buffer", 1)
+
+            if not state["mix_buffer"]:
+                check_tip_holder()
+
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                cmd.aspirate_384(
+                    hammy,
+                    plate.static(sample_index),
+                    0.0,
+                    liquidHeight=0.1,
+                    mixCycles=10,
+                    mixVolume=10.0,
+                )
+                cmd.dispense_384(
+                    hammy,
+                    plate.static(sample_index),
+                    0.0,
+                    liquidHeight=0.1,
+                    dispenseMode=9,
+                )
+                cmd.tip_eject_384(hammy, mode=2)
+
+                st.reset_state(state, state_file_path, "mix_buffer", 1)
+
+            # Incubate 1 minute
+            time.sleep(60)
+
+            # Move plate back to magnet
+            if not state["move_elute"]:
+                cmd.grip_get(hammy, plate.plate, gripWidth=81.0, gripHeight=9.0)
+                cmd.grip_place(hammy, magnet.plate)
+
+                st.reset_state(state, state_file_path, "move_elute", 1)
+
+            # Incubate 1 minute
+            time.sleep(60)
+
+            # Store purified samples in low volume sample tubes
+            if not state["elute_samples"]:
+                # Prompt user to add sample tubes to eppendorf carrier
+                input(f"Add sample tubes to carrier in positions: {sample_index}.")
+
+                while plate.total() > 0:
+                    channels = min(carrier.total(), 2)
+                    cmd.tip_pick_up(hammy, tips_96_300.ch2(channels))
+                    cmd.aspirate(hammy, plate.ch2(channels), [elute_volume])
+                    cmd.dispense(hammy, carrier.ch2(channels), [elute_volume])
+                    cmd.tip_eject(hammy, waste=True)
+
+                st.reset_state(state, state_file_path, "elute_samples", 1)
 
         cmd.grip_eject(hammy)
