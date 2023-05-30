@@ -147,9 +147,15 @@ def tip_pick_up(
 
     labwarePositions = compound_pos_str(positions)
 
+    if len(positions) == 1:
+        channelVariable = "10"
+    else:
+        channelVariable = "11"
+
     cid = ham.send_command(
         PICKUP,
         labwarePositions=labwarePositions,
+        channelVariable=channelVariable,
         **kw_args,
     )
 

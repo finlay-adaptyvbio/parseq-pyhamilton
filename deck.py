@@ -1,5 +1,4 @@
-import logging, itertools, string
-import pandas as pd
+import logging, shelve, sys, string
 
 import labware as lw
 
@@ -148,20 +147,20 @@ def add_dataframes(deck: dict) -> dict:
     return deck
 
 
-def print_deck(deck: dict):
+def print_deck(shelf: shelve.Shelf | dict):
     logger.debug(f"Printing deck...")
-    for col in deck.keys():
-        for row in range(0, len(deck[col])):
+    for col in shelf.keys():
+        for row in range(0, len(shelf[col])):
             position = col + str(row + 1)
-            if len(deck[col][row]["labware"]) > 0:
+            if len(shelf[col][row]["labware"]) > 0:
                 print(f"--- {position} ---")
 
-                for labware in deck[col][row]["labware"]:
+                for labware in shelf[col][row]["labware"]:
                     print(f"{labware.layout_name()[3:]}")
 
 
 def get_labware_list(
-    deck: dict,
+    shelf: shelve.Shelf,
     positions: list[str],
     labware_type,  # : Union[Lid, Plate96, Plate384, Tip384, Tip96, Reservoir300],
     n: list[int] = [1],
@@ -172,7 +171,7 @@ def get_labware_list(
         col, row = position[0], int(position[1])
         labwares = [
             labware
-            for labware in deck[col][row - 1]["labware"]
+            for labware in shelf[col][row - 1]["labware"]
             if type(labware) == labware_type
         ][: n[idx]]
 
@@ -182,6 +181,40 @@ def get_labware_list(
         labwares_merged.extend(labwares)
 
     return labwares_merged
+
+
+# Cleaning up labware
+
+
+def delete_lids(shelf: shelve.Shelf, position: str):
+    try:
+        letter, number = lw.pos(position)
+        for t in list(
+            zip(shelf[letter][number]["labware"], shelf[letter][number]["frame"])
+        )[::-1]:
+            if isinstance(t[0], Lid) and isinstance(t[1], lw.lid):
+                shelf[letter][number]["frame"].remove(t[0])
+                shelf[letter][number]["frame"].remove(t[1])
+    except:
+        sys.exit()
+
+
+def delete_unused(shelf: shelve.Shelf, position: str, n: int):
+    if n != 0:
+        try:
+            letter, number = lw.pos(position)
+            for k in shelf[letter][number]:
+                del shelf[letter][number][k][n:]
+        except:
+            sys.exit()
+
+
+def delete_labware(shelf: shelve.Shelf, labware):
+    for col in shelf.keys():
+        for row in range(0, len(shelf[col])):
+            if len(shelf[col][row]["labware"]) > 0:
+                if labware in shelf[col][row]["labware"]:
+                    shelf[col][row]["labware"].remove(labware)
 
 
 def extract_resource_from_field(field, resource, position):

@@ -60,8 +60,15 @@ default_index_384 = pd.DataFrame(
 # Conversion functions
 
 
-def pos(position: str) -> tuple:
-    return position[0], int(position[1])
+def pos(position: str):
+    try:
+        letter, number = position[0], int(position[1:]) - 1
+        if letter in list(string.ascii_uppercase) and number in list(range(5)):
+            return (letter, number)
+        else:
+            sys.exit()
+    except:
+        sys.exit()
 
 
 def string_to_index_384(position: str) -> int:
@@ -122,7 +129,7 @@ def pos_row_column_96(n: int = 96, skip: int = 0) -> list:
         f"{letter}{number}"
         for number in range(1, 13)
         for letter in list(string.ascii_uppercase)[:8]
-    ][skip:skip+n]
+    ][skip : skip + n]
 
 
 def pos_column_row_96(n: int = 96, skip: int = 0) -> list:
@@ -130,7 +137,7 @@ def pos_column_row_96(n: int = 96, skip: int = 0) -> list:
         f"{letter}{number}"
         for letter in list(string.ascii_uppercase)[:8]
         for number in range(1, 13)
-    ][skip:skip+n]
+    ][skip : skip + n]
     return pos
 
 
@@ -479,6 +486,27 @@ class reservoir_300:
 
         return [(self.reservoir, i) for i in index]
 
+    def quadrant(self, remove: bool = True) -> list[tuple[Plate384, int]]:
+        index, quadrant_df = None, None
+        for q in range(1, 5):
+            index = pos_96_in_384(q)
+            mask = default_index_384.isin(index)
+            quadrant_df = self.df[mask]
+            if quadrant_df.sum().sum() == 96:
+                break
+
+        try:
+            assert index is not None
+            assert quadrant_df is not None
+        except AssertionError:
+            logger.error(f"Not enough positions in {self.reservoir.layout_name()}")
+            sys.exit()
+
+        if remove:
+            self.df[quadrant_df == 1] = pd.NA
+
+        return [(self.reservoir, i) for i in index]
+
     def static(self, index: list[str]):
         """Get specific reservoir positions from input list."""
         return [(self.reservoir, default_index_384.at[i[0], int(i[1:])]) for i in index]
@@ -576,6 +604,10 @@ class tip_96:
             self.df[default_index_96.isin(index)] = pd.NA
 
         return [(self.rack, i) for i in index]
+
+    def static(self, index: list[str]) -> list[tuple[Tip96, int]]:
+        """Get specific tips from input list."""
+        return [(self.rack, default_index_96.at[i[0], int(i[1:])]) for i in index]
 
     def full(self):
         """Get all available positions."""
@@ -696,7 +728,7 @@ class carrier_24:
             except (IndexError, ValueError, KeyError) as e:
                 logger.error(
                     "Unable to parse positions. Make sure input is in list[str] format"
-                    " (['A1', 'B02']) or use list constructor from labware module."
+                    " (['A1', 'B02']) or use index generator from labware module."
                 )
                 raise e
 
@@ -743,7 +775,7 @@ class carrier_24:
 
     def static(self, index: list[str]):
         """Get specific tubes from input list."""
-        return [(self.carrier, default_index_24.loc[i[0], int(i[1:])]) for i in index]
+        return [(self.carrier, default_index_24.at[i[0], int(i[1:])]) for i in index]
 
 
 class lid:

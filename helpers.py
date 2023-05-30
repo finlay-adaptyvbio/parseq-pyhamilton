@@ -154,7 +154,7 @@ def sort_384_indexes_2channel(series: pd.Series) -> pd.Series:
     return pd.Series(sorted_cols + unsorted_cols, dtype=str, index=series.index)
 
 
-def process_cherry_csv(csv_path: str, output_dir: str, prefix: str):
+def process_cherry_csv(csv_path: str, output_dir: str):
     """Get plate names from CSV file. Save as CSV file.
 
     Args:
@@ -179,13 +179,13 @@ def process_cherry_csv(csv_path: str, output_dir: str, prefix: str):
         df.loc[start:end, "source_well"] = sorted_source
 
     df[["source_well", "source_plate"]].to_csv(
-        os.path.join(output_dir, f"{prefix}_wells.csv"), index=False, header=False
+        os.path.join(output_dir, "cherry_wells.csv"), index=False, header=False
     )
 
     plates = pd.DataFrame([df.source_plate.unique()], index=["source"]).T
 
     plates.to_csv(
-        os.path.join(output_dir, f"{prefix}_plates.csv"),
+        os.path.join(output_dir, "cherry_plates.csv"),
         index=False,
         header=False,
     )

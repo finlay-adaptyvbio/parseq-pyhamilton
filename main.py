@@ -1,4 +1,4 @@
-import os, argparse, sys, time, datetime, shutil, shelve
+import os, argparse, sys, time, datetime, shutil, shelve, importlib
 import logging, logging.config
 
 import deck as dk
@@ -127,8 +127,6 @@ if __name__ == "__main__":
 
                 st.save_state(state, state_path)
 
-                get_input_files = True
-
                 logger.info(f"Starting run {run_id}")
 
             # Check if method already exists and prompt to recover
@@ -202,8 +200,8 @@ if __name__ == "__main__":
                                         "Labware file not found for {method} method."
                                         " Was the correct method specified?"
                                     )
-
-                                get_input_files = False
+                                deck = dk.get_deck(layout_path)
+                                deck = dk.add_dataframes(deck)
 
                                 logger.info(f"Resuming run {run_id}")
 
@@ -260,8 +258,6 @@ if __name__ == "__main__":
 
                                 st.save_state(state, state_path)
 
-                                get_input_files = True
-
                                 logger.info(f"Restarting run {run_id}")
 
                             else:
@@ -293,8 +289,6 @@ if __name__ == "__main__":
 
                         st.save_state(state, state_path)
 
-                        get_input_files = True
-
                         logger.info(f" Starting run {run_id} ")
                 except IndexError:
                     logger.error("Invalid run id.")
@@ -314,101 +308,12 @@ if __name__ == "__main__":
     f_method_handler.setFormatter(f__method_format)
     logger.addHandler(f_method_handler)
 
-    # Run script
-
-    logger.debug(f"{'Method:':<8}{method}")
-    logger.debug(f"{'State:':<8}{state_path}")
-    logger.debug(f"{'Layout:':<8}{layout_path}")
-
-    # Get necessary input files depending on method and copy to temp dir
-    # script = __import__(method)
-
-    match method:
-        case "pooling":
-            from scripts import pooling as script
-
-        case "pcr_colony":
-            from scripts import pcr_colony as script
-
-        case "pcr_barcode":
-            from scripts import pcr_barcode as script
-
-        case "pm_emptying":
-            # get sorted_well_map.csv
-            # if recovering run, don't need to copy sorted_well_map.csv
-
-            from scripts import pm_emptying as script
-
-            if get_input_files:
-                well_map_path = hp.prompt_file_path(
-                    "Path to sorted_well_map.csv for run {run_id}"
-                )
-                shutil.copy(
-                    well_map_path,
-                    os.path.join(run_dir_path, f"{method}_sorted_well_map.csv"),
-                )
-                hp.process_pm_csv(well_map_path, run_dir_path, method)
-
-        case "pm_filling":
-            # get sorted_well_map.csv
-            # if recovering run, don't need to copy sorted_well_map.csv
-
-            from scripts import pm_filling as script
-
-            if get_input_files:
-                well_map_path = hp.prompt_file_path(
-                    f"Path to sorted_well_map.csv for run {run_id}"
-                )
-                shutil.copy(
-                    well_map_path,
-                    os.path.join(run_dir_path, f"{method}_sorted_well_map.csv"),
-                )
-                hp.process_pm_csv(well_map_path, run_dir_path, method)
-
-        case "cherry_picking":
-            # get sorted_well_list.csv
-            # if recovering run, don't need to copy sorted_well_list.csv
-
-            from scripts import cherry_picking as script
-
-            if get_input_files:
-                well_list_path = hp.prompt_file_path(
-                    f"Path to cherry.csv for run {run_id}"
-                )
-                shutil.copy(well_list_path, os.path.join(run_dir_path, f"{method}.csv"))
-                hp.process_cherry_csv(well_list_path, run_dir_path, method)
-
-        case "plate_filling":
-            from scripts import plate_filling as script
-
-        case "purification":
-            from scripts import purification as script
-
-        case "lib_nanopore":
-            from scripts import lib_nanopore as script
-
-            if get_input_files:
-                sample_concentrations_path = hp.prompt_file_path(
-                    f"Path to sample_concentrations.csv for run {run_id}"
-                )
-                shutil.copy(
-                    sample_concentrations_path,
-                    os.path.join(run_dir_path, f"{method}_concentrations.csv"),
-                )
-
-        case "test":
-            from scripts import test as script
-
-        case _:
-            # This shoudn't be needed but avoids type error
-            logger.error(f"Method {method} not found.")
-            parser.error(f"Method {method} not found.")
-
     # Run method, on failure notify and restart (max 3 retries)
     for attempt in range(3):
+        script = importlib.import_module(method, "scripts")
         try:
             with shelve.open(labware_path, writeback=True) as shelf:
-                script.run(shelf, state, state_path, run_dir_path)
+                script.run(shelf, deck, state, run_dir_path)
         except KeyboardInterrupt:
             logger.warning("Keyboard interrupt received. Exiting...")
             hp.notify(f"Method {method} for run {run_id} interrupted by user.")
