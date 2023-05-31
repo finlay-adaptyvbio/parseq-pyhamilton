@@ -60,7 +60,9 @@ def run(
     supernatant_index = [i for i in lw.pos_row_column_96(pools, pools)]
     wash1_index = [i for i in lw.pos_row_column_96(pools, pools * 2)]
     wash2_index = [i for i in lw.pos_row_column_96(pools, pools * 3)]
-    ethanol_index = [i for i in lw.pos_96_in_384(1)[: rows * columns]]
+    ethanol_index = [
+        lw.index_to_string_384(i) for i in lw.pos_96_in_384(1)[: rows * columns]
+    ]
 
     # Sample tube df and static positions
     carrier.fill([i for i in lw.pos_row_column_24(pools)])
@@ -119,7 +121,7 @@ def run(
 
                 mix_beads()
 
-                # Loop over wells, aspirating max bead volume and dispensing consecutively
+                # Loop over wells, aspirating max bead volume and dispensing consecutively into plate
                 while plate.total() > 0:
                     # Max amount of consecutive dispenses
                     cycles = min(math.floor(300 / (bead_volume * 1.2)), plate.total())
@@ -131,7 +133,7 @@ def run(
                     )
                     for _ in range(cycles):
                         cmd.dispense(
-                            hammy, beads, [bead_volume], liquidClass=ALIQUOT_300
+                            hammy, plate.ch2(1), [bead_volume], liquidClass=ALIQUOT_300
                         )
                     cmd.dispense(
                         hammy, beads, [bead_volume * cycles * 0.2], dispenseMode=9
@@ -275,6 +277,7 @@ def run(
                 # Prompt user to add buffer to carrier
                 input(f"Add buffer tube to carrier in position D6.")
 
+                cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
                 # Loop over wells, aspirating max bead volume and dispensing consecutively
                 while plate.total() > 0:
                     # Max amount of consecutive dispenses
