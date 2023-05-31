@@ -1,29 +1,19 @@
-import logging, math, time, os
+import os, time, logging, shelve, math
 import pandas as pd
 
 import commands as cmd
-import state as st
+import deck as dk
 import helpers as hp
 import labware as lw
+import state as st
 
-from pyhamilton import (
-    HamiltonInterface,
-    Plate96,
-    Tip96,
-    EppiCarrier24,  # type: ignore
-)
+from pyhamilton import HamiltonInterface
 
 # Logging
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-# Constants
-
-TIPS = 96
-CHANNELS = 2
-TUBE_VOLUME = 1800
-
+# Liquid classes
 ETHANOL = "StandardVolume_EtOH_DispenseJet_Part"
 ALIQUOT_300 = "StandardVolume_Water_DispenseJet_Part"
 MIX_300 = "StandardVolume_Water_DispenseSurface_Empty"
@@ -32,155 +22,151 @@ ALIQUOT_50 = "Tip_50ul_Water_DispenseJet_Part"
 MIX_50 = "Tip_50ul_Water_DispenseSurface_Empty"
 
 
-def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: str):
+def run(
+    shelf: shelve.Shelf[list[dict[str, list]]],
+    state: dict,
+    run_dir_path: str,
+):
+    # File paths
+    state_file_path = os.path.join(run_dir_path, "pm_filling_state.json")
+    csv_path = hp.prompt_file_path("Input CSV file (lib_nanopore_concentrations.csv)")
+
     # Sample info
     fragment_size = hp.prompt_int("Fragment size (bp)", 1000)
+    sample_moles = hp.prompt_int("Moles per sample (fmol)", 200)
 
     # Concentrations and normalization calculations
-    sample_concentrations_path = os.path.join(
-        run_dir_path, "lib_nanopore_concentrations.csv"
-    )
-
-    sample_concentrations = pd.read_csv(
-        sample_concentrations_path, names=["Sample", "C [ng/uL]"]
-    )
-    sample_concentrations["bp"] = fragment_size
-    sample_concentrations["MW [Da]"] = sample_concentrations["bp"] * 617.96 + 36.04
-    sample_concentrations["C [nM]"] = (
-        sample_concentrations["C [ng/uL]"] / sample_concentrations["MW [Da]"] * 1e6
-    )
-    sample_concentrations["moles [fmol]"] = 200  # TODO: User # input
-    sample_concentrations["Sample V [uL]"] = (
-        sample_concentrations["moles [fmol]"] / sample_concentrations["C [nM]"]
-    )
-    sample_concentrations["Water V [uL]"] = (
-        12.5 - sample_concentrations["Sample V [uL]"]
-    )
+    sample_c = pd.read_csv(csv_path, names=["Sample", "C [ng/uL]"])
+    sample_c["bp"] = fragment_size
+    sample_c["MW [Da]"] = sample_c["bp"] * 617.96 + 36.04
+    sample_c["C [nM]"] = sample_c["C [ng/uL]"] / sample_c["MW [Da]"] * 1e6
+    sample_c["moles [fmol]"] = sample_moles  # TODO: User # input
+    sample_c["Sample V [uL]"] = sample_c["moles [fmol]"] / sample_c["C [nM]"]
+    sample_c["Water V [uL]"] = 12.5 - sample_c["Sample V [uL]"]
 
     # Volume calculations
-    n_samples = sample_concentrations["Sample"].count()
-    n_ethanol_tubes = int((math.ceil(n_samples * 300 / TUBE_VOLUME) + 1) / 2.0 * 2)
+    samples = sample_c["Sample"].count()
+    n_ethanol_tubes = int((math.ceil(samples * 300 * 1.2 / 1800) + 1) / 2 * 2)
 
-    sample_volumes = sample_concentrations["Sample V [uL]"].tolist()
-    water_volumes = sample_concentrations["Water V [uL]"].tolist()
+    sample_volumes = sample_c["Sample V [uL]"].tolist()
+    water_volumes = sample_c["Water V [uL]"].tolist()
     water_volume = [(sum(water_volumes) // 50 + 1) * 50.0]
 
     # Assign labware to deck positions
-    carrier = lw.carrier_24(deck)
-    c3 = lw.plate_96(deck, "C3")
-    d3 = lw.plate_96(deck, "D3")
-    d1 = lw.plate_96(deck, "D1")
-    waste = lw.plate_96(deck, "C5")
-    tips_300 = lw.tip_96(deck, "F1")
-    tips_50 = lw.tip_96(deck, "F2")
-    tips_384_96 = lw.tip_96(deck, "A4")
+    carrier = shelf["C"][0]["frame"][0]
+    c3 = shelf["C"][2]["frame"][0]  # no magnet cooled to 4C
+    d3 = shelf["D"][2]["frame"][0]  # magnet
+    d1 = shelf["D"][0]["frame"][0]  # no magnet room temperature
 
-    # Plate layout for samples
+    tips_96_300 = shelf["F"][0]["frame"][0]
+    tips_96_50 = shelf["F"][1]["frame"][0]
+    tips_96in384_50 = shelf["A"][2]["frame"][0]
+    tips_holder_96in384_50 = shelf["A"][3]["frame"][0]
+
+    # Plate indexes and layout
     rows = 8
-    columns = math.ceil(n_samples / rows)
-    rows_last_column = n_samples % rows
+    columns = min(1, math.ceil(samples / rows))
+    sample_index = [i for i in lw.pos_row_column_24(samples)]
+    end_prep_index = [i for i in lw.pos_row_column_96(samples)]
+    barcode_index = [i for i in lw.pos_row_column_96(samples, samples)]
+    ethanol_index = [i for i in lw.pos_96_in_384(1)[: rows * columns]]
+    waste_index = [i for i in lw.pos_96_in_384(1)[: rows * columns]]
 
-    if columns == 1:
-        rows = rows_last_column
+    # Initial dfs
+    carrier.fill(sample_index)
+    c3.fill(end_prep_index)
 
-    # Reagent & sample positions
-    samples = carrier.tubes([t for t in lw.pos_row_column_24(n_samples)])
-    ethanol = carrier.tubes([t for t in lw.pos_row_column_24(n_ethanol_tubes)])
+    # Static positions
+    ethanol = shelf["C"][4]["frame"][0].static(ethanol_index)
+    waste = shelf["E"][4]["frame"][0].static(waste_index)
 
-    c3_end_prep = c3.wells([t for t in lw.pos_row_column_96(rows * columns)])
-    d3_end_prep = d3.wells([t for t in lw.pos_row_column_96(rows * columns)])
-    c3_barcode = c3.wells(
-        [t for t in lw.pos_row_column_96(rows * columns * 2)][rows * columns :]
-    )
-    d3_barcode = d3.wells(
-        [t for t in lw.pos_row_column_96(rows * columns * 2)][rows * columns :]
-    )
+    c3_pool = c3.static(["A12"])
+    d3_pool = d3.static(["A12"])
+    d1_pool = d1.static(["A12"])
 
-    water = carrier.tubes(["A4"])
-    beads = carrier.tubes(["B4"])
-    edta = carrier.tubes(["C4"])
-    end_prep_mm = carrier.tubes(["D4"])
-    blunt_ta_ligase_mm = carrier.tubes(["A5"])
-    adapter_mm = carrier.tubes(["B5"])
-    quick_t4_ligase_enzyme = carrier.tubes(["C5"])
-    quick_t4_ligase_buffer = carrier.tubes(["D5"])
-    elution_buffer = carrier.tubes(["A6"])
-    fragment_buffer = carrier.tubes(["B6"])
-    pool = carrier.tubes(["C6"])
+    water = carrier.static(["A4"])
+    beads = carrier.static(["B4"])
+    edta = carrier.static(["C4"])
+    end_prep_mm = carrier.static(["D4"])
+    blunt_ta_ligase_mm = carrier.static(["A5"])
+    adapter_mm = carrier.static(["B5"])
+    quick_t4_ligase_enzyme = carrier.static(["C5"])
+    quick_t4_ligase_buffer = carrier.static(["D5"])
+    elution_buffer = carrier.static(["A6"])
+    fragment_buffer = carrier.static(["B6"])
+    pool = carrier.static(["C6"])
 
-    # Inform user of labware positions, ask for confirmation after placing labware
-    logger.info(
-        f"{hp.color.PURPLE}{hp.color.BOLD}Make sure Alpaqua Magnum EX (magnetic plate)"
-        f" is in position D3.{hp.color.END}"
-    )
+    # Mixing parameters
+    bead_volume = (15 + 8) * samples * 1.2
+    bead_mix_volume = min(bead_volume * 0.5, 300.0)
 
     # Helper functions
     def mix_beads():
-        cmd.tip_pick_up(hammy, tips_300.ch2(1, remove=False))
+        cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
         cmd.aspirate(
             hammy,
-            beads.ch2(1, remove=False),
+            beads,
             [0.0],
             liquidClass=MIX_300,
             mixCycles=10,
-            mixVolume=300.0,
+            mixVolume=bead_mix_volume,
         )
-        cmd.dispense(hammy, beads.ch2(1, remove=False), [0.0], liquidClass=MIX_300)
-        cmd.tip_eject(hammy, tips_300.default.ch2(1), waste=False)
+        cmd.dispense(hammy, beads, [0.0], liquidClass=MIX_300)
+        cmd.tip_eject(hammy, waste=True)
+
+    def check_tip_holder():
+        if tips_holder_96in384_50.total() == 0:
+            cmd.tip_pick_up_384(hammy, tips_96in384_50.full())
+            cmd.tip_eject_384(hammy, tips_holder_96in384_50.full())
+        tips_holder_96in384_50.reset()
 
     # Start method!
     input(f"Press enter to start method!")
 
+    # Main script starts here
     with HamiltonInterface(simulate=True) as hammy:
         # Initialize Hamilton
         cmd.initialize(hammy)
 
         # Add water for normalization
         if not state["end_prep_add_water"]:
-            cmd.tip_pick_up(hammy, tips_300.default.ch2(1, remove=False))
+            cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
             cmd.aspirate(
                 hammy,
-                water.ch2(1, remove=False),
+                water,
                 water_volume,
                 liquidClass=ALIQUOT_300,
                 liquidHeight=0.1,
             )
 
-            while water_volumes:
+            while c3.total() > 0 and water_volumes:
                 cmd.dispense(
-                    hammy,
-                    c3_end_prep.ch2(1),
-                    [water_volumes.pop(0)],
-                    liquidClass=ALIQUOT_300,
+                    hammy, c3.ch2(1), [water_volumes.pop(0)], liquidClass=ALIQUOT_300
                 )
 
-            cmd.tip_eject(hammy, tips_300.default.ch2(1), waste=False)
+            cmd.tip_eject(hammy, waste=True)
 
-            c3_end_prep.reset()
-            st.update_state(state, state_file_path, "end_prep_add_water", 1)
+            c3.reset()
+            st.reset_state(state, state_file_path, "end_prep_add_water", 1)
 
         # Add end prep master mix to water
         if not state["end_prep_add_mm"]:
-            cmd.tip_pick_up(hammy, tips_50.default.ch2(1, remove=False))
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
             cmd.aspirate(
                 hammy,
-                end_prep_mm.ch2(1),
-                [2.5 * (n_samples + 1)],
+                end_prep_mm,
+                [2.5 * samples * 1.2],
                 liquidClass=ALIQUOT_50,
                 mixCycles=3,
-                mixVolume=2.5 * n_samples / 2,
+                mixVolume=2.5 * samples / 2,
                 liquidHeight=0.1,
             )
-            for _ in range(n_samples):
-                cmd.dispense(
-                    hammy,
-                    c3_end_prep.ch2(1),
-                    [2.5],
-                    liquidClass=ALIQUOT_50,
-                )
-            cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+            while c3.total() > 0:
+                cmd.dispense(hammy, c3.ch2(1), [2.5], liquidClass=ALIQUOT_50)
+            cmd.tip_eject(hammy, waste=True)
 
-            c3_end_prep.reset()
+            c3.reset()
+            st.reset_state(state, state_file_path, "end_prep_add_mm", 1)
 
         # Remove end prep reagents & add sample tubes to carrier
         hp.notify(
@@ -191,15 +177,12 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
 
         # Add samples to end prep master mix
         if not state["end_prep_add_samples"]:
-            while sample_volumes:
-                v = [sample_volumes.pop(0)]
-                cmd.tip_pick_up(
-                    hammy, tips_50.default.ch2(1, remove=False)
-                )
+            while carrier.total() > 0 and c3.total() > 0:
+                cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
                 cmd.aspirate(
                     hammy,
-                    samples.ch2(1),
-                    v,
+                    carrier.ch2(1),
+                    sample_volumes[0],
                     liquidClass=MIX_50,
                     mixCycles=3,
                     mixVolume=10.0,
@@ -207,16 +190,19 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 )
                 cmd.dispense(
                     hammy,
-                    c3_end_prep.ch2(1),
-                    v,
+                    c3.ch2(1),
+                    sample_volumes[0],
                     liquidClass=MIX_50,
                     mixCycles=5,
                     mixVolume=7.5,
                     liquidHeight=0.1,
                 )
-                cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+                cmd.tip_eject(hammy, waste=True)
 
-            c3_end_prep.reset()
+                del sample_volumes[0]
+
+            c3.reset()
+            st.reset_state(state, state_file_path, "end_prep_add_samples", 1)
 
         # Incubate samples & add end-prep clean-up reagents
         hp.notify(
@@ -228,13 +214,11 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
         # Add beads to samples
         if not state["end_prep_add_beads"]:
             mix_beads()
-            for _ in range(n_samples):
-                cmd.tip_pick_up(
-                    hammy, tips_50.default.ch2(1, remove=False)
-                )
+            while c3.total() > 0:
+                cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
                 cmd.aspirate(
                     hammy,
-                    beads.ch2(1, remove=False),
+                    beads,
                     [15.0],
                     liquidClass=MIX_50,
                     mixCycles=3,
@@ -242,160 +226,111 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 )
                 cmd.dispense(
                     hammy,
-                    c3_end_prep.ch2(1),
+                    c3.ch2(1),
                     [15.0],
                     liquidClass=MIX_50,
                     mixCycles=5,
                     mixVolume=15.0,
                 )
-                cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+                cmd.tip_eject(hammy, waste=True)
 
-            c3_end_prep.reset()
+            c3.reset()
 
-        # Incubate samples & mix
-        cmd.grip_get(hammy, c3.plate)
-        cmd.grip_place(hammy, d1.plate)
-        # time.sleep(60 * 3)
+            cmd.grip_get(hammy, c3.plate)
+            cmd.grip_place(hammy, d1.plate)
 
-        # Move to magnent & remove supernatant
-        cmd.grip_get(hammy, d1.plate)
-        cmd.grip_place(hammy, d3.plate)
+            st.reset_state(state, state_file_path, "end_prep_add_beads", 1)
 
+        # Incubate for 3 minutes at room temperature
+        time.sleep(60 * 3)
+
+        # Move to magnet & remove supernatant
         if not state["end_prep_cleanup_supernatant"]:
-            cmd.tip_pick_up_384(
-                hammy, tips_384_96.default.mph384(rows, columns)
-            )
-            cmd.aspirate_384(
-                hammy,
-                d3_end_prep.mph384(rows, columns),
-                30.0,
-                liquidHeight=0.1,
-            )
-            cmd.dispense_384(
-                hammy,
-                waste.default_wells.mph384(rows, columns),
-                30.0,
-                liquidHeight=12.0,
-            )
+            cmd.grip_get(hammy, d1.plate)
+            cmd.grip_place(hammy, d3.plate)
+
+            check_tip_holder()
+
+            cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
+            cmd.aspirate_384(hammy, d3.static(end_prep_index), 30.0, liquidHeight=0.1)
+            cmd.dispense_384(hammy, waste, 30.0, liquidHeight=12.0)
             cmd.tip_eject_384(hammy, mode=1)
-            d3_end_prep.reset()
+
+            st.reset_state(state, state_file_path, "end_prep_cleanup_supernatant", 1)
 
         # Wash samples
         if not state["end_prep_cleanup_wash"]:
-            cmd.tip_pick_up(hammy, tips_300.default.ch2(remove=False))
-            for j in range(2):
-                for i in range(0, n_samples, CHANNELS * 2):
-                    if i >= 12:
-                        ethanol.ch2()
-                    cmd.aspirate(
-                        hammy,
-                        ethanol.ch2(remove=False),
-                        [300.0],
-                        liquidClass=ETHANOL,
-                    )
-                    for _ in range(CHANNELS):
-                        cmd.dispense(
-                            hammy,
-                            d3_end_prep.ch2(),
-                            [150.0],
-                            liquidClass=ETHANOL,
-                            liquidHeight=12.0,
-                        )
-                d3_end_prep.reset()
+            check_tip_holder()
 
-                cmd.tip_pick_up_384(
-                    hammy,
-                    tips_384_96.default.mph384(
-                        rows, columns, remove=False
-                    ),
-                )
+            for _ in range(2):
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
                 for _ in range(3):
-                    cmd.aspirate_384(
-                        hammy,
-                        d3_end_prep.mph384(rows, columns, remove=False),
-                        50.0,
-                        liquidHeight=0.1,
-                    )
-                    cmd.dispense_384(
-                        hammy,
-                        waste.default_wells.mph384(
-                            rows, columns, remove=False
-                        ),
-                        50.0,
-                        liquidHeight=12.0,
-                    )
-                cmd.tip_eject_384(hammy, mode=j + 1)
-                waste.default_wells.mph384(rows, columns)
+                    cmd.aspirate_384(hammy, ethanol, 50.0)
+                    cmd.dispense_384(hammy, d3.static(end_prep_index), 50.0)
 
-            tips_384_96.default.mph384(rows, columns)
-            cmd.tip_eject(hammy, tips_300.default.ch2(), waste=False)
+                time.sleep(60)
+
+                for _ in range(3):
+                    cmd.aspirate_384(hammy, d3.static(sample_index), 50.0)
+                    cmd.dispense_384(hammy, waste, 50.0)
+                cmd.tip_eject_384(hammy, mode=2)
+
+            st.reset_state(state, state_file_path, "end_prep_cleanup_wash", 1)
 
         # Dry samples
-        # time.sleep(30)
+        time.sleep(30)
 
         # Elute samples
         if not state["end_prep_cleanup_elute"]:
             cmd.grip_get(hammy, d3.plate)
             cmd.grip_place(hammy, c3.plate)
 
-            cmd.tip_pick_up(hammy, tips_300.default.ch2(1, remove=False))
+            cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
             cmd.aspirate(
                 hammy,
-                water.ch2(1),
-                [10.0 * (n_samples + 1)],
+                water,
+                [10.0 * samples * 1.2],
                 liquidClass=ALIQUOT_300,
             )
 
-            for _ in range(n_samples):
+            while c3.total() > 0:
                 cmd.dispense(
                     hammy,
-                    c3_end_prep.ch2(1),
+                    c3.ch2(1),
                     [10.0],
                     liquidClass=ALIQUOT_300,
                     liquidHeight=5.0,
                 )
 
-            cmd.tip_eject(hammy, tips_300.default.ch2(1), waste=False)
+            cmd.tip_eject(hammy, waste=False)
 
-            c3_end_prep.reset()
+            c3.reset()
 
-            # Mix with 384mph
-            cmd.tip_pick_up_384(
-                hammy, tips_384_96.default.mph384(rows, columns)
-            )
+            check_tip_holder()
+
+            cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
             cmd.aspirate_384(
                 hammy,
-                c3_end_prep.mph384(rows, columns, remove=False),
+                c3.static(end_prep_index),
                 0.0,
                 mixCycles=5,
                 mixVolume=8.0,
                 liquidHeight=0.1,
             )
-            cmd.tip_eject_384(hammy, mode=1)
+            cmd.tip_eject_384(hammy, mode=2)
 
             cmd.grip_get(hammy, c3.plate)
             cmd.grip_place(hammy, d3.plate)
 
-            cmd.tip_pick_up_384(
-                hammy, tips_384_96.default.mph384(rows, columns)
-            )
-            cmd.aspirate_384(
-                hammy,
-                d3_end_prep.mph384(rows, columns),
-                7.5,
-                liquidHeight=0.1,
-            )
-            cmd.dispense_384(
-                hammy,
-                d3_barcode.mph384(rows, columns),
-                7.5,
-            )
-            cmd.tip_eject_384(hammy, mode=1)
+            check_tip_holder()
 
-            d3_barcode.reset()
+            cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
+            cmd.aspirate_384(hammy, d3.static(end_prep_index), 7.5, liquidHeight=0.1)
+            cmd.dispense_384(hammy, d3.static(barcode_index), 7.5)
+            cmd.tip_eject_384(hammy, mode=2)
 
-        # Incubate samples
-        # time.sleep(60 * 2)
+            c3.fill(barcode_index)
+            st.reset_state(state, state_file_path, "end_prep_cleanup_elute", 1)
 
         # Remove end prep reagents & add barcode reagents to carrier
         hp.notify(
@@ -409,28 +344,28 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
             cmd.grip_get(hammy, d3.plate)
             cmd.grip_place(hammy, c3.plate)
 
-            for _ in range(n_samples):
-                cmd.tip_pick_up(
-                    hammy, tips_50.default.ch2(1, remove=False)
-                )
+            while carrier.total() > 0 and c3.total() > 0:
+                cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
                 cmd.aspirate(
                     hammy,
-                    samples.ch2(1),
+                    carrier.ch2(1),
                     [2.5],
                     liquidClass=MIX_50,
                     liquidHeight=0.1,
                 )
                 cmd.dispense(
                     hammy,
-                    c3_barcode.ch2(1),
+                    c3.ch2(1),
                     [2.5],
                     liquidClass=MIX_50,
                     mixCycles=5,
                     mixVolume=7.5,
                 )
-                cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+                cmd.tip_eject(hammy, waste=True)
 
-            c3_barcode.reset()
+            carrier.reset()
+            c3.reset()
+            st.reset_state(state, state_file_path, "barcode_ligation_add_barcodes", 1)
 
         # Remove barcode reagents & add remaining reagents to carrier
         hp.notify(
@@ -441,103 +376,86 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
 
         # Add ligation master mix to samples
         if not state["barcode_ligation_add_mm"]:
-            for _ in range(n_samples):
-                cmd.tip_pick_up(
-                    hammy, tips_50.default.ch2(1, remove=False)
-                )
+            while c3.total() > 0:
+                cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
                 cmd.aspirate(
                     hammy,
-                    blunt_ta_ligase_mm.ch2(1),
+                    blunt_ta_ligase_mm,
                     [10.0],
                     liquidClass=MIX_50,
                     liquidHeight=0.1,
                 )
                 cmd.dispense(
                     hammy,
-                    c3_barcode.ch2(1),
+                    c3.ch2(1),
                     [10.0],
                     liquidClass=MIX_50,
                     mixCycles=5,
                     mixVolume=10.0,
                 )
-                cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+                cmd.tip_eject(hammy, waste=True)
 
-            c3_barcode.reset()
+            cmd.grip_get(hammy, c3.plate)
+            cmd.grip_place(hammy, d1.plate)
 
-        # Incubate samples
-        cmd.grip_get(hammy, c3.plate)
-        cmd.grip_place(hammy, d1.plate)
-        # time.sleep(60 * 20)
-        cmd.grip_get(hammy, d1.plate)
-        cmd.grip_place(hammy, c3.plate)
+            c3.reset()
+            st.reset_state(state, state_file_path, "barcode_ligation_add_mm", 1)
+
+        # Incubate samples for 20 minutes at room temperature
+        time.sleep(60 * 20)
 
         # Add EDTA to samples
         if not state["barcode_ligation_add_edta"]:
-            for _ in range(n_samples):
-                cmd.tip_pick_up(
-                    hammy, tips_50.default.ch2(1, remove=False)
-                )
-                cmd.aspirate(
-                    hammy,
-                    edta.ch2(1),
-                    [2.0],
-                    liquidClass=MIX_50,
-                    liquidHeight=0.1,
-                )
+            cmd.grip_get(hammy, d1.plate)
+            cmd.grip_place(hammy, c3.plate)
+
+            while c3.total() > 0:
+                cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
+                cmd.aspirate(hammy, edta, [2.0], liquidClass=MIX_50, liquidHeight=0.1)
                 cmd.dispense(
                     hammy,
-                    c3_barcode.ch2(1),
+                    c3.ch2(1),
                     [2.0],
                     liquidClass=MIX_50,
                     mixCycles=5,
                     mixVolume=10.0,
                 )
-                cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+                cmd.tip_eject(hammy, waste=True)
 
-            c3_barcode.reset()
+            c3.reset()
+            st.reset_state(state, state_file_path, "barcode_ligation_add_edta", 1)
 
         # Pool samples
         if not state["barcode_ligation_pool_samples"]:
-            cmd.tip_pick_up(hammy, tips_300.default.ch2(1, remove=False))
-            for i in range(n_samples):
-                if i == 14:
-                    cmd.dispense(
+            cycles = math.ceil(samples / 14)
+
+            cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
+            for _ in range(cycles):
+                aspirations = min(14, c3.total())
+
+                for _ in range(aspirations):
+                    cmd.aspirate(
                         hammy,
-                        pool.ch2(1, remove=False),
-                        [i * 20.0],
+                        c3.ch2(1),
+                        [10.0],
                         liquidClass=ALIQUOT_300,
+                        liquidHeight=0.1,
                     )
-                cmd.aspirate(
-                    hammy,
-                    c3_barcode.ch2(1),
-                    [10.0],
-                    liquidClass=ALIQUOT_300,
-                    liquidHeight=0.1,
-                )
-            cmd.dispense(
-                hammy,
-                pool.ch2(1, remove=False),
-                [(n_samples if n_samples < 14 else n_samples - 14) * 10.0],
-                liquidClass=ALIQUOT_300,
-            )
-            cmd.tip_eject(hammy, tips_300.default.ch2(1), waste=False)
+                cmd.dispense(hammy, pool, [aspirations * 20.0], liquidClass=ALIQUOT_300)
+            cmd.dispense(hammy, pool, [20.0], liquidClass=ALIQUOT_300)
+            cmd.tip_eject(hammy, waste=True)
+
+            st.reset_state(state, state_file_path, "barcode_ligation_pool_samples", 1)
 
         # Add beads to pool
         if not state["barcode_ligation_add_beads"]:
             mix_beads()
-            cmd.tip_pick_up(hammy, tips_300.default.ch2(1, remove=False))
-            cmd.aspirate(
-                hammy,
-                beads.ch2(1, remove=False),
-                [n_samples * 8.0],
-                liquidHeight=0.1,
-            )
-            cmd.dispense(
-                hammy,
-                pool.ch2(1, remove=False),
-                [n_samples * 8.0],
-            )
-            cmd.tip_eject(hammy, tips_300.default.ch2(1), waste=False)
+            cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
+            cmd.aspirate(hammy, beads, [samples * 8.0], liquidHeight=0.1)
+            cmd.dispense(hammy, pool, [samples * 8.0])
+            cmd.tip_eject(hammy, waste=True)
+
+            st.reset_state(state, state_file_path, "barcode_ligation_add_beads", 1)
 
         # User takes over from here to finish clean-up
         hp.notify("*User action required:* Finish clean-up of barcode ligation.")
@@ -545,21 +463,19 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
 
         # Add adapter reagents to pool
         if not state["adapter_ligation_add_reagents"]:
-            cmd.tip_pick_up(hammy, tips_50.default.ch2(1, remove=False))
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
             cmd.aspirate(
                 hammy,
-                adapter_mm.ch2(1, remove=False),
+                adapter_mm,
                 [5.0],
                 liquidClass=MIX_50,
                 mixCycles=3,
                 mixVolume=5.0,
                 liquidHeight=0.1,
             )
-            cmd.dispense(
-                hammy, d1.default_wells.static(["A12"]), [5.0], liquidClass=MIX_50
-            )
-            cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
-            cmd.tip_pick_up(hammy, tips_50.default.ch2(1, remove=False))
+            cmd.dispense(hammy, d1_pool, [5.0], liquidClass=MIX_50)
+            cmd.tip_eject(hammy, tips_96_50.ch2(1), waste=False)
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1, remove=False))
             cmd.aspirate(
                 hammy,
                 quick_t4_ligase_buffer.ch2(1, remove=False),
@@ -569,11 +485,9 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 mixVolume=10.0,
                 liquidHeight=0.1,
             )
-            cmd.dispense(
-                hammy, d1.default_wells.static(["A12"]), [10.0], liquidClass=MIX_50
-            )
-            cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
-            cmd.tip_pick_up(hammy, tips_50.default.ch2(1, remove=False))
+            cmd.dispense(hammy, d1_pool, [10.0], liquidClass=MIX_50)
+            cmd.tip_eject(hammy, tips_96_50.ch2(1), waste=False)
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1, remove=False))
             cmd.aspirate(
                 hammy,
                 quick_t4_ligase_enzyme.ch2(1, remove=False),
@@ -585,108 +499,120 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
             )
             cmd.dispense(
                 hammy,
-                d1.default_wells.static(["A12"]),
+                d1_pool,
                 [5.0],
                 liquidClass=MIX_50,
                 mixCycles=3,
                 mixVolume=25.0,
             )
-            cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+            cmd.tip_eject(hammy, waste=True)
 
-        # Incubate pool
-        # time.sleep(60 * 20)
+            st.reset_state(state, state_file_path, "adapter_ligation_add_reagents", 1)
 
-        # Add beads to pool
+        # Incubate for 20 minutes at room temperature
+        time.sleep(60 * 20)
+
+        # Add beads to library
         if not state["adapter_ligation_add_beads"]:
             mix_beads()
-            cmd.tip_pick_up(hammy, tips_50.default.ch2(1, remove=False))
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
             cmd.aspirate(
                 hammy,
-                beads.ch2(1, remove=False),
+                beads,
                 [20.0],
                 liquidClass=MIX_50,
                 liquidHeight=0.1,
             )
             cmd.dispense(
                 hammy,
-                d1.default_wells.static(["A12"]),
+                d1_pool,
                 [20.0],
                 liquidClass=MIX_50,
                 mixCycles=3,
                 mixVolume=50.0,
             )
-            cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+            cmd.tip_eject(hammy, waste=True)
 
-        # Incubate pool
-        # time.sleep(60 * 10)
+            st.reset_state(state, state_file_path, "adapter_ligation_add_beads", 1)
+
+        # Incubate for 10 minutes at room temperature
+        time.sleep(60 * 10)
 
         # Move to magnet & remove supernatant
         if not state["adapter_ligation_cleanup_supernatant"]:
             cmd.grip_get(hammy, d1.plate)
             cmd.grip_place(hammy, d3.plate)
-            cmd.tip_pick_up(hammy, tips_50.default.ch2(1, remove=False))
+
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
             cmd.aspirate(
                 hammy,
-                d3.default_wells.static(["A12"]),
+                d3_pool,
                 [50.0],
                 liquidClass=EMPTY_50,
                 liquidHeight=0.1,
             )
-            cmd.dispense(
-                hammy, d3.default_wells.static(["B12"]), [50.0], liquidClass=EMPTY_50
+            cmd.dispense(hammy, waste, [50.0], liquidClass=EMPTY_50)
+            cmd.tip_eject(hammy, waste=True)
+
+            st.reset_state(
+                state, state_file_path, "adapter_ligation_cleanup_supernatant", 1
             )
-            cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
 
         # Wash pool with fragment buffer
         if not state["adapter_ligation_cleanup_wash"]:
             for _ in range(2):
-                cmd.tip_pick_up(
-                    hammy, tips_300.default.ch2(1, remove=False)
-                )
+                cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
                 cmd.aspirate(
                     hammy,
-                    fragment_buffer.ch2(1, remove=False),
+                    fragment_buffer,
                     [125.0],
                     liquidClass=MIX_300,
                     liquidHeight=0.1,
                 )
                 cmd.dispense(
                     hammy,
-                    d3.default_wells.static(["A12"]),
+                    d3_pool,
                     [125.0],
                     liquidClass=MIX_300,
                     mixCycles=10,
                     mixVolume=50.0,
                 )
-                # time.sleep(60)
-                cmd.aspirate(hammy, d3.default_wells.static(["A12"]), [150.0])
-                cmd.tip_eject(hammy, tips_300.default.ch2(1), waste=False)
+
+                time.sleep(60)
+
+                cmd.aspirate(hammy, d3_pool, [150.0])
+                cmd.tip_eject(hammy, waste=True)
+
+            st.reset_state(state, state_file_path, "adapter_ligation_cleanup_wash", 1)
 
         # Dry pool
-        # time.sleep(30)
+        time.sleep(30)
 
         # Remove from magnet & add elution buffer
         if not state["adapter_ligation_cleanup_elute"]:
             cmd.grip_get(hammy, d3.plate)
             cmd.grip_place(hammy, c3.plate)
-            cmd.tip_pick_up(hammy, tips_50.default.ch2(1, remove=False))
+
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
             cmd.aspirate(
                 hammy,
-                elution_buffer.ch2(1, remove=False),
+                elution_buffer,
                 [15.0],
                 liquidClass=MIX_50,
                 liquidHeight=0.1,
             )
             cmd.dispense(
                 hammy,
-                c3.default_wells.static(["A12"]),
+                c3_pool,
                 [15.0],
                 liquidClass=MIX_50,
                 mixCycles=3,
                 mixVolume=7.5,
                 liquidHeight=0.1,
             )
-            cmd.tip_eject(hammy, tips_50.default.ch2(1), waste=False)
+            cmd.tip_eject(hammy, waste=True)
+
+            st.reset_state(state, state_file_path, "adapter_ligation_cleanup_elute", 1)
 
         # User takes over from here to finish clean-up
         hp.notify("*User action required:* Finish clean-up of adapter ligation.")

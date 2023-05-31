@@ -19,7 +19,6 @@ WATER = "Tip_50ul_Water_DispenseJet_Empty"
 
 def run(
     shelf: shelve.Shelf[list[dict[str, list]]],
-    deck: dict,
     state: dict,
     run_dir_path: str,
 ):

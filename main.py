@@ -200,8 +200,6 @@ if __name__ == "__main__":
                                         "Labware file not found for {method} method."
                                         " Was the correct method specified?"
                                     )
-                                deck = dk.get_deck(layout_path)
-                                deck = dk.add_dataframes(deck)
 
                                 logger.info(f"Resuming run {run_id}")
 
@@ -313,7 +311,7 @@ if __name__ == "__main__":
         script = importlib.import_module(method, "scripts")
         try:
             with shelve.open(labware_path, writeback=True) as shelf:
-                script.run(shelf, deck, state, run_dir_path)
+                script.run(shelf, state, run_dir_path)
         except KeyboardInterrupt:
             logger.warning("Keyboard interrupt received. Exiting...")
             hp.notify(f"Method {method} for run {run_id} interrupted by user.")

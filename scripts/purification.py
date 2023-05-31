@@ -20,7 +20,6 @@ ALIQUOT_300 = "StandardVolume_Water_DispenseJet_Part"
 
 def run(
     shelf: shelve.Shelf[list[dict[str, list]]],
-    deck: dict,
     state: dict,
     run_dir_path: str,
 ):
@@ -40,7 +39,6 @@ def run(
 
     # Calculate number of tips required
     tips = math.ceil((pools * 6 + 3) / 96) * 96
-    columns = min(1, math.ceil(pools / 8))
 
     # Labware aliases
     carrier = shelf["C"][0]["frame"][0]
@@ -55,12 +53,14 @@ def run(
     magnet = shelf["D"][2]["frame"][0]
     plate = shelf["C"][2]["frame"][0]
 
-    # Plate indexes
+    # Plate indexes and layout
+    rows = 8
+    columns = min(1, math.ceil(pools / rows))
     sample_index = [i for i in lw.pos_row_column_96(pools)]
     supernatant_index = [i for i in lw.pos_row_column_96(pools, pools)]
     wash1_index = [i for i in lw.pos_row_column_96(pools, pools * 2)]
     wash2_index = [i for i in lw.pos_row_column_96(pools, pools * 3)]
-    ethanol_index = [i for i in lw.pos_96_in_384(1)[: 8 * columns]]
+    ethanol_index = [i for i in lw.pos_96_in_384(1)[: rows * columns]]
 
     # Sample tube df and static positions
     carrier.fill([i for i in lw.pos_row_column_24(pools)])
@@ -91,6 +91,7 @@ def run(
             cmd.tip_eject_384(hammy, tips_holder_96in384_50.full())
         tips_holder_96in384_50.reset()
 
+    # Start method!
     input(f"Press enter to start method!")
 
     # Main script starts here
@@ -191,12 +192,7 @@ def run(
 
             # Move plate to magnetic plate
             if not state["move_beads"]:
-                cmd.grip_get(
-                    hammy,
-                    plate.plate,
-                    gripWidth=81.0,
-                    gripHeight=9.0,
-                )
+                cmd.grip_get(hammy, plate.plate, gripWidth=81.0)
                 cmd.grip_place(hammy, magnet.plate)
 
                 st.reset_state(state, state_file_path, "move_beads", 1)
@@ -210,7 +206,7 @@ def run(
 
                 cycles = math.ceil((sample_volume + bead_volume) / 50)
 
-                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
                 for _ in range(cycles):
                     cmd.aspirate_384(hammy, magnet.static(sample_index), 50.0)
                     cmd.dispense_384(hammy, magnet.static(supernatant_index), 50.0)
@@ -225,7 +221,7 @@ def run(
                 cycles = math.ceil(wash_volume / 50)
 
                 # Add ethanol
-                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
                 for _ in range(cycles):
                     cmd.aspirate_384(hammy, ethanol, 50.0)
                     cmd.dispense_384(hammy, magnet.static(sample_index), 50.0)
@@ -248,7 +244,7 @@ def run(
                 cycles = math.ceil(wash_volume / 50)
 
                 # Add ethanol
-                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
                 for _ in range(cycles):
                     cmd.aspirate_384(hammy, ethanol, 50.0)
                     cmd.dispense_384(hammy, magnet.static(sample_index), 50.0)
@@ -266,7 +262,7 @@ def run(
 
             # Move plate away from magnet
             if not state["move_wash"]:
-                cmd.grip_get(hammy, magnet.plate, gripWidth=81.0, gripHeight=9.0)
+                cmd.grip_get(hammy, magnet.plate, gripWidth=81.0)
                 cmd.grip_place(hammy, plate.plate, 1)
 
                 st.reset_state(state, state_file_path, "move_wash", 1)
@@ -304,7 +300,7 @@ def run(
             if not state["mix_buffer"]:
                 check_tip_holder()
 
-                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, columns))
+                cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
                 cmd.aspirate_384(
                     hammy,
                     plate.static(sample_index),
@@ -312,13 +308,6 @@ def run(
                     liquidHeight=0.1,
                     mixCycles=10,
                     mixVolume=10.0,
-                )
-                cmd.dispense_384(
-                    hammy,
-                    plate.static(sample_index),
-                    0.0,
-                    liquidHeight=0.1,
-                    dispenseMode=9,
                 )
                 cmd.tip_eject_384(hammy, mode=2)
 
@@ -329,7 +318,7 @@ def run(
 
             # Move plate back to magnet
             if not state["move_elute"]:
-                cmd.grip_get(hammy, plate.plate, gripWidth=81.0, gripHeight=9.0)
+                cmd.grip_get(hammy, plate.plate, gripWidth=81.0)
                 cmd.grip_place(hammy, magnet.plate)
 
                 st.reset_state(state, state_file_path, "move_elute", 1)

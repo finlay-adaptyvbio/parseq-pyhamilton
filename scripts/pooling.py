@@ -15,7 +15,6 @@ logger.addHandler(logging.NullHandler())
 
 def run(
     shelf: shelve.Shelf[list[dict[str, list]]],
-    deck: dict,
     state: dict,
     run_dir_path: str,
 ):
@@ -42,8 +41,8 @@ def run(
     active_pooling_plate = shelf["C"][2]["frame"][0]
 
     # EDTA reservoir and tips
-    edta_reservoir = shelf["C"][4]["frame"][0]
-    edta_rack = shelf["B"][4]["frame"][0]
+    edta_reservoir = shelf["C"][4]["frame"][0].full()
+    edta_tips = shelf["B"][4]["frame"][0].full()
 
     # Eppendorf carrier
     carrier = shelf["C"][0]["frame"][0]
@@ -110,8 +109,8 @@ def run(
 
             # Add EDTA to pcr plate if not already done
             if not state["add_edta"]:
-                cmd.tip_pick_up_384(hammy, edta_rack.full())
-                cmd.aspirate_384(hammy, edta_reservoir.full(), 20.0, liquidHeight=2.0)
+                cmd.tip_pick_up_384(hammy, edta_tips)
+                cmd.aspirate_384(hammy, edta_reservoir, 20.0, liquidHeight=2.0)
                 cmd.dispense_384(
                     hammy,
                     active_pcr_plate.full(),

@@ -20,7 +20,6 @@ ETHANOL_DISPENSE = "StandardVolume_EtOH_DispenseJet_Part"
 
 def run(
     shelf: shelve.Shelf[list[dict[str, list]]],
-    deck: dict,
     state: dict,
     run_dir_path: str,
 ):

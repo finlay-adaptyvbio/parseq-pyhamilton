@@ -19,7 +19,6 @@ WATER = "Tip_50ul_Water_DispenseJet_Empty"
 
 def run(
     shelf: shelve.Shelf[list[dict[str, list]]],
-    deck: dict,
     state: dict,
     run_dir_path: str,
 ):
@@ -90,7 +89,7 @@ def run(
         cmd.initialize(hammy)
 
         # Loop over plates as long as there are still source plates to process
-        while source_plates:
+        while src_plates:
             # Get next source plate if not already done
             if not state["active_src_plate"]:
                 cmd.grip_get(hammy, src_plates[-1].plate, gripWidth=82.0)
