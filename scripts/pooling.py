@@ -248,7 +248,5 @@ def run(
 
                 st.reset_state(state, state_file_path, "active_pooling_plate", 0)
 
-            st.print_state(state)
-
         # Cleanup grip tool if not done
         cmd.grip_eject(hammy)
