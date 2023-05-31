@@ -67,6 +67,8 @@ def run(
                 )
                 cmd.grip_place(hammy, tmp_bact_lid.lid, mode=1)
 
+                dk.delete_labware(shelf, bact_plates.pop().plate)
+
                 st.reset_state(state, state_file_path, "active_bact_plate", 1)
                 st.reset_state(state, state_file_path, "add_bact", 0)
 
@@ -88,14 +90,11 @@ def run(
                 cmd.aspirate_384(hammy, master_mix, 18.5, liquidHeight=2.0)
                 cmd.dispense_384(
                     hammy,
-                    active_pcr_plate.plate,
+                    active_pcr_plate.full(),
                     18.5,
                     liquidHeight=8.0,
                     dispenseMode=9,
                 )
-
-                dk.delete_labware(shelf, active_pcr_plate.pop(0).plate)
-
                 cmd.tip_eject_384(hammy, mode=1)
 
                 st.reset_state(state, state_file_path, "add_mm", 1)
