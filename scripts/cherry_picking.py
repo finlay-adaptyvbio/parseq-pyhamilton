@@ -97,7 +97,7 @@ def run(
                 cmd.grip_get(
                     hammy, active_src_lid.lid, mode=1, gripWidth=85.2, gripHeight=5.0
                 )
-                cmd.grip_place(hammy, tmp_src_lid, mode=1)
+                cmd.grip_place(hammy, tmp_src_lid.lid, mode=1)
 
                 # Build list of source wells for current plate
                 active_src_plate.fill(
@@ -133,8 +133,8 @@ def run(
                 cmd.grip_place(hammy, src_plates_done[0].plate)
 
                 dk.delete_labware(shelf, src_plates_done.pop(0).plate)
-                st.reset_state(state, state_file_path, "active_source_plate", 0)
-                break
+                st.reset_state(state, state_file_path, "active_src_plate", 0)
+                continue
 
             # Check if there are still wells available in the current target plate
             # Swich to next target plate if current one is full
@@ -149,8 +149,8 @@ def run(
                 cmd.grip_place(hammy, tgt_plates_done[0].plate)
 
                 dk.delete_labware(shelf, tgt_plates_done.pop(0).plate)
-                st.reset_state(state, state_file_path, "active_target_plate", 0)
-                break
+                st.reset_state(state, state_file_path, "active_tgt_plate", 0)
+                continue
 
             # Check if there are still tips in the active rack
             # Discard rack and get new one from stacked racks if current one is done
