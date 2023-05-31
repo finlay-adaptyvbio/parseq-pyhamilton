@@ -25,7 +25,7 @@ def run(
     plates = hp.prompt_int("Plates to fill", 18)
     volume = hp.prompt_int("Volume to add", 100)
 
-    cycles = min(math.ceil(volume / 50), 1)
+    cycles = math.ceil(volume / 50)
 
     volume = volume / cycles
     reservoir_volume = volume * plates * 384 / 1000 * 1.2
@@ -82,11 +82,11 @@ def run(
                 cmd.grip_place(hammy, tmp_lid.lid, mode=1)
 
                 dk.delete_labware(shelf, bact_plates.pop().plate)
-                st.reset_state(state, state_file_path, "media", 0)
+                st.reset_state(state, state_file_path, "add_media", 0)
                 st.reset_state(state, state_file_path, "active_plate", 1)
 
             # Add media to bact plate
-            if not state["media"]:
+            if not state["add_media"]:
                 for _ in range(cycles):
                     cmd.aspirate_384(hammy, reservoir, volume, liquidHeight=2.0)
                     cmd.dispense_384(
@@ -97,17 +97,17 @@ def run(
                         dispenseMode=9,
                     )
 
-                st.reset_state(state, state_file_path, "media", 1)
+                st.reset_state(state, state_file_path, "add_media", 1)
 
             # Remove filled plate
-            if state["active_bact_plate"]:
+            if state["active_plate"]:
                 cmd.grip_get(hammy, tmp_lid.lid, mode=1, gripWidth=85.2, gripHeight=5.0)
                 cmd.grip_place(hammy, active_lid.lid, mode=1)
                 cmd.grip_get(hammy, active_plate.plate, gripWidth=82.0)
                 cmd.grip_place(hammy, bact_plates_done[0].plate)
 
                 dk.delete_labware(shelf, bact_plates_done.pop(0).plate)
-                st.reset_state(state, state_file_path, "active_bact_plate", 0)
+                st.reset_state(state, state_file_path, "active_plate", 0)
 
         # Cleanup instrument
         cmd.tip_eject_384(hammy, tips, mode=2)
