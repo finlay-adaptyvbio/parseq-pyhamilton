@@ -277,8 +277,8 @@ class tip_384:
     def frame(self):
         return self.df.fillna(0).astype(int)
 
-    def total(self):
-        return self.df.sum().sum()
+    def total(self) -> int:
+        return int(self.df.sum().sum())
 
     def full(self):
         """Get all available positions."""
@@ -315,8 +315,8 @@ class plate_384:
     def frame(self):
         return self.df.fillna(0).astype(int)
 
-    def total(self):
-        return self.df.sum().sum()
+    def total(self) -> int:
+        return int(self.df.sum().sum())
 
     def ch2(self, n: int = 2, remove: bool = True) -> list[tuple[Plate384, int]]:
         """Get wells from a plate in 2 channel mode."""
@@ -346,6 +346,17 @@ class plate_384:
 
         if remove:
             self.df[default_index_384.isin(index)] = pd.NA
+
+        if n != len(index) and remove:
+            wells = [(self.plate, i) for i in index]
+            wells.extend(self.ch2(1))
+            return wells
+        elif n != len(index) and not remove:
+            wells = [(self.plate, i) for i in index]
+            self.df[default_index_384.isin(index)] = pd.NA
+            wells.extend(self.ch2(1, remove=False))
+            self.df[default_index_384.isin(index)] = 1
+            return wells
 
         return [(self.plate, i) for i in index]
 
@@ -434,8 +445,8 @@ class reservoir_300:
     def frame(self):
         return self.df.fillna(0).astype(int)
 
-    def total(self):
-        return self.df.sum().sum()
+    def total(self) -> int:
+        return int(self.df.sum().sum())
 
     def ch2(self, n: int = 2) -> list[tuple[Reservoir300, int]]:
         """Get positions from a reservoir in 2 channel mode."""
@@ -486,7 +497,7 @@ class reservoir_300:
 
         return [(self.reservoir, i) for i in index]
 
-    def quadrant(self, remove: bool = True) -> list[tuple[Plate384, int]]:
+    def quadrant(self, remove: bool = True) -> list[tuple[Reservoir300, int]]:
         index, quadrant_df = None, None
         for q in range(1, 5):
             index = pos_96_in_384(q)
@@ -545,8 +556,8 @@ class tip_96:
     def frame(self):
         return self.df.fillna(0).astype(int)
 
-    def total(self):
-        return self.df.sum().sum()
+    def total(self) -> int:
+        return int(self.df.sum().sum())
 
     def ch2(self, n: int = 2, remove: bool = True) -> list[tuple[Tip96, int]]:
         """Get tips from a 96-tip rack in 2 channel mode."""
@@ -574,6 +585,17 @@ class tip_96:
 
         if remove:
             self.df[default_index_96.isin(index)] = pd.NA
+
+        if n != len(index) and remove:
+            tips = [(self.rack, i) for i in index]
+            tips.extend(self.ch2(1))
+            return tips
+        elif n != len(index) and not remove:
+            tips = [(self.rack, i) for i in index]
+            self.df[default_index_96.isin(index)] = pd.NA
+            tips.extend(self.ch2(1, remove=False))
+            self.df[default_index_96.isin(index)] = 1
+            return tips
 
         return [(self.rack, i) for i in index]
 
@@ -642,8 +664,8 @@ class plate_96:
     def frame(self):
         return self.df.fillna(0).astype(int)
 
-    def total(self):
-        return self.df.sum().sum()
+    def total(self) -> int:
+        return int(self.df.sum().sum())
 
     def ch2(self, n: int = 2, remove=True) -> list[tuple[Plate96, int]]:
         """Get wells from a 96 well plate in 2 channel mode."""
@@ -671,6 +693,17 @@ class plate_96:
 
         if remove:
             self.df[default_index_96.isin(index)] = pd.NA
+
+        if n != len(index) and remove:
+            wells = [(self.plate, i) for i in index]
+            wells.extend(self.ch2(1))
+            return wells
+        elif n != len(index) and not remove:
+            wells = [(self.plate, i) for i in index]
+            self.df[default_index_96.isin(index)] = pd.NA
+            wells.extend(self.ch2(1, remove=False))
+            self.df[default_index_96.isin(index)] = 1
+            return wells
 
         return [(self.plate, i) for i in index]
 
@@ -740,8 +773,8 @@ class carrier_24:
     def frame(self):
         return self.df.fillna(0).astype(int)
 
-    def total(self):
-        return self.df.sum().sum()
+    def total(self) -> int:
+        return int(self.df.sum().sum())
 
     def ch2(self, n: int = 2, remove=True) -> list[tuple[EppiCarrier24, int]]:
         """Get tubes from a 24 tube carrier in 2 channel mode."""

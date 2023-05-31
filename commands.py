@@ -442,7 +442,7 @@ def grip_place_tip_rack(
     **kw_args,
 ):
     logger.info(
-        f"Command: {'grip_get_tip_rack'} | Labware:"
+        f"Command: {'grip_place_tip_rack'} | Labware:"
         f" {labware.layout_name()} | Waste: {waste} | Eject: {eject}"
     )
 

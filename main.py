@@ -308,7 +308,7 @@ if __name__ == "__main__":
 
     # Run method, on failure notify and restart (max 3 retries)
     for attempt in range(3):
-        script = importlib.import_module(method, "scripts")
+        script = importlib.import_module(f".{method}", "scripts")
         try:
             with shelve.open(labware_path, writeback=True) as shelf:
                 script.run(shelf, state, run_dir_path)

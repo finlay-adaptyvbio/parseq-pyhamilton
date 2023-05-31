@@ -193,7 +193,7 @@ def delete_lids(shelf: shelve.Shelf, position: str):
             zip(shelf[letter][number]["labware"], shelf[letter][number]["frame"])
         )[::-1]:
             if isinstance(t[0], Lid) and isinstance(t[1], lw.lid):
-                shelf[letter][number]["frame"].remove(t[0])
+                shelf[letter][number]["labware"].remove(t[0])
                 shelf[letter][number]["frame"].remove(t[1])
     except:
         sys.exit()
@@ -204,7 +204,7 @@ def delete_unused(shelf: shelve.Shelf, position: str, n: int):
         try:
             letter, number = lw.pos(position)
             for k in shelf[letter][number]:
-                del shelf[letter][number][k][n:]
+                del shelf[letter][number][k][-n:]
         except:
             sys.exit()
 
