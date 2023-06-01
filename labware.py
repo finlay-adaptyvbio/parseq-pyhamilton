@@ -5,17 +5,6 @@ from pyhamilton import Plate96, Plate384, Tip96
 
 from pyhamilton.deckresource import DeckResource
 
-# Class mapping
-TYPES = {
-    Plate384: "plate_384",
-    Plate96: "plate_96",
-    Tip384: "tip_384",
-    Tip96: "tip_96",
-    Reservoir300: "reservoir_300",
-    EppiCarrier24: "carrier_24",
-    Lid: "lid",
-}
-
 # Logging settings
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -227,6 +216,80 @@ def assign_labware(labware):
 
 
 # Additional PyHamilton labware classes
+class Standard384(DeckResource):
+    """Labware types with 384 positions that use a letter-number id scheme like `'A1'`."""
+
+    def well_coords(self, idx):
+        self._assert_idx_in_range(idx)
+        return int(idx) // 16, int(idx) % 16
+
+    def position_id(self, idx):
+        x, y = self.well_coords(idx)
+        return "ABCDEFGHIJKLMNOP"[y] + str(x + 1)
+
+
+class Tip384(Standard384):
+    def __init__(self, layout_name):
+        self._layout_name = layout_name
+        self._num_items = 384
+        self.resource_type = DeckResource.types.TIP
+
+    def position_id(self, idx):  # tips use 1-indexed int ids descending columns first
+        self._assert_idx_in_range(idx)
+        return str(idx + 1)  # switch to standard advance through row first
+
+
+class Reservoir300(Standard384):
+    def __init__(self, layout_name):
+        self._layout_name = layout_name
+        self._num_items = 384
+        self.resource_type = DeckResource.types.VESSEL
+
+    def position_id(self, idx):
+        self._assert_idx_in_range(idx)
+        return str(idx + 1)
+
+
+class Lid(DeckResource):
+    def __init__(self, layout_name):
+        self._layout_name = layout_name
+        self._num_items = 1
+        self.resource_type = DeckResource.types.VESSEL
+
+    def well_coords(self, idx):
+        self._assert_idx_in_range(idx)
+        return int(idx) // 1, int(idx) % 1
+
+    def position_id(self, idx):  # tips use 1-indexed int ids descending columns first
+        self._assert_idx_in_range(idx)
+        return str(idx + 1)  # switch to standard advance through row first
+
+
+class EppiCarrier24(DeckResource):
+    def __init__(self, layout_name):
+        self._layout_name = layout_name
+        self._num_items = 24
+        self.positions = [str(i + 1) for i in range(self._num_items)]
+        self.resource_type = DeckResource.types.VESSEL
+
+    def well_coords(self, idx):
+        self._assert_idx_in_range(idx)
+        return int(idx) // 24, int(idx) % 24
+
+    def position_id(self, idx):
+        return self.positions[idx]
+
+
+# Class mapping
+TYPES = {
+    Plate384: "plate_384",
+    Plate96: "plate_96",
+    Tip384: "tip_384",
+    Tip96: "tip_96",
+    Reservoir300: "reservoir_300",
+    EppiCarrier24: "carrier_24",
+    Lid: "lid",
+}
 
 
 # Labware classes (DataFrame wrapper)

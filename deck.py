@@ -3,6 +3,7 @@ import logging, sys, shelve
 import labware as lw
 
 from pyhamilton import LayoutManager, ResourceType, Plate96, Plate384, Tip96
+from labware import Tip384, Reservoir300, Lid, EppiCarrier24
 
 from pyhamilton.oemerr import ResourceUnavailableError
 
