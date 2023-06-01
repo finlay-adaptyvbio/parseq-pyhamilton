@@ -165,8 +165,11 @@ def print_deck(shelf: shelve.Shelf | dict):
 
 
 def delete_lids(shelf: shelve.Shelf, position: str):
-    """Deletes lids from stacks of plates with lids.
-    Lids in plate stacks are not used for transport and cause issues in indexing."""
+    """
+    Deletes lids from stacks of plates with lids.
+    Lids in plate stacks are not used for transport and cause issues in indexing.
+    """
+    logger.debug(f"Deleting lids from {position}.")
     try:
         letter, number = lw.pos(position)
         for t in list(
@@ -182,6 +185,7 @@ def delete_lids(shelf: shelve.Shelf, position: str):
 
 def delete_unused(shelf: shelve.Shelf, position: str, n: int):
     """Delete n labware for a provided deck position."""
+    logger.debug(f"Deleting {n} labware from {position}.")
     if n != 0:
         try:
             letter, number = lw.pos(position)
@@ -193,6 +197,7 @@ def delete_unused(shelf: shelve.Shelf, position: str, n: int):
 
 def delete_labware(shelf: shelve.Shelf, labware):
     """Delete specific labware from deck."""
+    logger.debug(f"Deleting {labware.layout_name()} from deck.")
     for col in shelf.keys():
         for row in range(0, len(shelf[col])):
             if len(shelf[col][row]["labware"]) > 0:

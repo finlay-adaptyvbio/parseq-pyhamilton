@@ -15,12 +15,15 @@ def prompt_file_path(message: str) -> str:
     Returns:
         str: Path.
     """
+    logger.debug(f"Prompting for path: {message}")
     while True:
         path = input(f"{message}: ")
         if os.path.isfile(path):
             break
         else:
             print("File does not exist.")
+
+    logger.debug(f"{message}: {path}")
 
     return path
 
@@ -91,6 +94,7 @@ def process_cherry_csv(csv_path: str, output_dir: str) -> None:
         csv_path (str): Path to CSV file.
         output_dir (str): Path to output directory.
     """
+    logger.debug(f"Processing CSV at {csv_path}.")
 
     with open(csv_path, "r") as f:
         reader = csv.reader(f)
@@ -113,6 +117,8 @@ def process_cherry_csv(csv_path: str, output_dir: str) -> None:
         header=False,
     )
 
+    logger.debug(f"Saved output CSVs to {output_dir}.")
+
 
 def process_pm_csv(csv_path: str, output_dir: str, prefix: str):
     """Get plate names from CSV file. Save as CSV file.
@@ -121,6 +127,7 @@ def process_pm_csv(csv_path: str, output_dir: str, prefix: str):
         csv_path (str): Path to CSV file.
         output_dir (str): Path to output directory.
     """
+    logger.debug(f"Processing CSV at {csv_path}.")
 
     df = pd.read_csv(
         csv_path, names=["source_well", "source_plate", "target_well", "target_plate"]
@@ -133,6 +140,8 @@ def process_pm_csv(csv_path: str, output_dir: str, prefix: str):
     plates.to_csv(
         os.path.join(output_dir, f"{prefix}_plate_map.csv"), index=False, header=False
     )
+
+    logger.debug(f"Saved output CSV to {output_dir}.")
 
 
 # TODO: rewrite

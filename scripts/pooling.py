@@ -219,17 +219,9 @@ def run(
                 )
                 cmd.grip_place(hammy, active_pcr_lid.lid, mode=1)
                 cmd.grip_get(
-                    hammy,
-                    active_pcr_plate.plate,
-                    mode=0,
-                    gripWidth=81.0,
-                    gripHeight=6.0,
+                    hammy, active_pcr_plate.plate, gripWidth=81.0, gripHeight=6.0
                 )
-                cmd.grip_place(
-                    hammy,
-                    dest_pcr_plates[0].plate,
-                    mode=0,
-                )
+                cmd.grip_place(hammy, dest_pcr_plates[0].plate)
                 dest_pcr_plates.pop(0)
 
                 st.set_state(state, state_file_path, "active_pcr_plate", 0)
@@ -239,11 +231,10 @@ def run(
                 cmd.grip_get(
                     hammy,
                     active_pooling_plate.plate,
-                    mode=0,
                     gripWidth=81.0,
                     gripHeight=9.0,
                 )
-                cmd.grip_place(hammy, dest_pooling_plates[0].plate, mode=0)
+                cmd.grip_place(hammy, dest_pooling_plates[0].plate)
                 dest_pooling_plates.pop(0)
 
                 st.set_state(state, state_file_path, "active_pooling_plate", 0)

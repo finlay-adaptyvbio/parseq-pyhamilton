@@ -442,7 +442,7 @@ class plate_384:
     def quadrant(self, remove: bool = True) -> list[tuple[Plate384, int]]:
         """Get 96 positions from a reservoir with 384-head in 96-channel mode."""
         # Get first quadrant available
-        index, quadrant_df = None, None# required to check if quadrant is returned
+        index, quadrant_df = None, None  # required to check if quadrant is returned
         for q in range(1, 5):
             index = pos_96_in_384(q)
             mask = default_index_384.isin(index)
@@ -458,7 +458,7 @@ class plate_384:
             logger.error(f"Not enough wells in {self.plate.layout_name()}.")
             logger.exception(e)
             sys.exit()
-        
+
         # Optionally remove positions from df
         if remove:
             self.df[quadrant_df == 1] = pd.NA
