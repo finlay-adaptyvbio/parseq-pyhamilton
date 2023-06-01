@@ -1,4 +1,4 @@
-import os, argparse, sys, shelve, importlib, shutil, time, datetime
+import os, sys, shelve, importlib, shutil, time, datetime
 import logging, logging.config
 
 import deck as dk
@@ -40,32 +40,36 @@ logging.config.dictConfig(LOGGING)
 logger = logging.getLogger()
 
 
-# CLI arguments for argparse
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Hamilton script runner",
-        formatter_class=argparse.MetavarTypeHelpFormatter,
-    )
-    parser.add_argument(
-        "method",
-        metavar="method",
-        type=str,
-        help="(%(type)s) method to run (%(choices)s)",
-        choices=[
-            f[:-3]
-            for f in os.listdir(script_dir_path)
-            if f.endswith(".py") and not f.startswith("__")
-        ],
-    )
-    return parser
-
-
 # Main script starts here
 if __name__ == "__main__":
-    # Process arguments
-    parser = parse_args()
-    args = parser.parse_args()
-    method = args.method
+    # Find available methods
+    methods = [
+        f[:-3]
+        for f in os.listdir(script_dir_path)
+        if f.endswith(".py") and not f.startswith("__")
+    ]
+
+    # Format and print runs found
+    if len(methods) > 0:
+        print(f"{'#':<5}{'method':<25}")
+        print(f"{'-' * 80}")
+        for idx, method in enumerate(methods):
+            print(f"{idx + 1:<5}{method:<25}")
+        print(f"{'-' * 80}")
+    else:
+        logger.error(f"No methods found!")
+        sys.exit()
+
+    # Prompt for method
+    while True:
+        method_idx = input("Method id: ")
+        try:
+            method_idx = int(method_idx)
+            method = methods[method_idx - 1]
+        except (ValueError, IndexError) as e:
+            logger.error("Invalid method id.")
+            continue
+        break
 
     # Find previous runs
     runs = [
