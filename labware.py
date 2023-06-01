@@ -223,10 +223,6 @@ class Standard384(DeckResource):
         self._assert_idx_in_range(idx)
         return int(idx) // 16, int(idx) % 16
 
-    def position_id(self, idx):
-        x, y = self.well_coords(idx)
-        return "ABCDEFGHIJKLMNOP"[y] + str(x + 1)
-
 
 class Tip384(Standard384):
     def __init__(self, layout_name):
@@ -234,9 +230,9 @@ class Tip384(Standard384):
         self._num_items = 384
         self.resource_type = DeckResource.types.TIP
 
-    def position_id(self, idx):  # tips use 1-indexed int ids descending columns first
+    def position_id(self, idx):
         self._assert_idx_in_range(idx)
-        return str(idx + 1)  # switch to standard advance through row first
+        return str(idx + 1)
 
 
 class Reservoir300(Standard384):
@@ -260,9 +256,9 @@ class Lid(DeckResource):
         self._assert_idx_in_range(idx)
         return int(idx) // 1, int(idx) % 1
 
-    def position_id(self, idx):  # tips use 1-indexed int ids descending columns first
+    def position_id(self, idx):
         self._assert_idx_in_range(idx)
-        return str(idx + 1)  # switch to standard advance through row first
+        return str(idx + 1)
 
 
 class EppiCarrier24(DeckResource):
@@ -292,7 +288,7 @@ TYPES = {
 }
 
 
-# Labware classes (DataFrame wrapper)
+# Labware classes (DataFrame wrappers)
 class tip_384:
     """
     384-tip rack, methods available for accessing positions:
@@ -371,8 +367,8 @@ class plate_384:
     def ch2(self, n: int = 2, remove: bool = True) -> list[tuple[Plate384, int]]:
         """Get wells from a plate in 2 channel mode."""
 
+        # Try to get n tips, if less than n tips left try again with 1 tip
         column = default_index_384.T[self.df.sum(axis=0) >= n].first_valid_index()
-
         for _ in range(2):
             try:
                 row = self.df.T.loc[column] == 1
@@ -394,9 +390,12 @@ class plate_384:
 
         index = sort_list(default_index_384.T.loc[column][row].tolist(), 4)[:n]
 
+        # Optionally remove wells from df
         if remove:
             self.df[default_index_384.isin(index)] = pd.NA
 
+        # Check if correct number of wells was found, otherwise fetch another well
+        # This happens if the number of wells left in a column is less than n
         if n != len(index) and remove:
             wells = [(self.plate, i) for i in index]
             wells.extend(self.ch2(1))
@@ -415,6 +414,7 @@ class plate_384:
     ) -> list[tuple[Plate384, int]]:
         """Get wells from a 384-well plate in 384-head mode."""
 
+        # Find matrix which supports provided row and column dimensions
         row_df = self.df[self.df.sum(axis=1) >= columns].dropna(axis=1, how="any")
         column_df = row_df.T[(row_df.T.sum(axis=1) >= rows)].T
         mask = column_df.iloc[:rows, :columns] == 1
@@ -425,6 +425,8 @@ class plate_384:
             .dropna(axis=0, how="all")
             .values.flatten()
         )
+
+        # Check if matrix actually contains wells
         try:
             index[-1]
         except IndexError as e:
@@ -439,7 +441,8 @@ class plate_384:
 
     def quadrant(self, remove: bool = True) -> list[tuple[Plate384, int]]:
         """Get 96 positions from a reservoir with 384-head in 96-channel mode."""
-        index, quadrant_df = None, None
+        # Get first quadrant available
+        index, quadrant_df = None, None# required to check if quadrant is returned
         for q in range(1, 5):
             index = pos_96_in_384(q)
             mask = default_index_384.isin(index)
@@ -447,6 +450,7 @@ class plate_384:
             if quadrant_df.sum().sum() == 96:
                 break
 
+        # Check if quadrant was found
         try:
             assert index is not None
             assert quadrant_df is not None
@@ -454,7 +458,8 @@ class plate_384:
             logger.error(f"Not enough wells in {self.plate.layout_name()}.")
             logger.exception(e)
             sys.exit()
-
+        
+        # Optionally remove positions from df
         if remove:
             self.df[quadrant_df == 1] = pd.NA
 
@@ -516,8 +521,8 @@ class reservoir_300:
     def ch2(self, n: int = 2) -> list[tuple[Reservoir300, int]]:
         """Get positions from a reservoir in 2 channel mode."""
 
+        # Try to get n tips, if less than n tips left try again with 1 tip
         column = default_index_384.T[self.df.sum(axis=0) >= n].first_valid_index()
-
         for _ in range(2):
             try:
                 row = self.df.T.loc[column] == 1
@@ -543,6 +548,8 @@ class reservoir_300:
 
     def mph384(self, rows: int = 1, columns: int = 1) -> list[tuple[Reservoir300, int]]:
         """Get positions from a reservoir in 384 multi-probe head mode."""
+
+        # Find matrix which supports provided row and column dimensions
         row_df = self.df[self.df.sum(axis=1) >= columns].dropna(axis=1, how="any")
         column_df = row_df.T[(row_df.T.sum(axis=1) >= rows)].T
         mask = column_df.iloc[:rows, :columns] == 1
@@ -553,6 +560,8 @@ class reservoir_300:
             .dropna(axis=0, how="all")
             .values.flatten()
         )
+
+        # Check if matrix actually contains positions
         try:
             index[-1]
         except IndexError as e:
@@ -563,7 +572,9 @@ class reservoir_300:
 
     def quadrant(self, remove: bool = True) -> list[tuple[Reservoir300, int]]:
         """Get 96 positions from a reservoir with 384-head in 96-channel mode."""
-        index, quadrant_df = None, None
+
+        # Get first quadrant available
+        index, quadrant_df = None, None  # required to check if quadrant is returned
         for q in range(1, 5):
             index = pos_96_in_384(q)
             mask = default_index_384.isin(index)
@@ -571,6 +582,7 @@ class reservoir_300:
             if quadrant_df.sum().sum() == 96:
                 break
 
+        # Check if quadrant was found
         try:
             assert index is not None
             assert quadrant_df is not None
@@ -579,6 +591,7 @@ class reservoir_300:
             logger.exception(e)
             sys.exit()
 
+        # Optionally remove positions from df
         if remove:
             self.df[quadrant_df == 1] = pd.NA
 
@@ -638,8 +651,9 @@ class tip_96:
 
     def ch2(self, n: int = 2, remove: bool = True) -> list[tuple[Tip96, int]]:
         """Get tips from a 96-tip rack in 2-channel mode."""
-        column = default_index_96.T[self.df.sum(axis=0) >= n].first_valid_index()
 
+        # Try to get n tips, if less than n tips left try again with 1 tip
+        column = default_index_96.T[self.df.sum(axis=0) >= n].first_valid_index()
         for _ in range(2):
             try:
                 row = self.df.T.loc[column] == 1
@@ -660,9 +674,12 @@ class tip_96:
 
         index = sort_list(default_index_96.T.loc[column][row].tolist(), 2)[:n]
 
+        # Optionally remove tips from df
         if remove:
             self.df[default_index_96.isin(index)] = pd.NA
 
+        # Check if correct number of tips was found, otherwise fetch another tip
+        # This happens if the number of tips left in a column is less than n
         if n != len(index) and remove:
             tips = [(self.rack, i) for i in index]
             tips.extend(self.ch2(1))
@@ -680,9 +697,13 @@ class tip_96:
         self, rows: int = 1, columns: int = 1, remove: bool = True
     ) -> list[tuple[Tip96, int]]:
         """Get tips from a 96-tip rack in 384-head mode."""
-        self.df.columns = self.df.columns[::-1]
+
+        # Find matrix which supports provided row and column dimensions
+        self.df.columns = self.df.columns[
+            ::-1
+        ]  # reverse df to allow 384-head to approach from south
         row_df = self.df.loc[self.df.sum(axis=1) >= columns].dropna(axis=1, how="any")
-        self.df.columns = self.df.columns[::-1]
+        self.df.columns = self.df.columns[::-1]  # and reverse again for next steps
         column_df = row_df.T[(row_df.T.sum(axis=1) >= rows)].T
         column_df.columns = column_df.columns[::-1]
         mask = column_df.iloc[:rows, :columns] == 1
@@ -693,12 +714,15 @@ class tip_96:
             .dropna(axis=0, how="all")
             .values.flatten(),
         )
+
+        # Check if matrix actually contains wells
         try:
             index[-1]
         except IndexError as e:
             logger.error(f"Not enough wells in {self.rack.layout_name()}.")
             sys.exit()
 
+        # Optionally remove tips from df
         if remove:
             self.df[default_index_96.isin(index)] = pd.NA
 
@@ -757,8 +781,9 @@ class plate_96:
 
     def ch2(self, n: int = 2, remove=True) -> list[tuple[Plate96, int]]:
         """Get wells from a 96-well plate in 2-channel mode."""
-        column = default_index_96.T[self.df.sum(axis=0) >= n].first_valid_index()
 
+        # Try to get n wells, if less than n wells left try again with 1 well
+        column = default_index_96.T[self.df.sum(axis=0) >= n].first_valid_index()
         for _ in range(2):
             try:
                 row = self.df.T.loc[column] == 1
@@ -779,9 +804,12 @@ class plate_96:
 
         index = sort_list(default_index_96.T.loc[column][row].tolist(), 2)[:n]
 
+        # Optionally remove wells from df
         if remove:
             self.df[default_index_96.isin(index)] = pd.NA
 
+        # Check if correct number of wells was found, otherwise fetch another well
+        # This happens if the number of wells left in a column is less than n
         if n != len(index) and remove:
             wells = [(self.plate, i) for i in index]
             wells.extend(self.ch2(1))
@@ -799,6 +827,8 @@ class plate_96:
         self, rows: int = 1, columns: int = 1, remove: bool = True
     ) -> list[tuple[Plate96, int]]:
         """Get wells from a 96-well plate in 384-head mode."""
+
+        # Find matrix which supports provided row and column dimensions
         row_df = self.df[self.df.sum(axis=1) >= columns].dropna(axis=1, how="any")
         column_df = row_df.T[(row_df.T.sum(axis=1) >= rows)].T
         mask = column_df.iloc[:rows, :columns] == 1
@@ -809,12 +839,15 @@ class plate_96:
             .dropna(axis=0, how="all")
             .values.flatten()
         )
+
+        # Check if matrix actually contains wells
         try:
             index[-1]
         except IndexError as e:
             logger.error(f"Not enough wells in {self.plate.layout_name()}.")
             sys.exit()
 
+        # Optionally remove wells from df
         if remove:
             self.df[default_index_96.isin(index)] = pd.NA
 
@@ -876,8 +909,8 @@ class carrier_24:
     def ch2(self, n: int = 2, remove=True) -> list[tuple[EppiCarrier24, int]]:
         """Get tubes from a 24-tube carrier in 2-channel mode."""
 
+        # Try to get n tubes, if less than n tubes left try again with 1 tube
         column = default_index_24.T[self.df.sum(axis=0) >= n].first_valid_index()
-
         for _ in range(2):
             try:
                 row = self.df.T.loc[column] == 1
@@ -898,6 +931,7 @@ class carrier_24:
 
         index = sort_list(default_index_24.T.loc[column][row].tolist(), 2)[:n]
 
+        # Optionally remove tubes from df
         if remove:
             self.df[default_index_24.isin(index)] = pd.NA
 
