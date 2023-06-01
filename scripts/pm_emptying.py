@@ -91,7 +91,7 @@ def run(
 
                 del plates[-1]
                 dk.delete_labware(shelf, bact_plates.pop().plate)
-                st.reset_state(state, state_file_path, "active_plate", 1)
+                st.set_state(state, state_file_path, "active_plate", 1)
 
             # Remove media from wells
             if not state["remove_media"]:
@@ -127,7 +127,7 @@ def run(
                 cmd.tip_eject(hammy, waste_tips)
 
                 active_plate.reset()
-                st.reset_state(state, state_file_path, "remove_media", 1)
+                st.set_state(state, state_file_path, "remove_media", 1)
 
             # Add ethanol to emptied wells
             if not state["add_ethanol"]:
@@ -161,7 +161,7 @@ def run(
                 cmd.tip_eject(hammy, ethanol_tips)
 
                 active_plate.reset()
-                st.reset_state(state, state_file_path, "add_ethanol", 1)
+                st.set_state(state, state_file_path, "add_ethanol", 1)
 
             # Remove ethanol from cleaned wells
             if not state["remove_ethanol"]:
@@ -196,7 +196,7 @@ def run(
 
                 cmd.tip_eject(hammy, waste_tips)
 
-                st.reset_state(state, state_file_path, "remove_ethanol", 1)
+                st.set_state(state, state_file_path, "remove_ethanol", 1)
 
             # Remove completed plate if not already done
             if state["active_plate"]:
@@ -206,6 +206,6 @@ def run(
                 cmd.grip_place(hammy, bact_plates_done[0].plate)
 
                 dk.delete_labware(shelf, bact_plates_done.pop(0).plate)
-                st.reset_state(state, state_file_path, "active_plate", 0)
+                st.set_state(state, state_file_path, "active_plate", 0)
 
         cmd.grip_eject(hammy)

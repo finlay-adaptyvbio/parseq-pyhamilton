@@ -109,7 +109,7 @@ def run(
 
                 del source_plates[-1]
                 del src_plates[-1]
-                st.reset_state(state, state_file_path, "active_src_plate", 1)
+                st.set_state(state, state_file_path, "active_src_plate", 1)
 
             # Get next target plate if not already done
             if not state["active_tgt_plate"]:
@@ -127,7 +127,7 @@ def run(
 
                 del target_plates[-1]
                 dk.delete_labware(shelf, tgt_plates.pop().plate)
-                st.reset_state(state, state_file_path, "active_tgt_plate", 1)
+                st.set_state(state, state_file_path, "active_tgt_plate", 1)
 
             # Check if there are still wells to process in the current source plate
             # Swich to next source plate if current one is empty
@@ -142,7 +142,7 @@ def run(
                 cmd.grip_place(hammy, src_plates_done[0].plate)
 
                 del src_plates_done[0]
-                st.reset_state(state, state_file_path, "active_source_plate", 0)
+                st.set_state(state, state_file_path, "active_source_plate", 0)
                 break
 
             # Check if there are still wells available in the current target plate
@@ -158,7 +158,7 @@ def run(
                 cmd.grip_place(hammy, tgt_plates_done[0].plate)
 
                 dk.delete_labware(shelf, tgt_plates_done.pop(0).plate)
-                st.reset_state(state, state_file_path, "active_target_plate", 0)
+                st.set_state(state, state_file_path, "active_target_plate", 0)
                 break
 
             # Check if there are still tips in the active rack

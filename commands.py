@@ -1,53 +1,22 @@
 import logging
 
-from pyhamilton import (
-    HamiltonInterface,
-    Lid,  # type: ignore
-    Plate96,
-    Plate384,
-    Tip96,
-    Tip384,  # type: ignore
-    Reservoir300,  # type: ignore
-    EppiCarrier24,  # type: ignore
-    INITIALIZE,  # type: ignore
-    GRIP_GET,  # type: ignore
-    GRIP_PLACE,  # type: ignore
-    PICKUP,  # type: ignore
-    EJECT,  # type: ignore
-    DISPENSE,  # type: ignore
-    ASPIRATE,  # type: ignore
-    ASPIRATE384,  # type: ignore
-    DISPENSE384,  # type: ignore
-    PICKUP384,  # type: ignore
-    EJECT384,  # type: ignore
-)
+from pyhamilton import HamiltonInterface, Plate96, Plate384, Tip96
 
 from pyhamilton.oemerr import PositionError
 
 # Logging
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 # Defaults
-
 DEFAULT_GRIP_TOOL_SEQUENCE = "CORE_Grip"
 DEFAULT_LIQUID_CLASS_2CH = "StandardVolume_Water_DispenseJet_Empty"
 DEFAULT_LIQUID_CLASS_384MPH = "50ulTip_conductive_384COREHead_Water_DispenseJet_Empty"
 
 HEAD_PATTERN = "1" + "0" * (95)
 
-# TODO: Add docstrings
 
-
-def initialize(ham: HamiltonInterface):
-    logger.info(f"Command: {'initialize'}")
-
-    cid = ham.send_command(INITIALIZE)
-
-    ham.wait_on_response(cid, raise_first_exception=True)
-
-
+# Position formatting functions
 def labware_pos_str(labware, idx):
     return labware.layout_name() + ", " + labware.position_id(idx)
 
@@ -59,13 +28,22 @@ def compound_pos_str(pos_tuples):
     )
 
 
+# Commands
+def initialize(ham: HamiltonInterface):
+    logger.debug(f"Command: {'initialize'}")
+
+    cid = ham.send_command(INITIALIZE)
+
+    ham.wait_on_response(cid, raise_first_exception=True)
+
+
 def grip_get(
     ham: HamiltonInterface,
     labware: Plate96 | Plate384 | Lid,
     mode: int = 0,
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'grip_get'} | Labware: {labware.layout_name()} | Mode: {mode}"
     )
 
@@ -101,7 +79,7 @@ def grip_place(
     eject: bool = False,
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'grip_place'} | Labware: {labware.layout_name()} |"
         f" Mode: {mode} | Eject: {eject}"
     )
@@ -139,7 +117,7 @@ def tip_pick_up(
     positions: list[tuple[Tip96, int]],
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'tip_pick_up'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions:"
         f" {[p[0].position_id(p[1]) for p in positions]}"
@@ -173,7 +151,7 @@ def tip_eject(
     else:
         labware = "None"
 
-    logger.info(
+    logger.debug(
         f"Command: {'tip_eject'} | Labware: {labware} | Positions:"
         f" {[p[0].position_id(p[1]) for p in positions]} | Waste: {waste}"
     )
@@ -200,7 +178,7 @@ def grip_eject(
     ham: HamiltonInterface,
     **kw_args,
 ):
-    logger.info(f"Command: {'grip_eject'}")
+    logger.debug(f"Command: {'grip_eject'}")
 
     cid = ham.send_command(
         EJECT,
@@ -220,7 +198,7 @@ def aspirate(
     volumes: list[float],
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'aspirate'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions:"
         f" {[p[0].position_id(p[1]) for p in positions]} | Volumes:"
@@ -256,7 +234,7 @@ def dispense(
     volumes: list[float],
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'dispense'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions:"
         f" {[p[0].position_id(p[1]) for p in positions]} | Volumes:"
@@ -288,7 +266,7 @@ def tip_pick_up_384(
     positions: list[tuple[Tip96, int]] | list[tuple[Tip384, int]],
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'tip_pick_up_384'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions: {len(positions)}"
     )
@@ -319,7 +297,7 @@ def tip_eject_384(
     else:
         labware = "None"
 
-    logger.info(
+    logger.debug(
         f"Command: {'tip_eject_384'} | Labware:"
         f" {labware} | Positions: {len(positions)} |"
         f" Mode: {mode}"
@@ -354,7 +332,7 @@ def aspirate_384(
     volume: float,
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'aspirate_384'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions: {len(positions)} |"
         f" Volume: {volume}"
@@ -383,7 +361,7 @@ def dispense_384(
     volume: float,
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'dispense_384'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions: {len(positions)} |"
         f" Volume: {volume}"
@@ -409,7 +387,7 @@ def grip_get_tip_rack(
     labware: Tip96 | Tip384,
     **kw_args,
 ):
-    logger.info(f"Command: {'grip_get_tip_rack'} | Labware: {labware.layout_name()}")
+    logger.debug(f"Command: {'grip_get_tip_rack'} | Labware: {labware.layout_name()}")
 
     labwarePositions = labware_pos_str(labware, 0)
 
@@ -441,7 +419,7 @@ def grip_place_tip_rack(
     eject: bool = False,
     **kw_args,
 ):
-    logger.info(
+    logger.debug(
         f"Command: {'grip_place_tip_rack'} | Labware:"
         f" {labware.layout_name()} | Waste: {waste} | Eject: {eject}"
     )

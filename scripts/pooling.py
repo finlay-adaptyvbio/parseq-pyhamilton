@@ -65,7 +65,7 @@ def run(
         tip_column = hp.prompt_int("Current tip column in holder (0 for new rack)", 12)
 
         if tip_column > 0:
-            tips_holder_96in384_50.fill(lw.pos_row_column_96(8 * tip_column))
+            tips_holder_96in384_50.fill(lw.pos_row_96(8 * tip_column))
         elif tip_column == 0:
             cmd.tip_pick_up_384(hammy, tips_96in384_50.full())
             cmd.tip_eject_384(hammy, tips_holder_96in384_50.full())
@@ -86,12 +86,12 @@ def run(
                 cmd.grip_place(hammy, tmp_pcr_lid.lid, mode=1)
                 src_pcr_plates.pop()
 
-                st.reset_state(state, state_file_path, "active_pcr_plate", 1)
+                st.set_state(state, state_file_path, "active_pcr_plate", 1)
 
-                st.reset_state(state, state_file_path, "add_edta", 0)
-                st.reset_state(state, state_file_path, "384_to_96", 0)
-                st.reset_state(state, state_file_path, "96_to_8", 0)
-                st.reset_state(state, state_file_path, "8_to_1", 0)
+                st.set_state(state, state_file_path, "add_edta", 0)
+                st.set_state(state, state_file_path, "384_to_96", 0)
+                st.set_state(state, state_file_path, "96_to_8", 0)
+                st.set_state(state, state_file_path, "8_to_1", 0)
 
             # Get next pooling plate from source stack if not already done
             if not state["active_pooling_plate"]:
@@ -105,7 +105,7 @@ def run(
                 cmd.grip_place(hammy, active_pooling_plate.plate)
                 src_pooling_plates.pop()
 
-                st.reset_state(state, state_file_path, "active_pooling_plate", 1)
+                st.set_state(state, state_file_path, "active_pooling_plate", 1)
 
             # Add EDTA to pcr plate if not already done
             if not state["add_edta"]:
@@ -120,7 +120,7 @@ def run(
                 )
                 cmd.tip_eject_384(hammy, mode=1)
 
-                st.reset_state(state, state_file_path, "add_edta", 1)
+                st.set_state(state, state_file_path, "add_edta", 1)
 
             # Get next 96_384-tip rack of 50 uL tips if not already done
             if not state["active_rack"]:
@@ -151,19 +151,19 @@ def run(
                 active_pcr_plate.reset()
 
                 cmd.tip_eject_384(hammy, mode=2)
-                st.reset_state(state, state_file_path, "384_to_96", 1)
+                st.set_state(state, state_file_path, "384_to_96", 1)
 
             # Discard current 96_384-tip rack if not already done
             if state["active_rack"]:
                 cmd.grip_get_tip_rack(hammy, active_rack_384_50.rack)
                 cmd.grip_place_tip_rack(hammy, active_rack_384_50.rack, waste=True)
 
-                st.reset_state(state, state_file_path, "active_rack", 0)
+                st.set_state(state, state_file_path, "active_rack", 0)
 
             # Transfer columns 2-12 to column 1 in pooling plate using 8 tips on 384-head if not already done
             if not state["96_to_8"]:
                 cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(8, 1))
-                active_pooling_plate.fill(lw.pos_row_column_96(88, 8))
+                active_pooling_plate.fill(lw.pos_row_96(88, 8))
                 while active_pooling_plate.total() > 0:
                     cmd.aspirate_384(
                         hammy,
@@ -173,7 +173,7 @@ def run(
                     )
                     cmd.dispense_384(
                         hammy,
-                        active_pooling_plate.static(lw.pos_row_column_96(8, 8)),
+                        active_pooling_plate.static(lw.pos_row_96(8, 8)),
                         16.0,
                         dispenseMode=9,
                         liquidHeight=10.0,
@@ -181,13 +181,13 @@ def run(
                 active_pooling_plate.reset()
                 cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "96_to_8", 1)
+                st.set_state(state, state_file_path, "96_to_8", 1)
 
             # Transfer column 1 in pooling plate to next eppendorf tube using 2 channels if not already done
             if not state["8_to_1"]:
                 cmd.tip_pick_up(hammy, tips_96_300.ch2(2))
-                active_pooling_plate.fill(lw.pos_row_column_96(8))
-                carrier.fill(lw.pos_row_column_24(plates))
+                active_pooling_plate.fill(lw.pos_row_96(8))
+                carrier.fill(lw.pos_row_24(plates))
 
                 while active_pooling_plate.total() > 0:
                     cmd.aspirate(
@@ -206,7 +206,7 @@ def run(
 
                 cmd.tip_eject(hammy, waste=True)
 
-                st.reset_state(state, state_file_path, "8_to_1", 1)
+                st.set_state(state, state_file_path, "8_to_1", 1)
 
             # Move active pcr plate to destination stack if not already done
             if state["active_pcr_plate"]:
@@ -232,7 +232,7 @@ def run(
                 )
                 dest_pcr_plates.pop(0)
 
-                st.reset_state(state, state_file_path, "active_pcr_plate", 0)
+                st.set_state(state, state_file_path, "active_pcr_plate", 0)
 
             # Move active pooling plate to destination stack if not already done
             if state["active_pooling_plate"]:
@@ -246,7 +246,7 @@ def run(
                 cmd.grip_place(hammy, dest_pooling_plates[0].plate, mode=0)
                 dest_pooling_plates.pop(0)
 
-                st.reset_state(state, state_file_path, "active_pooling_plate", 0)
+                st.set_state(state, state_file_path, "active_pooling_plate", 0)
 
         # Cleanup grip tool if not done
         cmd.grip_eject(hammy)

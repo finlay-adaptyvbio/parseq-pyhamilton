@@ -64,8 +64,8 @@ def run(
                 cmd.grip_place(hammy, tmp_lid.lid, mode=1)
 
                 del pcr_plates[-1]
-                st.reset_state(state, state_file_path, "active_plate", 1)
-                st.reset_state(state, state_file_path, "add_oligos", 0)
+                st.set_state(state, state_file_path, "active_plate", 1)
+                st.set_state(state, state_file_path, "add_oligos", 0)
 
             # Check if there is an active rack, get a new rack if needed
             if not state["active_rack"]:
@@ -73,7 +73,7 @@ def run(
                 cmd.grip_place_tip_rack(hammy, transport_rack_384_50.rack)
 
                 del racks_384_50[-1]
-                st.reset_state(state, state_file_path, "active_rack", 1)
+                st.set_state(state, state_file_path, "active_rack", 1)
 
             # Add oligos from barcoding plate to active pcr plate
             if not state["add_oligos"]:
@@ -97,14 +97,14 @@ def run(
                 )
                 cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "add_oligos", 1)
+                st.set_state(state, state_file_path, "add_oligos", 1)
 
             # Discard current active rack to waste if not already done
             if state["active_rack"]:
                 cmd.grip_get_tip_rack(hammy, active_rack_384_50.rack)
                 cmd.grip_place_tip_rack(hammy, active_rack_384_50.rack, waste=True)
 
-                st.reset_state(state, state_file_path, "active_rack", 0)
+                st.set_state(state, state_file_path, "active_rack", 0)
 
             # Remove active PCR plate and place in destination stack
             if state["active_plate"]:
@@ -120,6 +120,6 @@ def run(
                 cmd.grip_place(hammy, pcr_plates_done[0].plate)
 
                 del pcr_plates_done[0]
-                st.reset_state(state, state_file_path, "active_plate", 0)
+                st.set_state(state, state_file_path, "active_plate", 0)
 
         cmd.grip_eject(hammy)

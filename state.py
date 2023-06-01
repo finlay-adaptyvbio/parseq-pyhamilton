@@ -1,11 +1,11 @@
-import json, logging, shelve
+import logging, shelve, json
 
 # Logging
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+# Interactive prompt for state recovery
 def recover_state(path) -> dict:
     logger.debug(f"Recovering state from: {path}")
     state = load_state(path)
@@ -22,7 +22,7 @@ def recover_state(path) -> dict:
                 value = input(f"Enter a new value for {key}: ")
                 while True:
                     try:
-                        reset_state(state, path, key, int(value))
+                        set_state(state, path, key, int(value))
                     except ValueError as e:
                         logger.exception(e)
                         continue
@@ -36,6 +36,7 @@ def recover_state(path) -> dict:
     return state
 
 
+# Load state file (json) from provided path
 def load_state(path) -> dict:
     try:
         with open(path, "r") as f:
@@ -47,22 +48,24 @@ def load_state(path) -> dict:
         raise e
 
 
-def save_state(state, path):
-    with open(path, "w") as f:
-        json.dump(state, f, indent=4)
+# Save state in memory to disk
+def save_state(state, path) -> None:
+    try:
+        with open(path, "w") as f:
+            json.dump(state, f, indent=4)
+    except (FileNotFoundError, IsADirectoryError) as e:
+        logger.exception(e)
+        raise e
 
 
-def update_state(state, path, key, value):
-    state[key] += value
-    save_state(state, path)
-
-
-def reset_state(state, path, key, value):
+# Set state variables from key: value pair
+def set_state(state, path, key, value) -> None:
     state[key] = value
     save_state(state, path)
 
 
-def print_state(state):
+# Format and print state variables
+def print_state(state) -> None:
     print(f"{'-' * 40}")
     print(f"{'#':<5}{'Key':<25}{'Value':<25}")
     print(f"{'-' * 40}")
@@ -71,18 +74,22 @@ def print_state(state):
     print(f"{'-' * 40}")
 
 
-def dump_state(state):
-    print(json.dumps(state, indent=4))
+# Save deck state as shelve db
+def save_deck_state(path, deck) -> None:
+    try:
+        with shelve.open(path) as shelf:
+            shelf.update(deck)
+    except (FileNotFoundError, IsADirectoryError) as e:
+        logger.exception(e)
+        raise e
 
 
-def save_deck_state(path, deck):
-    with shelve.open(path) as shelf:
-        shelf.update(deck)
-
-
-def sync_deck_state(shelf: shelve.Shelf):
-    shelf.sync()
-
-
-def load_deck_state(path):
-    return shelve.open(path, writeback=True)
+# Load shelve db from provided path
+def load_deck_state(path) -> shelve.Shelf:
+    try:
+        with open(path, "r") as f:
+            logger.debug("Path is valid! Loading deck...")
+        return shelve.open(path, writeback=True)
+    except (FileNotFoundError, IsADirectoryError) as e:
+        logger.exception(e)
+        raise e

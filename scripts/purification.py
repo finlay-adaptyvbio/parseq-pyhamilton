@@ -24,7 +24,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "cherry_state.json")
+    state_file_path = os.path.join(run_dir_path, "purification_state.json")
 
     # Pool information and variables
     pools = hp.prompt_int("Pools to purify", 24)
@@ -56,16 +56,16 @@ def run(
     # Plate indexes and layout
     rows = 8
     columns = min(1, math.ceil(pools / rows))
-    sample_index = [i for i in lw.pos_row_column_96(pools)]
-    supernatant_index = [i for i in lw.pos_row_column_96(pools, pools)]
-    wash1_index = [i for i in lw.pos_row_column_96(pools, pools * 2)]
-    wash2_index = [i for i in lw.pos_row_column_96(pools, pools * 3)]
+    sample_index = [i for i in lw.pos_row_96(pools)]
+    supernatant_index = [i for i in lw.pos_row_96(pools, pools)]
+    wash1_index = [i for i in lw.pos_row_96(pools, pools * 2)]
+    wash2_index = [i for i in lw.pos_row_96(pools, pools * 3)]
     ethanol_index = [
-        lw.index_to_string_384(i) for i in lw.pos_96_in_384(1)[: rows * columns]
+        lw.int_to_str_384(i) for i in lw.pos_96_in_384(1)[: rows * columns]
     ]
 
     # Sample tube df and static positions
-    carrier.fill([i for i in lw.pos_row_column_24(pools)])
+    carrier.fill([i for i in lw.pos_row_24(pools)])
     plate.fill(sample_index)
     beads = carrier.static(["C6"])
     teb = carrier.static(["D6"])
@@ -105,7 +105,7 @@ def run(
         tip_column = hp.prompt_int("Current tip column in holder (0 for new rack)", 12)
 
         if tip_column > 0:
-            tips_holder_96in384_50.fill(lw.pos_row_column_96(8 * tip_column))
+            tips_holder_96in384_50.fill(lw.pos_row_96(rows * tip_column))
         elif tip_column == 0:
             cmd.tip_pick_up_384(hammy, tips_96in384_50.full())
             cmd.tip_eject_384(hammy, tips_holder_96in384_50.full())
@@ -141,7 +141,7 @@ def run(
                 cmd.tip_eject(hammy, waste=True)
 
                 plate.reset()
-                st.reset_state(state, state_file_path, "add_beads", 1)
+                st.set_state(state, state_file_path, "add_beads", 1)
 
             # Add samples to 96-well plate
             if not state["add_samples"]:
@@ -163,7 +163,7 @@ def run(
 
                 plate.reset()
                 carrier.reset()
-                st.reset_state(state, state_file_path, "add_samples", 1)
+                st.set_state(state, state_file_path, "add_samples", 1)
 
             # Mix beads and samples
             if not state["mix_beads"]:
@@ -187,7 +187,7 @@ def run(
                 )
                 cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "mix_beads", 1)
+                st.set_state(state, state_file_path, "mix_beads", 1)
 
             # Incubate at RT for 2 minutes
             time.sleep(60 * 2)
@@ -197,7 +197,7 @@ def run(
                 cmd.grip_get(hammy, plate.plate, gripWidth=81.0)
                 cmd.grip_place(hammy, magnet.plate)
 
-                st.reset_state(state, state_file_path, "move_beads", 1)
+                st.set_state(state, state_file_path, "move_beads", 1)
 
             # Wait for 1 minute to allow beads to separate
             time.sleep(60)
@@ -214,7 +214,7 @@ def run(
                     cmd.dispense_384(hammy, magnet.static(supernatant_index), 50.0)
                 cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "remove_supernatant", 1)
+                st.set_state(state, state_file_path, "remove_supernatant", 1)
 
             # Wash beads with 70% ethanol
             if not state["wash1"]:
@@ -237,7 +237,7 @@ def run(
                     cmd.dispense_384(hammy, magnet.static(wash1_index), 50.0)
                 cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "wash1", 1)
+                st.set_state(state, state_file_path, "wash1", 1)
 
             # Wash beads with 70% ethanol
             if not state["wash2"]:
@@ -260,14 +260,14 @@ def run(
                     cmd.dispense_384(hammy, magnet.static(wash1_index), 50.0)
                 cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "wash2", 1)
+                st.set_state(state, state_file_path, "wash2", 1)
 
             # Move plate away from magnet
             if not state["move_wash"]:
                 cmd.grip_get(hammy, magnet.plate, gripWidth=81.0)
                 cmd.grip_place(hammy, plate.plate, 1)
 
-                st.reset_state(state, state_file_path, "move_wash", 1)
+                st.set_state(state, state_file_path, "move_wash", 1)
 
             # Dry beads for 2 minutes
             time.sleep(60 * 2)
@@ -298,7 +298,7 @@ def run(
                 cmd.tip_eject(hammy, waste=True)
 
                 plate.reset()
-                st.reset_state(state, state_file_path, "add_buffer", 1)
+                st.set_state(state, state_file_path, "add_buffer", 1)
 
             if not state["mix_buffer"]:
                 check_tip_holder()
@@ -314,7 +314,7 @@ def run(
                 )
                 cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "mix_buffer", 1)
+                st.set_state(state, state_file_path, "mix_buffer", 1)
 
             # Incubate 1 minute
             time.sleep(60)
@@ -324,7 +324,7 @@ def run(
                 cmd.grip_get(hammy, plate.plate, gripWidth=81.0)
                 cmd.grip_place(hammy, magnet.plate)
 
-                st.reset_state(state, state_file_path, "move_elute", 1)
+                st.set_state(state, state_file_path, "move_elute", 1)
 
             # Incubate 1 minute
             time.sleep(60)
@@ -341,6 +341,6 @@ def run(
                     cmd.dispense(hammy, carrier.ch2(channels), [elute_volume])
                     cmd.tip_eject(hammy, waste=True)
 
-                st.reset_state(state, state_file_path, "elute_samples", 1)
+                st.set_state(state, state_file_path, "elute_samples", 1)
 
         cmd.grip_eject(hammy)

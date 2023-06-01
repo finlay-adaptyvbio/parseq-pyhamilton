@@ -22,7 +22,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "pcr_barcode_state.json")
+    state_file_path = os.path.join(run_dir_path, "pcr_colony_state.json")
 
     # Plate information and variables
     plates = hp.prompt_int("Plates to process", 4)
@@ -69,8 +69,8 @@ def run(
 
                 dk.delete_labware(shelf, bact_plates.pop().plate)
 
-                st.reset_state(state, state_file_path, "active_bact_plate", 1)
-                st.reset_state(state, state_file_path, "add_bact", 0)
+                st.set_state(state, state_file_path, "active_bact_plate", 1)
+                st.set_state(state, state_file_path, "add_bact", 0)
 
             # Get next pcr plates if not already done
             if not state["active_pcr_plate"]:
@@ -81,8 +81,8 @@ def run(
 
                 dk.delete_labware(shelf, pcr_plates.pop().plate)
 
-                st.reset_state(state, state_file_path, "active_pcr_plate", 1)
-                st.reset_state(state, state_file_path, "add_mm", 0)
+                st.set_state(state, state_file_path, "active_pcr_plate", 1)
+                st.set_state(state, state_file_path, "add_mm", 0)
 
             # Add master mix to pcr plate if not already done
             if not state["add_mm"]:
@@ -97,7 +97,7 @@ def run(
                 )
                 cmd.tip_eject_384(hammy, mode=1)
 
-                st.reset_state(state, state_file_path, "add_mm", 1)
+                st.set_state(state, state_file_path, "add_mm", 1)
 
             # Get new tip rack if no current active tip rack
             if not state["active_rack"]:
@@ -105,7 +105,7 @@ def run(
                 cmd.grip_place_tip_rack(hammy, transport_rack_384_50.rack)
 
                 dk.delete_labware(shelf, racks_384_50.pop().rack)
-                st.reset_state(state, state_file_path, "active_rack", 1)
+                st.set_state(state, state_file_path, "active_rack", 1)
 
             # Aspirate from active bact plate to active pcr plate
             if not state["add_bact"]:
@@ -129,7 +129,7 @@ def run(
                 )
                 cmd.tip_eject_384(hammy, mode=2)
 
-                st.reset_state(state, state_file_path, "add_bact", 1)
+                st.set_state(state, state_file_path, "add_bact", 1)
 
             # Place current active bact plate in dest bact plate stack if not already done
             if state["active_bact_plate"]:
@@ -141,7 +141,7 @@ def run(
                 cmd.grip_place(hammy, bact_plates_done[0].plate)
 
                 dk.delete_labware(shelf, bact_plates_done.pop(0).plate)
-                st.reset_state(state, state_file_path, "active_bact_plate", 0)
+                st.set_state(state, state_file_path, "active_bact_plate", 0)
 
             # Place current active pcr plate in dest pcr plate stack if not already done
             # Also get a new lid from stack
@@ -156,7 +156,7 @@ def run(
                 cmd.grip_place(hammy, pcr_plates_done[0].plate)
 
                 dk.delete_labware(shelf, pcr_plates_done.pop(0).plate)
-                st.update_state(state, state_file_path, "active_pcr_plate", 1)
+                st.set_state(state, state_file_path, "active_pcr_plate", 1)
 
             # Discard current active rack to waste if not already done
             if state["active_rack"]:
@@ -164,6 +164,6 @@ def run(
                 cmd.grip_get_tip_rack(hammy, active_rack_384_50.rack)
                 cmd.grip_place_tip_rack(hammy, active_rack_384_50.rack, waste=True)
 
-                st.reset_state(state, state_file_path, "active_rack", 0)
+                st.set_state(state, state_file_path, "active_rack", 0)
 
         cmd.grip_eject(hammy)

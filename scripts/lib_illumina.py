@@ -98,7 +98,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
             cmd.grip_place_tip_rack(hammy, rack_virtual)
 
             st.update_state(state, state_file_path, "current_rack", 1)
-            st.reset_state(state, state_file_path, "current_tip", 0)
+            st.set_state(state, state_file_path, "current_tip", 0)
 
     # Inform user of labware positions, ask for confirmation after placing labware
 
@@ -144,7 +144,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     f" {hp.color.END  }"
                 )
 
-                st.reset_state(state, state_file_path, "bead_volume", TUBE_VOLUME)
+                st.set_state(state, state_file_path, "bead_volume", TUBE_VOLUME)
 
                 logger.debug("Adding beads to plate...")
                 logger.debug("Mixing beads before addition...")
@@ -180,7 +180,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                             f" beads. Press enter to continue: {hp.color.END}"
                         )
 
-                        st.reset_state(
+                        st.set_state(
                             state, state_file_path, "bead_volume", TUBE_VOLUME
                         )
 
@@ -212,8 +212,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 )
                 st.update_state(state, state_file_path, "current_tip", 1)
 
-                st.reset_state(state, state_file_path, "add_beads", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "add_beads", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
             # Add pools to pcr plate on magnetic stand
 
@@ -273,8 +273,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     st.update_state(state, state_file_path, "current_tip", 1)
                     st.update_state(state, state_file_path, "current_pool", 1)
 
-                st.reset_state(state, state_file_path, "eppi_to_plate", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "eppi_to_plate", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
             # Incubate at RT for 5 minutes
 
@@ -294,7 +294,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 )
                 cmd.grip_place(hammy, mag_plate, 1)
 
-                st.reset_state(state, state_file_path, "move_beads", 1)
+                st.set_state(state, state_file_path, "move_beads", 1)
 
             # Wait for 1 minute to allow beads to separate
 
@@ -336,8 +336,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     st.update_state(state, state_file_path, "current_tip", 1)
                     st.update_state(state, state_file_path, "current_pool", 1)
 
-                st.reset_state(state, state_file_path, "remove_supernatant", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "remove_supernatant", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
             # Wash beads with 70% ethanol from eppendorf carrier
             # Prompt user to add 70% ethanol tubes to eppendorf carrier
@@ -366,7 +366,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                             state, state_file_path, "current_ethanol_tube", 1
                         )
                         ethanol_tube = [ethanol[state["current_ethanol_tube"]]]
-                        st.reset_state(
+                        st.set_state(
                             state, state_file_path, "current_ethanol_step", 0
                         )
 
@@ -396,8 +396,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 )
                 st.update_state(state, state_file_path, "current_tip", 1)
 
-                st.reset_state(state, state_file_path, "add_wash1", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "add_wash1", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
             # FIXME: not necessary as removing from all wells > 30 s
             # Incubate 30 seconds
@@ -442,8 +442,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     st.update_state(state, state_file_path, "current_tip", 1)
                     st.update_state(state, state_file_path, "current_pool", 1)
 
-                st.reset_state(state, state_file_path, "remove_wash1", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "remove_wash1", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
             # Wash beads with 70% ethanol from eppendorf carrier
 
@@ -465,7 +465,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                             state, state_file_path, "current_ethanol_tube", 1
                         )
                         ethanol_tube = [ethanol[state["current_ethanol_tube"]]]
-                        st.reset_state(
+                        st.set_state(
                             state, state_file_path, "current_ethanol_step", 0
                         )
 
@@ -495,8 +495,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 )
                 st.update_state(state, state_file_path, "current_tip", 1)
 
-                st.reset_state(state, state_file_path, "add_wash2", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "add_wash2", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
             # FIXME: not necessary as removing from all wells > 30 s
             # Incubate 30 seconds
@@ -541,8 +541,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     st.update_state(state, state_file_path, "current_tip", 1)
                     st.update_state(state, state_file_path, "current_pool", 1)
 
-                st.reset_state(state, state_file_path, "remove_wash2", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "remove_wash2", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
             # Move plate away from magnet
 
@@ -558,7 +558,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 )
                 cmd.grip_place(hammy, no_mag_plate, 1)
 
-                st.reset_state(state, state_file_path, "move_pure", 1)
+                st.set_state(state, state_file_path, "move_pure", 1)
 
             # Dry beads for 5-10 minutes
 
@@ -614,8 +614,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     st.update_state(state, state_file_path, "current_tip", 1)
                     st.update_state(state, state_file_path, "current_pool", 1)
 
-                st.reset_state(state, state_file_path, "add_buffer", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "add_buffer", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
             # Incubate 1 minute
 
@@ -635,7 +635,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 )
                 cmd.grip_place(hammy, mag_plate, 1)
 
-                st.reset_state(state, state_file_path, "move_to_elute", 1)
+                st.set_state(state, state_file_path, "move_to_elute", 1)
 
             # Incubate 1 minute
 
@@ -683,9 +683,9 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     st.update_state(state, state_file_path, "current_tip", 1)
                     st.update_state(state, state_file_path, "current_pool", 1)
 
-                st.reset_state(state, state_file_path, "store_samples", 1)
-                st.reset_state(state, state_file_path, "current_pool", 0)
+                st.set_state(state, state_file_path, "store_samples", 1)
+                st.set_state(state, state_file_path, "current_pool", 0)
 
-            st.reset_state(state, state_file_path, "complete", 1)
+            st.set_state(state, state_file_path, "complete", 1)
 
         cmd.grip_eject(hammy)

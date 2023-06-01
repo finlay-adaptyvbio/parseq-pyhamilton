@@ -28,7 +28,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "pm_filling_state.json")
+    state_file_path = os.path.join(run_dir_path, "lib_nanopore_state.json")
     csv_path = hp.prompt_file_path("Input CSV file (lib_nanopore_concentrations.csv)")
 
     # Sample info
@@ -46,7 +46,6 @@ def run(
 
     # Volume calculations
     samples = sample_c["Sample"].count()
-    n_ethanol_tubes = int((math.ceil(samples * 300 * 1.2 / 1800) + 1) / 2 * 2)
 
     sample_volumes = sample_c["Sample V [uL]"].tolist()
     water_volumes = sample_c["Water V [uL]"].tolist()
@@ -66,11 +65,13 @@ def run(
     # Plate indexes and layout
     rows = 8
     columns = min(1, math.ceil(samples / rows))
-    sample_index = [i for i in lw.pos_row_column_24(samples)]
-    end_prep_index = [i for i in lw.pos_row_column_96(samples)]
-    barcode_index = [i for i in lw.pos_row_column_96(samples, samples)]
-    ethanol_index = [i for i in lw.pos_96_in_384(1)[: rows * columns]]
-    waste_index = [i for i in lw.pos_96_in_384(1)[: rows * columns]]
+    sample_index = [i for i in lw.pos_row_24(samples)]
+    end_prep_index = [i for i in lw.pos_row_96(samples)]
+    barcode_index = [i for i in lw.pos_row_96(samples, samples)]
+    ethanol_index = [
+        lw.int_to_str_384(i) for i in lw.pos_96_in_384(1)[: rows * columns]
+    ]
+    waste_index = [lw.int_to_str_384(i) for i in lw.pos_96_in_384(1)[: rows * columns]]
 
     # Initial dfs
     carrier.fill(sample_index)
@@ -147,7 +148,7 @@ def run(
             cmd.tip_eject(hammy, waste=True)
 
             c3.reset()
-            st.reset_state(state, state_file_path, "end_prep_add_water", 1)
+            st.set_state(state, state_file_path, "end_prep_add_water", 1)
 
         # Add end prep master mix to water
         if not state["end_prep_add_mm"]:
@@ -166,7 +167,7 @@ def run(
             cmd.tip_eject(hammy, waste=True)
 
             c3.reset()
-            st.reset_state(state, state_file_path, "end_prep_add_mm", 1)
+            st.set_state(state, state_file_path, "end_prep_add_mm", 1)
 
         # Remove end prep reagents & add sample tubes to carrier
         hp.notify(
@@ -202,7 +203,7 @@ def run(
                 del sample_volumes[0]
 
             c3.reset()
-            st.reset_state(state, state_file_path, "end_prep_add_samples", 1)
+            st.set_state(state, state_file_path, "end_prep_add_samples", 1)
 
         # Incubate samples & add end-prep clean-up reagents
         hp.notify(
@@ -239,7 +240,7 @@ def run(
             cmd.grip_get(hammy, c3.plate)
             cmd.grip_place(hammy, d1.plate)
 
-            st.reset_state(state, state_file_path, "end_prep_add_beads", 1)
+            st.set_state(state, state_file_path, "end_prep_add_beads", 1)
 
         # Incubate for 3 minutes at room temperature
         time.sleep(60 * 3)
@@ -256,7 +257,7 @@ def run(
             cmd.dispense_384(hammy, waste, 30.0, liquidHeight=12.0)
             cmd.tip_eject_384(hammy, mode=1)
 
-            st.reset_state(state, state_file_path, "end_prep_cleanup_supernatant", 1)
+            st.set_state(state, state_file_path, "end_prep_cleanup_supernatant", 1)
 
         # Wash samples
         if not state["end_prep_cleanup_wash"]:
@@ -265,17 +266,21 @@ def run(
             for _ in range(2):
                 cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
                 for _ in range(3):
-                    cmd.aspirate_384(hammy, ethanol, 50.0)
-                    cmd.dispense_384(hammy, d3.static(end_prep_index), 50.0)
+                    cmd.aspirate_384(hammy, ethanol, 50.0, liquidClass=ETHANOL)
+                    cmd.dispense_384(
+                        hammy, d3.static(end_prep_index), 50.0, liquidClass=ETHANOL
+                    )
 
                 time.sleep(60)
 
                 for _ in range(3):
-                    cmd.aspirate_384(hammy, d3.static(sample_index), 50.0)
-                    cmd.dispense_384(hammy, waste, 50.0)
+                    cmd.aspirate_384(
+                        hammy, d3.static(sample_index), 50.0, liquidClass=ETHANOL
+                    )
+                    cmd.dispense_384(hammy, waste, 50.0, liquidClass=ETHANOL)
                 cmd.tip_eject_384(hammy, mode=2)
 
-            st.reset_state(state, state_file_path, "end_prep_cleanup_wash", 1)
+            st.set_state(state, state_file_path, "end_prep_cleanup_wash", 1)
 
         # Dry samples
         time.sleep(30)
@@ -330,7 +335,7 @@ def run(
             cmd.tip_eject_384(hammy, mode=2)
 
             c3.fill(barcode_index)
-            st.reset_state(state, state_file_path, "end_prep_cleanup_elute", 1)
+            st.set_state(state, state_file_path, "end_prep_cleanup_elute", 1)
 
         # Remove end prep reagents & add barcode reagents to carrier
         hp.notify(
@@ -365,7 +370,7 @@ def run(
 
             carrier.reset()
             c3.reset()
-            st.reset_state(state, state_file_path, "barcode_ligation_add_barcodes", 1)
+            st.set_state(state, state_file_path, "barcode_ligation_add_barcodes", 1)
 
         # Remove barcode reagents & add remaining reagents to carrier
         hp.notify(
@@ -399,7 +404,7 @@ def run(
             cmd.grip_place(hammy, d1.plate)
 
             c3.reset()
-            st.reset_state(state, state_file_path, "barcode_ligation_add_mm", 1)
+            st.set_state(state, state_file_path, "barcode_ligation_add_mm", 1)
 
         # Incubate samples for 20 minutes at room temperature
         time.sleep(60 * 20)
@@ -423,7 +428,7 @@ def run(
                 cmd.tip_eject(hammy, waste=True)
 
             c3.reset()
-            st.reset_state(state, state_file_path, "barcode_ligation_add_edta", 1)
+            st.set_state(state, state_file_path, "barcode_ligation_add_edta", 1)
 
         # Pool samples
         if not state["barcode_ligation_pool_samples"]:
@@ -445,7 +450,7 @@ def run(
             cmd.dispense(hammy, pool, [20.0], liquidClass=ALIQUOT_300)
             cmd.tip_eject(hammy, waste=True)
 
-            st.reset_state(state, state_file_path, "barcode_ligation_pool_samples", 1)
+            st.set_state(state, state_file_path, "barcode_ligation_pool_samples", 1)
 
         # Add beads to pool
         if not state["barcode_ligation_add_beads"]:
@@ -455,7 +460,7 @@ def run(
             cmd.dispense(hammy, pool, [samples * 8.0])
             cmd.tip_eject(hammy, waste=True)
 
-            st.reset_state(state, state_file_path, "barcode_ligation_add_beads", 1)
+            st.set_state(state, state_file_path, "barcode_ligation_add_beads", 1)
 
         # User takes over from here to finish clean-up
         hp.notify("*User action required:* Finish clean-up of barcode ligation.")
@@ -507,7 +512,7 @@ def run(
             )
             cmd.tip_eject(hammy, waste=True)
 
-            st.reset_state(state, state_file_path, "adapter_ligation_add_reagents", 1)
+            st.set_state(state, state_file_path, "adapter_ligation_add_reagents", 1)
 
         # Incubate for 20 minutes at room temperature
         time.sleep(60 * 20)
@@ -533,7 +538,7 @@ def run(
             )
             cmd.tip_eject(hammy, waste=True)
 
-            st.reset_state(state, state_file_path, "adapter_ligation_add_beads", 1)
+            st.set_state(state, state_file_path, "adapter_ligation_add_beads", 1)
 
         # Incubate for 10 minutes at room temperature
         time.sleep(60 * 10)
@@ -554,7 +559,7 @@ def run(
             cmd.dispense(hammy, waste, [50.0], liquidClass=EMPTY_50)
             cmd.tip_eject(hammy, waste=True)
 
-            st.reset_state(
+            st.set_state(
                 state, state_file_path, "adapter_ligation_cleanup_supernatant", 1
             )
 
@@ -583,7 +588,7 @@ def run(
                 cmd.aspirate(hammy, d3_pool, [150.0])
                 cmd.tip_eject(hammy, waste=True)
 
-            st.reset_state(state, state_file_path, "adapter_ligation_cleanup_wash", 1)
+            st.set_state(state, state_file_path, "adapter_ligation_cleanup_wash", 1)
 
         # Dry pool
         time.sleep(30)
@@ -612,7 +617,7 @@ def run(
             )
             cmd.tip_eject(hammy, waste=True)
 
-            st.reset_state(state, state_file_path, "adapter_ligation_cleanup_elute", 1)
+            st.set_state(state, state_file_path, "adapter_ligation_cleanup_elute", 1)
 
         # User takes over from here to finish clean-up
         hp.notify("*User action required:* Finish clean-up of adapter ligation.")

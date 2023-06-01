@@ -82,8 +82,8 @@ def run(
                 cmd.grip_place(hammy, tmp_lid.lid, mode=1)
 
                 dk.delete_labware(shelf, bact_plates.pop().plate)
-                st.reset_state(state, state_file_path, "add_media", 0)
-                st.reset_state(state, state_file_path, "active_plate", 1)
+                st.set_state(state, state_file_path, "add_media", 0)
+                st.set_state(state, state_file_path, "active_plate", 1)
 
             # Add media to bact plate
             if not state["add_media"]:
@@ -97,7 +97,7 @@ def run(
                         dispenseMode=9,
                     )
 
-                st.reset_state(state, state_file_path, "add_media", 1)
+                st.set_state(state, state_file_path, "add_media", 1)
 
             # Remove filled plate
             if state["active_plate"]:
@@ -107,7 +107,7 @@ def run(
                 cmd.grip_place(hammy, bact_plates_done[0].plate)
 
                 dk.delete_labware(shelf, bact_plates_done.pop(0).plate)
-                st.reset_state(state, state_file_path, "active_plate", 0)
+                st.set_state(state, state_file_path, "active_plate", 0)
 
         # Cleanup instrument
         cmd.tip_eject_384(hammy, tips, mode=2)
