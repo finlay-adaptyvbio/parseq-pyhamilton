@@ -29,6 +29,7 @@ def compound_pos_str(pos_tuples):
 
 # Commands
 def initialize(ham: HamiltonInterface):
+    """Initialize the Hamilton robot."""
     logger.debug(f"Command: {'initialize'}")
 
     cid = ham.send_command(commands["INITIALIZE"])
@@ -41,7 +42,15 @@ def grip_get(
     labware: Plate96 | Plate384 | Lid,
     mode: int = 0,
     **kw_args,
-):
+) -> None:
+    """
+    Pick up a plate or lid with the gripper.
+
+    Args:
+        ham: HamiltonInterface object.
+        labware: Labware object to pick up.
+        mode: 0 for plate, 1 for lid.
+    """
     logger.debug(
         f"Command: {'grip_get'} | Labware: {labware.layout_name()} | Mode: {mode}"
     )
@@ -56,7 +65,6 @@ def grip_get(
             transportMode=transportMode,
             **kw_args,
         )
-
     elif mode == 1:
         cid = ham.send_command(
             commands["GRIP_GET"],
@@ -64,7 +72,6 @@ def grip_get(
             transportMode=transportMode,
             **kw_args,
         )
-
     else:
         raise ValueError
 
@@ -78,6 +85,15 @@ def grip_place(
     eject: bool = False,
     **kw_args,
 ):
+    """
+    Place a plate or lid with the gripper.
+
+    Args:
+        ham: HamiltonInterface object.
+        labware: Labware object to place.
+        mode: 0 for plate, 1 for lid.
+        eject: Whether to eject the gripper tool after placing.
+    """
     logger.debug(
         f"Command: {'grip_place'} | Labware: {labware.layout_name()} |"
         f" Mode: {mode} | Eject: {eject}"
@@ -95,7 +111,6 @@ def grip_place(
             ejectToolWhenFinish=ejectToolWhenFinish,
             **kw_args,
         )
-
     elif mode == 1:
         cid = ham.send_command(
             commands["GRIP_PLACE"],
@@ -104,7 +119,6 @@ def grip_place(
             ejectToolWhenFinish=ejectToolWhenFinish,
             **kw_args,
         )
-
     else:
         raise ValueError
 
@@ -116,6 +130,13 @@ def tip_pick_up(
     positions: list[tuple[Tip96, int]],
     **kw_args,
 ):
+    """
+    Pick up tips using single channels.
+
+    Args:
+        ham: HamiltonInterface object.
+        positions: List of tuples of (Tip96, int) where int is the tip index and Tip96 the tip-rack to pick up from.
+    """
     logger.debug(
         f"Command: {'tip_pick_up'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions:"
@@ -145,6 +166,14 @@ def tip_eject(
     waste: bool = False,
     **kw_args,
 ):
+    """
+    Eject tips using single channels.
+
+    Args:
+        ham: HamiltonInterface object.
+        positions: List of tuples of (Tip96, int) where int is the tip index and Tip96 the tip-rack to eject to.
+        waste: Whether to eject to waste.
+    """
     if positions:
         labware = positions[0][0].layout_name()
     else:
@@ -177,6 +206,12 @@ def grip_eject(
     ham: HamiltonInterface,
     **kw_args,
 ):
+    """
+    Eject the gripper tool.
+
+    Args:
+        ham: HamiltonInterface object.
+    """
     logger.debug(f"Command: {'grip_eject'}")
 
     cid = ham.send_command(
@@ -197,6 +232,14 @@ def aspirate(
     volumes: list[float],
     **kw_args,
 ):
+    """
+    Aspirate from labware using single channels.
+
+    Args:
+        ham: HamiltonInterface object.
+        positions: List of tuples of (Labware, int) where int is the well index and Labware the plate, carrier or reservoir to aspirate from.
+        volumes: List of volumes to aspirate.
+    """
     logger.debug(
         f"Command: {'aspirate'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions:"
@@ -233,6 +276,14 @@ def dispense(
     volumes: list[float],
     **kw_args,
 ):
+    """
+    Dispense to labware using single channels.
+
+    Args:
+        ham: HamiltonInterface object.
+        positions: List of tuples of (Labware, int) where int is the well index and Labware the plate, carrier or reservoir to dispense to.
+        volumes: List of volumes to dispense.
+    """
     logger.debug(
         f"Command: {'dispense'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions:"
@@ -265,6 +316,13 @@ def tip_pick_up_384(
     positions: list[tuple[Tip96, int]] | list[tuple[Tip384, int]],
     **kw_args,
 ):
+    """
+    Pick up tips using 384 head.
+
+    Args:
+        ham: HamiltonInterface object.
+        positions: List of tuples of (Tip96 | Tip384, int) where int is the tip index and Tip96 or Tip384 the tip-rack to pick up from.
+    """
     logger.debug(
         f"Command: {'tip_pick_up_384'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions: {len(positions)}"
@@ -291,6 +349,14 @@ def tip_eject_384(
     mode: int = 0,
     **kw_args,
 ):
+    """
+    Eject tips using 384 head.
+
+    Args:
+        ham: HamiltonInterface object.
+        positions: List of tuples of (Tip384, int) where int is the tip index and Tip384 the tip-rack to eject to.
+        mode: 0 for ejecting to tip-rack, 1 for ejecting to default waste, 2 for ejecting to known position.
+    """
     if positions:
         labware = positions[0][0].layout_name()
     else:
@@ -331,6 +397,14 @@ def aspirate_384(
     volume: float,
     **kw_args,
 ):
+    """
+    Aspirate from labware using 384 head.
+
+    Args:
+        ham: HamiltonInterface object.
+        positions: List of tuples of (Labware, int) where int is the well index and Labware the plate or reservoir to aspirate from.
+        volume: Volume to aspirate.
+    """
     logger.debug(
         f"Command: {'aspirate_384'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions: {len(positions)} |"
@@ -360,6 +434,14 @@ def dispense_384(
     volume: float,
     **kw_args,
 ):
+    """
+    Dispense to labware using 384 head.
+
+    Args:
+        ham: HamiltonInterface object.
+        positions: List of tuples of (Labware, int) where int is the well index and Labware the plate or reservoir to dispense to.
+        volume: Volume to dispense.
+    """
     logger.debug(
         f"Command: {'dispense_384'} | Labware:"
         f" {positions[0][0].layout_name()} | Positions: {len(positions)} |"
@@ -386,6 +468,13 @@ def grip_get_tip_rack(
     labware: Tip96 | Tip384,
     **kw_args,
 ):
+    """
+    Pick up a tip rack with the gripper.
+
+    Args:
+        ham: HamiltonInterface object.
+        labware: tip rack to pick up.
+    """
     logger.debug(f"Command: {'grip_get_tip_rack'} | Labware: {labware.layout_name()}")
 
     labwarePositions = labware_pos_str(labware, 0)
@@ -418,6 +507,15 @@ def grip_place_tip_rack(
     eject: bool = False,
     **kw_args,
 ):
+    """
+    Place a tip rack with the gripper.
+
+    Args:
+        ham: HamiltonInterface object.
+        labware: destination tip rack placement.
+        waste: Whether to eject the rack to default waste.
+        eject: Whether to eject the gripper tool after placing.
+    """
     logger.debug(
         f"Command: {'grip_place_tip_rack'} | Labware:"
         f" {labware.layout_name()} | Waste: {waste} | Eject: {eject}"
@@ -435,7 +533,6 @@ def grip_place_tip_rack(
     if waste:
         plateSequence = "Waste" + rack_type
         labwarePositions = ""
-
     else:
         plateSequence = ""
         labwarePositions = labware_pos_str(labware, 0)
