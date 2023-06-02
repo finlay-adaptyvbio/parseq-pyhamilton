@@ -53,7 +53,16 @@ def grip_get(
     Args:
         - ham: Robot interface.
         - labware: Labware object to pick up.
-        - mode: 0 for plate, 1 for lid. Defaults to 0.
+        - mode: 0 for plate, 1 for lid and 2 for plate with lid. Defaults to 0.
+
+    Keyword Args:
+        - gripForce (integer): 0-9, from lowest to highest force. Defaults to 7.
+        - gripWidth (float): Grip width in mm. Defaults to 82.0.
+        - gripHeight (float): Height from labware base in mm. Defaults to 9.0.
+        - widthBefore (float): Width before gripping in mm. Defaults to 88.0.
+        - gripSpeed (float): Speed used by grippers when approaching labware in mm/s. Defaults to 275.0.
+        - zSpeed (float): Speed used by grippers for vertical movements in mm/s. Defaults to 125.0.
+        - checkPlate (integer): 0 or 1, whether to check for plate presence. Defaults to 0.
     """
     logger.debug(
         f"Command: {'grip_get'} | Labware: {labware.layout_name()} | Mode: {mode}"
@@ -97,6 +106,12 @@ def grip_place(
         - labware: Labware object to place.
         - mode: 0 for plate, 1 for lid. Defaults to 0.
         - eject: Whether to eject the gripper tool after placing. Defaults to False.
+
+    Keyword Args:
+        - movementType (integer): 0=To carrier, 1=Complex movement. Defaults to 0.
+        - zSpeed (float): Speed used by grippers for vertical movements in mm/s. Defaults to 125.0.
+        - platePressOnDistance (float): Lift-up distance in mm. Defaults to 0.0. Requires movementType=1.
+        - xAcceleration (integer): 1-5 from slowest to fastest. Defaults to 4.
     """
     logger.debug(
         f"Command: {'grip_place'} | Labware: {labware.layout_name()} |"
@@ -243,6 +258,25 @@ def aspirate(
         - ham: Robot interface.
         - positions where int is the well index and Labware the plate, carrier or reservoir to aspirate from.
         - volumes: List of volumes to aspirate.
+
+    Keyword Args:
+        - liquidClass (string): Liquid class to use. Defaults to DEFAULT_LIQUID_CLASS_2CH (300 uL tips with water).
+        - aspirateMode (integer): 0=Normal, 1=No air gap, 2=Aspirate all volume. Defaults to 0.
+        - capacitiveLLD (integer): 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition. Defaults to 0.
+        - pressureLLD (integer): 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From liquid class definition. Defaults to 0.
+        - liquidFollowing (integer): 0=Off , 1=On. Defaults to 0.
+        - submergeDepth (float): mm of immersion below liquid's surface to start aspiration when using LLD. Defaults to 2.0.
+        - liquidHeight (float): mm above container's base to start aspiration when not using LLD. Defaults to 1.0.
+        - maxLLdDifference (float): max mm height difference between cLLD and pLLD detected liquid levels. Defaults to 0.0.
+        - mixCycles (integer): number of mixing cycles (1 cycle = 1 aspiration + 1 dispensing). Defaults to 0.
+        - mixPosition (float): additional immersion mm below aspiration position to start mixing. Defaults to 0.0.
+        - mixVolume (float): mix volume in uL. Defaults to 0.0.
+        - xDisplacement (float): x displacement in mm. Defaults to 0.0.
+        - yDisplacement (float): y displacement in mm. Defaults to 0.0.
+        - zDisplacement (float): z displacement in mm. Defaults to 0.0.
+        - airTransportRetractDist (float): mm to move up in Z after finishing the aspiration at a fixed height before aspirating 'transport air'. Defaults to 5.0.
+        - touchOff (integer): 0=Off , 1=On. Defaults to 0.
+        - aspPosAboveTouch (float): mm to move up in Z after touch off detects the bottom before aspirating liquid. Defaults to 0.0.
     """
     logger.debug(
         f"Command: {'aspirate'} | Labware:"
@@ -287,6 +321,25 @@ def dispense(
         - ham: Robot interface.
         - positions where int is the well index and Labware the plate, carrier or reservoir to dispense to.
         - volumes: List of volumes to dispense.
+
+    Keyword Args:
+        - liquidClass (string): Liquid class to use. Defaults to DEFAULT_LIQUID_CLASS_2CH (300 uL tips with water).
+        - dispenseMode (integer): 0=Jet Part, 1=Jet Empty, 2=Surface Part, 3=Surface Empty, 4=Jet Drain tip, 8=From liquid class, 9=Blowout tip. Defaults to 0.
+        - capacitiveLLD (integer): 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition. Defaults to 0.
+        - liquidFollowing (integer): 0=Off , 1=On. Defaults to 0.
+        - submergeDepth (float): mm of immersion below liquid's surface to start dispense when using LLD. Defaults to 2.0.
+        - liquidHeight (float): mm above container's base to start dispense when not using LLD. Defaults to 1.0.
+        - mixCycles (integer): number of mixing cycles (1 cycle = 1 aspiration + 1 dispensing). Defaults to 0.
+        - mixPosition (float): additional immersion mm below aspiration position to start mixing. Defaults to 0.0.
+        - mixVolume (float): mix volume in uL. Defaults to 0.0.
+        - xDisplacement (float): x displacement in mm. Defaults to 0.0.
+        - yDisplacement (float): y displacement in mm. Defaults to 0.0.
+        - zDisplacement (float): z displacement in mm. Defaults to 0.0.
+        - airTransportRetractDist (float): mm to move up in Z after finishing the aspiration at a fixed height before aspirating 'transport air'. Defaults to 5.0.
+        - touchOff (integer): 0=Off , 1=On. Defaults to 0.
+        - dispPositionAboveTouch (float): mm to move up in Z after touch off detects the bottom before dispensing liquid. Defaults to 0.0.
+        - zMoveAfterStep (integer): 0=Normal, 1=Minimized. Defaults to 0.
+        - sideTouch (integer): 0=Off, 1=On. Defaults to 0.
     """
     logger.debug(
         f"Command: {'dispense'} | Labware:"
@@ -408,6 +461,18 @@ def aspirate_384(
         - ham: Robot interface.
         - positions where int is the well index and Labware the plate or reservoir to aspirate from.
         - volume: Volume to aspirate.
+
+    Keyword Args:
+        - liquidClass (string): Liquid class to use. Defaults to DEFAULT_LIQUID_CLASS_384MPH (50 uL tips with water).
+        - aspirateMode (integer): 0=Normal, 1=No air gap, 2=Aspirate all volume. Defaults to 0.
+        - capacitiveLLD (integer): 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition. Defaults to 0.
+        - liquidFollowing (integer): 0=Off , 1=On. Defaults to 0.
+        - submergeDepth (float): mm of immersion below liquid's surface to start aspiration when using LLD. Defaults to 2.0.
+        - liquidHeight (float): mm above container's base to start aspiration when not using LLD. Defaults to 1.0.
+        - mixCycles (integer): number of mixing cycles (1 cycle = 1 aspiration + 1 dispensing). Defaults to 0.
+        - mixPosition (float): additional immersion mm below aspiration position to start mixing. Defaults to 0.0.
+        - mixVolume (float): mix volume in uL. Defaults to 0.0.
+        - airTransportRetractDist (float): mm to move up in Z after finishing the aspiration at a fixed height before aspirating 'transport air'. Defaults to 5.0.
     """
     logger.debug(
         f"Command: {'aspirate_384'} | Labware:"
@@ -445,6 +510,20 @@ def dispense_384(
         - ham: Robot interface.
         - positions where int is the well index and Labware the plate or reservoir to dispense to.
         - volume: Volume to dispense.
+
+    Keyword Args:
+        - liquidClass (string): Liquid class to use. Defaults to DEFAULT_LIQUID_CLASS_384MPH (50 uL tips with water).
+        - dispenseMode (integer): 0=Jet Part, 1=Jet Empty, 2=Surface Part, 3=Surface Empty, 4=Jet Drain tip, 8=From liquid class, 9=Blowout tip. Defaults to 0.
+        - capacitiveLLD (integer): 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition. Defaults to 0.
+        - liquidFollowing (integer): 0=Off , 1=On. Defaults to 0.
+        - submergeDepth (float): mm of immersion below liquid's surface to start dispense when using LLD. Defaults to 2.0.
+        - liquidHeight (float): mm above container's base to start dispense when not using LLD. Defaults to 1.0.
+        - mixCycles (integer): number of mixing cycles (1 cycle = 1 aspiration + 1 dispensing). Defaults to 0.
+        - mixPosition (float): additional immersion mm below aspiration position to start mixing. Defaults to 0.0.
+        - mixVolume (float): mix volume in uL. Defaults to 0.0.
+        - airTransportRetractDist (float): mm to move up in Z after finishing the aspiration at a fixed height before aspirating 'transport air'. Defaults to 5.0.
+        - zMoveAfterStep (integer): 0=Normal, 1=Minimized. Defaults to 0.
+        - sideTouch (integer): 0=Off, 1=On. Defaults to 0.
     """
     logger.debug(
         f"Command: {'dispense_384'} | Labware:"
@@ -552,372 +631,183 @@ def grip_place_tip_rack(
     ham.wait_on_response(cid, raise_first_exception=True)
 
 
-# Default channel patterns
-_channel_patt_2 = "11"
-_channel_patt_384 = "1" * 384
-
 # Default command templates
 command_templates = {
     "initialize": ("INITIALIZE", {"initializeAlways": 0}),
     "channelTipPickUp": (
         "PICKUP",
         {
-            "tipSequence": (
-                ""
-            ),  # (string) leave empty if you are going to provide specific labwarePositions below
-            "labwarePositions": (
-                ""
-            ),  # (string) leave empty if you are going to provide a sequence name above.'LabwareId1, positionId1; LabwareId2,positionId2; ....'
-            "channelVariable": (
-                _channel_patt_2
-            ),  # (string)  channel pattern e.g. '11110000'
-            "sequenceCounting": 0,  # (integer) 0=don´t autoincrement,  1=Autoincrement
-            "channelUse": (
-                1
-            ),  # (integer) 1=use all sequence positions (no empty wells), 2=keep channel pattern
+            "tipSequence": "",
+            "labwarePositions": "",
+            "channelVariable": "11",
+            "sequenceCounting": 0,
+            "channelUse": 1,
         },
     ),
     "channelTipEject": (
         "EJECT",
         {
-            "wasteSequence": (
-                ""
-            ),  # (string) leave empty if you are going to provide specific labware-positions below or ejecting to default waste
-            "labwarePositions": (
-                ""
-            ),  # (string) leave empty if you are going to provide a sequence name above.'LabwareId1, positionId1; LabwareId2,positionId2; ....'
-            "channelVariable": (
-                _channel_patt_2
-            ),  # (string) channel pattern e.g. "11110000"
-            "sequenceCounting": (
-                0
-            ),  # (integer) 0=don´t autoincrement,  1=Autoincrement.  Value omitted if ejecting to default waste
-            "channelUse": (
-                1
-            ),  # (integer) 1=use all sequence positions (no empty wells), 2=keep channel pattern
-            "useDefaultWaste": (
-                0
-            ),  # (integer) 0=eject to custom waste sequence,  1=Use default waste
+            "wasteSequence": "",
+            "labwarePositions": "",
+            "channelVariable": "11",
+            "sequenceCounting": 0,
+            "channelUse": 1,
+            "useDefaultWaste": 0,
         },
     ),
     "channelAspirate": (
         "ASPIRATE",
         {
-            "aspirateSequence": (
-                ""
-            ),  # (string) leave empty if you are going to provide specific labware-positions below
-            "labwarePositions": (
-                ""
-            ),  # (string) leave empty if you are going to provide a sequence name above. 'LabwareId1, positionId1; LabwareId2,positionId2; ....'
-            "volumes": (
-                None
-            ),  # (float or string) enter a single value used for all channels or enter an array of values for each channel like [10.0,15.5,11.2]
-            "channelVariable": (
-                _channel_patt_2
-            ),  # (string) channel pattern e.g. "11110000"
-            "liquidClass": None,  # (string)
-            "sequenceCounting": 0,  # (integer) 0=don´t autoincrement,  1=Autoincrement
-            "channelUse": (
-                1
-            ),  # (integer) 1=use all sequence positions (no empty wells), 2=keep channel pattern
-            "aspirateMode": (
-                0
-            ),  # (integer) 0=Normal Aspiration, 1=Consecutive (don´t aspirate blowout), 2=Aspirate all
-            "capacitiveLLD": (
-                0
-            ),  # (integer) 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition
-            "pressureLLD": (
-                0
-            ),  # (integer) 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From liquid class definition
-            "liquidFollowing": 0,  # (integer) 0=Off , 1=On
-            "submergeDepth": (
-                2.0
-            ),  # (float) mm of immersion below liquid´s surface to start aspiration when using LLD
-            "liquidHeight": (
-                1.0
-            ),  # (float) mm above container´s bottom to start aspiration when not using LLD
-            "maxLLdDifference": (
-                0.0
-            ),  # (float) max mm height different between cLLD and pLLD detected liquid levels
-            "mixCycles": (
-                0
-            ),  # (integer) number of mixing cycles (1 cycle = 1 asp + 1 disp)
-            "mixPosition": (
-                0.0
-            ),  # (float) additional immersion mm below aspiration position to start mixing
-            "mixVolume": 0.0,  # (float) mix volume
+            "aspirateSequence": "",
+            "labwarePositions": "",
+            "volumes": None,
+            "channelVariable": "11",
+            "liquidClass": None,
+            "sequenceCounting": 0,
+            "channelUse": 1,
+            "aspirateMode": 0,
+            "capacitiveLLD": 0,
+            "pressureLLD": 0,
+            "liquidFollowing": 0,
+            "submergeDepth": 2.0,
+            "liquidHeight": 1.0,
+            "maxLLdDifference": 0.0,
+            "mixCycles": 0,
+            "mixPosition": 0.0,
+            "mixVolume": 0.0,
             "xDisplacement": 0.0,
             "yDisplacement": 0.0,
             "zDisplacement": 0.0,
-            "airTransportRetractDist": (
-                5.0
-            ),  # (float) mm to move up in Z after finishing the aspiration at a fixed height before aspirating 'transport air'
-            "touchOff": 0,  # (integer) 0=Off , 1=On
-            "aspPosAboveTouch": (
-                0.0
-            ),  # (float)  mm to move up in Z after touch off detects the bottom before aspirating liquid
+            "airTransportRetractDist": 5.0,
+            "touchOff": 0,
+            "aspPosAboveTouch": 0.0,
         },
     ),
     "channelDispense": (
         "DISPENSE",
         {
-            "dispenseSequence": (
-                ""
-            ),  # (string) leave empty if you are going to provide specific labware-positions below
-            "labwarePositions": (
-                ""
-            ),  # (string) leave empty if you are going to provide a sequence name above. 'LabwareId1, positionId1; LabwareId2,positionId2; ....'
-            "volumes": (
-                None
-            ),  # (float or string) enter a single value used for all channels or enter an array of values for each channel like [10.0,15.5,11.2]
-            "channelVariable": (
-                _channel_patt_2
-            ),  # (string) channel pattern e.g. "11110000"
-            "liquidClass": None,  # (string)
-            "sequenceCounting": 0,  # (integer) 0=don´t autoincrement,  1=Autoincrement
-            "channelUse": (
-                1
-            ),  # (integer) 1=use all sequence positions (no empty wells), 2=keep channel pattern
-            "dispenseMode": (
-                8
-            ),  # (integer) 0=Jet Part, 1=Jet Empty, 2=Surface Part, 3=Surface Empty, 4=Jet Drain tip, 8=From liquid class, 9=Blowout tip
-            "capacitiveLLD": (
-                0
-            ),  # (integer) 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition
-            "liquidFollowing": 0,  # (integer) 0=Off , 1=On
-            "submergeDepth": (
-                2.0
-            ),  # (float) mm of immersion below liquid´s surface to start dispense when using LLD
-            "liquidHeight": (
-                1.0
-            ),  # (float) mm above container´s bottom to start dispense when not using LLD
-            "mixCycles": (
-                0
-            ),  # (integer) number of mixing cycles (1 cycle = 1 asp + 1 disp)
-            "mixPosition": (
-                0.0
-            ),  # (float) additional immersion mm below dispense position to start mixing
-            "mixVolume": 0.0,  # (float) mix volume
+            "dispenseSequence": "",
+            "labwarePositions": "",
+            "volumes": None,
+            "channelVariable": "11",
+            "liquidClass": None,
+            "sequenceCounting": 0,
+            "channelUse": 1,
+            "dispenseMode": 8,
+            "capacitiveLLD": 0,
+            "liquidFollowing": 0,
+            "submergeDepth": 2.0,
+            "liquidHeight": 1.0,
+            "mixCycles": 0,
+            "mixPosition": 0.0,
+            "mixVolume": 0.0,
             "xDisplacement": 0.0,
             "yDisplacement": 0.0,
             "zDisplacement": 0.0,
-            "airTransportRetractDist": (
-                5.0
-            ),  # (float) mm to move up in Z after finishing the dispense at a fixed height before aspirating 'transport air'
-            "touchOff": 0,  # (integer) 0=Off , 1=On
-            "dispPositionAboveTouch": (
-                0.0
-            ),  # (float) mm to move up in Z after touch off detects the bottom, before dispense
-            "zMoveAfterStep": (
-                1
-            ),  # (integer) 0=normal, 1=Minimized (Attention!!! this depends on labware clearance height, can crash).
-            "sideTouch": 0,  # (integer) 0=Off , 1=On
+            "airTransportRetractDist": 5.0,
+            "touchOff": 0,
+            "dispPositionAboveTouch": 0.0,
+            "zMoveAfterStep": 1,
+            "sideTouch": 0,
         },
     ),
     "mph384TipPickUp": (
         "PICKUP384",
         {
-            "tipSequence": (
-                ""
-            ),  # (string) leave empty if you are going to provide specific labware-positions below
-            "labwarePositions": (
-                ""
-            ),  # (string) leave empty if you are going to provide a sequence name above. 'LabwareId1, positionId1; LabwareId2,positionId2; ....' Must contain 96 values
-            "tipMode": 0,  # (integer) 0=All, 1=96 Tips, 2=Tip lifter
-            "headPatternVariable": (
-                _channel_patt_384
-            ),  # (string) channel Variable e.g. "11110000...." . Must contain 96 values
-            "sequenceCounting": 0,  # (integer) 0=don´t autoincrement,  1=Autoincrement
-            "reducedPatternMode": (
-                0
-            ),  # (integer) 0=All (not reduced), 1=One channel, 2=Quarter  3=Row(s), 4=Column(s)
-            "headPatternAsVariable": (
-                0
-            ),  # (integer) 0=Off, 1=Column pattern, 2=384 manual pattern, 3=96 manual pattern, 4=Row pattern
-            "pickUpFromTipLifter": (
-                0
-            ),  # (integer) 0=Off, 1= One column, 2=Two columns, 3=All remaining tips
+            "tipSequence": "",
+            "labwarePositions": "",
+            "tipMode": 0,
+            "headPatternVariable": "1" * 384,
+            "sequenceCounting": 0,
+            "reducedPatternMode": 0,
+            "headPatternAsVariable": 0,
+            "pickUpFromTipLifter": 0,
         },
     ),
     "mph384TipEject": (
         "EJECT384",
         {
-            "wasteSequence": (
-                ""
-            ),  # (string) leave empty if you are going to provide specific labware-positions below or ejecting to default waste
-            "labwarePositions": (
-                ""
-            ),  # (string) leave empty if you are going to provide a sequence name above. 'LabwareId1, positionId1; LabwareId2,positionId2; ....'
-            "sequenceCounting": (
-                0
-            ),  # (integer)  0=don´t autoincrement,  1=Autoincrement.  Value omitted if ejecting to default waste
-            "tipEjectToKnownPosition": (
-                0
-            ),  # (integer) 0=Eject to specified sequence position,  1=Eject on tip pick up position, 2=Eject on default waste
+            "wasteSequence": "",
+            "labwarePositions": "",
+            "sequenceCounting": 0,
+            "tipEjectToKnownPosition": 0,
         },
     ),
     "mph384Aspirate": (
         "ASPIRATE384",
         {
-            "aspirateSequence": (
-                ""
-            ),  # (string) leave empty if you are going to provide specific labware-positions below
-            "labwarePositions": (
-                ""
-            ),  # (string) leave empty if you are going to provide a sequence name above. LabwareId1, positionId1; LabwareId2,positionId2; ....
-            "aspirateVolume": (
-                None
-            ),  # (float)  single volume used for all channels in the head. There´s no individual control of each channel volume in multi-probe heads.
-            "liquidClass": None,  # (string)
-            "sequenceCounting": 0,  # (integer)  0=don´t autoincrement,  1=Autoincrement
-            "aspirateMode": (
-                0
-            ),  # (integer) 0=Normal Aspiration, 1=Consecutive (don´t aspirate blowout), 2=Aspirate all
-            "capacitiveLLD": (
-                0
-            ),  # (integer) 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition
-            "liquidFollowing": 0,  # (integer) 0=Off , 1=On
-            "submergeDepth": (
-                2.0
-            ),  # (float) mm of immersion below liquid´s surface to start aspiration when using LLD
-            "liquidHeight": (
-                1.0
-            ),  # (float) mm above container´s bottom to start aspiration when not using LLD
-            "mixCycles": (
-                0
-            ),  # (integer) number of mixing cycles (1 cycle = 1 asp + 1 disp)
-            "mixPosition": (
-                0.0
-            ),  # (float) additional immersion mm below aspiration position to start mixing
-            "mixVolume": 0.0,  # (float) mix volume
-            "airTransportRetractDist": (
-                5.0
-            ),  # (float) mm to move up in Z after finishing the aspiration at a fixed height before aspirating 'transport air'
+            "aspirateSequence": "",
+            "labwarePositions": "",
+            "aspirateVolume": None,
+            "liquidClass": None,
+            "sequenceCounting": 0,
+            "aspirateMode": 0,
+            "capacitiveLLD": 0,
+            "liquidFollowing": 0,
+            "submergeDepth": 2.0,
+            "liquidHeight": 1.0,
+            "mixCycles": 0,
+            "mixPosition": 0.0,
+            "mixVolume": 0.0,
+            "airTransportRetractDist": 5.0,
         },
     ),
     "mph384Dispense": (
         "DISPENSE384",
         {
-            "dispenseSequence": (
-                ""
-            ),  # (string) leave empty if you are going to provide specific labware-positions below
-            "labwarePositions": (
-                ""
-            ),  # (string) leave empty if you are going to provide a sequence name above. LabwareId1, positionId1; LabwareId2,positionId2; ....
-            "dispenseVolume": (
-                None
-            ),  # (float) single volume used for all channels in the head. There´s no individual control of each channel volume in multi-probe heads.
-            "liquidClass": None,  # (string)
-            "sequenceCounting": 0,  # (integer)  0=don´t autoincrement,  1=Autoincrement
-            "dispenseMode": (
-                8
-            ),  # (integer) 0=Jet Part, 1=Jet Empty, 2=Surface Part, 3=Surface Empty,4=Jet Drain tip, 8=From liquid class, 9=Blowout tip
-            "capacitiveLLD": (
-                0
-            ),  # (integer) 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition
-            "liquidFollowing": 0,  # (integer)  0=Off , 1=On
-            "submergeDepth": (
-                2.0
-            ),  # (float) mm of immersion below liquid´s surface to start dispense when using LLD
-            "liquidHeight": (
-                1.0
-            ),  # (float) mm above container´s bottom to start dispense when not using LLD
-            "mixCycles": (
-                0
-            ),  # (integer)  number of mixing cycles (1 cycle = 1 asp + 1 disp)
-            "mixPosition": (
-                0.0
-            ),  # (float)  additional immersion mm below dispense position to start mixing
-            "mixVolume": 0.0,  # (float)  mix volume
-            "airTransportRetractDist": (
-                5.0
-            ),  # (float) mm to move up in Z after finishing the dispense at a fixed height before aspirating 'transport air'
-            "zMoveAfterStep": (
-                0
-            ),  # (integer) 0=normal, 1=Minimized (Attention!!! this depends on labware clearance height, can crash).
-            "sideTouch": 0,  # (integer) 0=Off , 1=On
+            "dispenseSequence": "",
+            "labwarePositions": "",
+            "dispenseVolume": None,
+            "liquidClass": None,
+            "sequenceCounting": 0,
+            "dispenseMode": 8,
+            "capacitiveLLD": 0,
+            "liquidFollowing": 0,
+            "submergeDepth": 2.0,
+            "liquidHeight": 1.0,
+            "mixCycles": 0,
+            "mixPosition": 0.0,
+            "mixVolume": 0.0,
+            "airTransportRetractDist": 5.0,
+            "zMoveAfterStep": 0,
+            "sideTouch": 0,
         },
     ),
     "gripGet": (
         "GRIP_GET",
         {
-            "plateSequence": (
-                ""
-            ),  # leave empty if you are going to provide specific plate labware-position below
-            "plateLabwarePositions": (
-                ""
-            ),  # leave empty if you are going to provide a plate sequence name above. LabwareId1, positionId1;
-            "lidSequence": (
-                ""
-            ),  # leave empty if you don´t use lid or if you are going to provide specific plate labware-positions below or ejecting to default waste
-            "lidLabwarePositions": (
-                ""
-            ),  # leave empty if you are going to provide a plate sequence name above. LabwareId1, positionId1;
-            "toolSequence": "CORE_Grip",  # sequence name of the CO-RE Gripper
-            "gripForce": 7,  # (integer) 0-9, from lowest to highest
-            "gripperToolChannel": (
-                2
-            ),  # specifies the higher of two consecutive integers representing the CO-RE gripper channels.
-            "sequenceCounting": (
-                0
-            ),  # (integer) 0=don´t autoincrement plate sequence,  1=Autoincrement
-            "gripWidth": 82.0,  # (float) mm
-            "gripHeight": 9.0,  # (float) mm
-            "widthBefore": 88,  # (float) mm width before gripping
-            "gripSpeed": 275.0,  # (float) mm/s. Must be supplied
-            "zSpeed": 125.0,  # (float) mm/s. Must be supplied
-            "transportMode": 0,  # (integer) 0=Plate only, 1=Lid only ,2=Plate with lid
-            "checkPlate": 0,  # (integer)
-        },
-    ),
-    "gripMove": (
-        "GRIP_MOVE",
-        {
-            "plateSequence": (
-                ""
-            ),  # leave empty if you are going to provide specific plate labware-position below
-            "xAcceleration": (
-                4
-            ),  # (integer) 1-5 from slowest to fastest, where 4 is default
-            "plateLabwarePositions": (
-                ""
-            ),  # leave empty if you don´t use lid or if you are going to provide specific plate labware-positions below or ejecting to default waste
-            "xDisplacement": 0.0,
-            "yDisplacement": 0.0,
-            "zDisplacement": 0.0,
+            "plateSequence": "",
+            "plateLabwarePositions": "",
+            "lidSequence": "",
+            "lidLabwarePositions": "",
+            "toolSequence": "CORE_Grip",
+            "gripForce": 7,
+            "gripperToolChannel": 2,
+            "sequenceCounting": 0,
+            "gripWidth": 82.0,
+            "gripHeight": 9.0,
+            "widthBefore": 88,
+            "gripSpeed": 275.0,
+            "zSpeed": 125.0,
+            "transportMode": 0,
+            "checkPlate": 0,
         },
     ),
     "gripPlace": (
         "GRIP_PLACE",
         {
-            "plateSequence": (
-                ""
-            ),  # leave empty if you are going to provide specific plate labware-position below
-            "plateLabwarePositions": (
-                ""
-            ),  # leave empty if you are going to provide a plate sequence name above. LabwareId1, positionId1;
-            "lidSequence": (
-                ""
-            ),  # leave empty if you don´t use lid or if you are going to provide specific plate labware-positions below or ejecting to default waste
-            "lidLabwarePositions": (
-                ""
-            ),  # leave empty if you are going to provide a plate sequence name above. LabwareId1, positionId1;
-            "toolSequence": (
-                "CORE_Grip"
-            ),  # sequence name of the iSWAP. leave empty if you are going to provide a plate sequence name above. LabwareId1, positionId1;
-            "sequenceCounting": (
-                0
-            ),  # (integer) 0=don´t autoincrement plate sequence,  1=Autoincrement
-            "movementType": 0,  # (integer) 0=To carrier, 1=Complex movement
-            "transportMode": 0,  # (integer) 0=Plate only, 1=Lid only ,2=Plate with lid
-            "ejectToolWhenFinish": 1,  # (integer) 0=Off, 1=On
-            "zSpeed": 125.0,  # (float) mm/s
-            "platePressOnDistance": (
-                0.0
-            ),  # (float) lift-up distance [mm] (only used if 'movement type' is set to 'complex movement'),
-            "xAcceleration": (
-                4
-            ),  # (integer) 1-5 from slowest to fastest, where 4 is default
+            "plateSequence": "",
+            "plateLabwarePositions": "",
+            "lidSequence": "",
+            "lidLabwarePositions": "",
+            "toolSequence": "CORE_Grip",
+            "sequenceCounting": 0,
+            "movementType": 0,
+            "transportMode": 0,
+            "ejectToolWhenFinish": 1,
+            "zSpeed": 125.0,
+            "platePressOnDistance": 0.0,
+            "xAcceleration": 4,
         },
     ),
 }
