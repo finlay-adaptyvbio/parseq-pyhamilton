@@ -10,7 +10,7 @@ def prompt_file_path(message: str) -> str:
     """Prompt user for file path and check if it exists.
 
     Args:
-        message (str): Message to prompt user.
+        - message: Message to prompt user.
 
     Returns:
         str: Path.
@@ -28,14 +28,16 @@ def prompt_file_path(message: str) -> str:
     return path
 
 
-def prompt_int(message: str, max: int) -> int:
+def prompt_int(message: str, max: int, min: int = 0) -> int:
     """Prompt user for integer.
 
     Args:
-        message (str): Message to prompt user.
+        - message: Message to prompt user.
+        - max: Maximum value.
+        - min: Minimum value. Defaults to 0.
 
     Returns:
-        int: Integer.
+        - int: Integer.
     """
     logger.debug(f"Prompting for integer: {message}")
     while True:
@@ -45,7 +47,7 @@ def prompt_int(message: str, max: int) -> int:
             if value > max:
                 print(f"Please enter an integer smaller than {max}.")
                 continue
-            elif value < 0:
+            elif value < min:
                 print("Please enter a positive integer.")
                 continue
             break
@@ -57,14 +59,16 @@ def prompt_int(message: str, max: int) -> int:
     return value
 
 
-def prompt_float(message: str, max: float) -> float:
+def prompt_float(message: str, max: float, min: float = 0) -> float:
     """Prompt user for foat.
 
     Args:
-        message (str): Message to prompt user.
+        - message: Message to prompt user.
+        - max: Maximum value.
+        - min: Minimum value. Defaults to 0.
 
     Returns:
-        float: Float.
+        - float: Float.
     """
     logger.debug(f"Prompting for float: {message}")
     while True:
@@ -74,7 +78,7 @@ def prompt_float(message: str, max: float) -> float:
             if value > max:
                 print(f"Please enter a float smaller than {max}.")
                 continue
-            elif value < 0:
+            elif value < min:
                 print("Please enter a positive float.")
                 continue
             break
@@ -91,8 +95,8 @@ def process_cherry_csv(csv_path: str, output_dir: str) -> None:
     Sort wells by name and then plate.
 
     Args:
-        csv_path (str): Path to CSV file.
-        output_dir (str): Path to output directory.
+        - csv_path: Path to CSV file.
+        - output_dir: Path to output directory.
     """
     logger.debug(f"Processing CSV at {csv_path}.")
 
@@ -120,12 +124,12 @@ def process_cherry_csv(csv_path: str, output_dir: str) -> None:
     logger.debug(f"Saved output CSVs to {output_dir}.")
 
 
-def process_pm_csv(csv_path: str, output_dir: str, prefix: str):
+def process_pm_csv(csv_path: str, output_dir: str, prefix: str) -> None:
     """Get plate names from CSV file. Save as CSV file.
 
     Args:
-        csv_path (str): Path to CSV file.
-        output_dir (str): Path to output directory.
+        - csv_path: Path to CSV file.
+        - output_dir: Path to output directory.
     """
     logger.debug(f"Processing CSV at {csv_path}.")
 
@@ -145,7 +149,15 @@ def process_pm_csv(csv_path: str, output_dir: str, prefix: str):
 
 
 # TODO: rewrite
-def place_labware(labwares: list, type: str, names: list[str] = []):
+def place_labware(labwares: list, type: str | int, names: list[str] = []):
+    """
+    Prompt user to place labware in the correct position.
+
+    Args:
+        - labwares: list of labware objects
+        - type: type of labware
+        - names: list of names for each labware. Defaults to [].
+    """
     print("-" * 100)
     print(f"Please place labware in the following position(s) (ignore if done):\n")
     print(f"{'Name':<10}{'Position':<10}{'Level':<8}{'Labware'}")
@@ -165,10 +177,10 @@ def notify(text) -> dict:
     """Send a notification to Slack
 
     Args:
-        text (str): message to send
+        - text: message to send
 
     Returns:
-        dict: response from Slack API
+        - dict: response from Slack API
     """
     slack_api_token = os.environ.get(
         "SLACK_API_TOKEN"

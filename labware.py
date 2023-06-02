@@ -323,11 +323,11 @@ class plate_384:
     """
     384-well plate, methods available for accessing positions:
 
-    ch2:        2-channel mode (max 2 positions)
-    mph384:     384-head mode (max 384 positions)
-    quadrant:   384-head in 96-channel mode (max 96 positions)
-    static:     provided positions
-    full:       all positions
+    - ch2:        2-channel mode (max 2 positions)
+    - mph384:     384-head mode (max 384 positions)
+    - quadrant:   384-head in 96-channel mode (max 96 positions)
+    - static:     provided positions
+    - full:       all positions
     """
 
     def __init__(self, labware: Plate384) -> None:
@@ -478,11 +478,11 @@ class reservoir_300:
     """
     384-well reservoir, methods available for accessing positions:
 
-    ch2:        2-channel mode (max 2 positions)
-    mph384:     384-head mode (max 384 positions)
-    quadrant:   384-head in 96-channel mode (max 96 positions)
-    static:     provided positions
-    full:       all positions
+    - ch2:        2-channel mode (max 2 positions)
+    - mph384:     384-head mode (max 384 positions)
+    - quadrant:   384-head in 96-channel mode (max 96 positions)
+    - static:     provided positions
+    - full:       all positions
     """
 
     def __init__(self, labware: Reservoir300) -> None:
@@ -610,10 +610,10 @@ class tip_96:
     """
     96-tip rack, methods available for accessing positions:
 
-    ch2:        2-channel mode (max 2 positions)
-    mph384:     384-head mode (max 96 positions)
-    static:     provided positions
-    full:       all positions
+    - ch2:        2-channel mode (max 2 positions)
+    - mph384:     384-head mode (max 96 positions)
+    - static:     provided positions
+    - full:       all positions
     """
 
     def __init__(self, labware: Tip96) -> None:
@@ -741,10 +741,10 @@ class plate_96:
     """
     96-well plate, methods available for accessing positions:
 
-    ch2:        2-channel mode (max 2 positions)
-    mph384:     384-head mode (max 96 positions)
-    static:     provided positions
-    full:       all positions
+    - ch2:        2-channel mode (max 2 positions)
+    - mph384:     384-head mode (max 96 positions)
+    - static:     provided positions
+    - full:       all positions
     """
 
     def __init__(self, labware: Plate96) -> None:
@@ -866,8 +866,8 @@ class carrier_24:
     """
     24-tube carrier, methods available for accessing positions:
 
-    ch2:        2-channel mode (max 2 positions)
-    static:     provided positions
+    - ch2:        2-channel mode (max 2 positions)
+    - static:     provided positions
     """
 
     def __init__(
@@ -943,7 +943,7 @@ class carrier_24:
 
 
 class lid:
-    """passthrough class for lids"""
+    """Passthrough class for lids."""
 
     def __init__(
         self,

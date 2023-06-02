@@ -71,7 +71,14 @@ DECK = {
 
 
 def get_deck(layout_file_path: str) -> dict:
-    """Get deck from provided layout file."""
+    """Get deck from provided layout file. Returns deck dictionary.
+
+    Args:
+        - layout_file_path: Path to layout file.
+
+    Returns:
+        - dict: Deck dictionary with labware.
+    """
     logger.debug(f"Getting deck from: {layout_file_path}")
     lmgr = LayoutManager(layout_file_path)
 
@@ -85,6 +92,13 @@ def parse_layout_file(deck: dict, lmgr: LayoutManager) -> dict:
     """
     Parse provided layout file, extracting valid labware into default deck dictionary.
     Labware in layout file must named according to scheme provided in documentation.
+
+    Args:
+        - deck: Empty deck dictionary.
+        - lmgr: LayoutManager object.
+
+    Returns:
+        - dict: Deck dictionary with labware.
     """
     logger.debug(f"Parsing layout file...")
     for col in deck.keys():
@@ -119,6 +133,12 @@ def clean_deck(deck: dict) -> dict:
     """
     Layout files can contain non-existent labware (especially in stacks).
     This function finds and removes 'ghost' labware.
+
+    Args:
+        - deck: Deck dictionary with labware.
+
+    Returns:
+        - dict: Cleaned deck dictionary with labware.
     """
     logger.debug(f"Cleaning deck...")
     for col in deck.keys():
@@ -138,7 +158,15 @@ def clean_deck(deck: dict) -> dict:
 
 
 def add_dataframes(deck: dict) -> dict:
-    """Assign labware classes (DataFrame wrapper) to objects in deck."""
+    """
+    Assign labware classes (DataFrame wrapper) to objects in deck.
+
+    Args:
+        - deck: Deck dictionary with labware.
+
+    Returns:
+        - dict: Deck dictionary with labware and dataframes.
+    """
     logger.debug(f"Adding dataframes to labware...")
     for col in deck.keys():
         for row in range(len(deck[col])):
@@ -151,8 +179,12 @@ def add_dataframes(deck: dict) -> dict:
     return deck
 
 
-def print_deck(shelf: shelve.Shelf | dict):
-    """Convenience function to print deck and its contents in a nicely formatted layout."""
+def print_deck(shelf: shelve.Shelf | dict) -> None:
+    """Convenience function to print deck and its contents in a nicely formatted layout.
+
+    Args:
+        - shelf: Shelf or dictionary with deck contents.
+    """
     logger.debug(f"Printing deck...")
     for col in shelf.keys():
         for row in range(0, len(shelf[col])):
@@ -164,10 +196,14 @@ def print_deck(shelf: shelve.Shelf | dict):
                     print(f"{labware.layout_name()[3:]}")
 
 
-def delete_lids(shelf: shelve.Shelf, position: str):
+def delete_lids(shelf: shelve.Shelf, position: str) -> None:
     """
     Deletes lids from stacks of plates with lids.
     Lids in plate stacks are not used for transport and cause issues in indexing.
+
+    Args:
+        - shelf: Shelf with deck contents.
+        - position: Deck position to delete lids from.
     """
     logger.debug(f"Deleting lids from {position}.")
     try:
@@ -183,8 +219,13 @@ def delete_lids(shelf: shelve.Shelf, position: str):
         sys.exit()
 
 
-def delete_unused(shelf: shelve.Shelf, position: str, n: int):
-    """Delete n labware for a provided deck position."""
+def delete_unused(shelf: shelve.Shelf, position: str, n: int) -> None:
+    """Delete n labware for a provided deck position.
+
+    Args:
+        - shelf: Shelf with deck contents.
+        - position: Deck position to delete labware from.
+        - n: Number of labware to delete."""
     logger.debug(f"Deleting {n} labware from {position}.")
     if n != 0:
         try:
@@ -196,7 +237,12 @@ def delete_unused(shelf: shelve.Shelf, position: str, n: int):
 
 
 def delete_labware(shelf: shelve.Shelf, labware):
-    """Delete specific labware from deck."""
+    """Delete specific labware from deck by finding it in provided shelf.
+
+    Args:
+        - shelf: Shelf with deck contents.
+        - labware: Labware to delete from deck.
+    """
     logger.debug(f"Deleting {labware.layout_name()} from deck.")
     for col in shelf.keys():
         for row in range(0, len(shelf[col])):
@@ -205,8 +251,15 @@ def delete_labware(shelf: shelve.Shelf, labware):
                     shelf[col][row]["labware"].remove(labware)
 
 
-def extract_resource_from_field(field, resource, position):
-    """Check if a labware of provided type exists at a position."""
+def extract_resource_from_field(field, resource, position) -> bool:
+    """Check if a labware of provided type exists at a position.
+
+    Args:
+        - field: Field name from layout file.
+        - resource: Labware type to check for.
+
+    Returns:
+        - bool: True if labware of provided type exists at position, False otherwise."""
     if resource == Lid:
         if field.startswith(position) and field.find("_lid") > 0:
             return True

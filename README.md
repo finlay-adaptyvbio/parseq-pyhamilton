@@ -1,8 +1,19 @@
 # Adaptyv-PyHamilton
 
-Source code for methods and protocols developed using pyhamilton python library.
+Source code for automation of PARSEQ pipeline and other protocols developed using [PyHamilton](https://github.com/dgretton/pyhamilton), the python library for Hamilton robots.
 
-## Running protocols
+## Features
+
+- A state-centric approach to protocol management which allows automatic error recovery and tracking of each step involved in the process
+- A CLI handles the local library of protocols, each written as a modular Python script, simplifying the day-to-day running of the pipeline
+- Custom labware classes implement physical matrices (ie. a 384-well MTP in 16x24 format) as [Pandas](https://pandas.pydata.org/) DataFrames, enabling efficient sorting of wells for optimised pipetting and automatic tracking of wells and tips during a process
+- Commands for operating the 384-channel pipetting head, which PyHamilton lacks
+- Unlocking useful actions, such as picking up a subset of tips, prohibited by the proprietary Hamilton software (VENUS)
+- Wrappers to simplify common combinations of robot movements into short one-liners
+- Extended support for common labware formats
+- Notifications via [Slack](https://slack.com/) API when user intervention is required
+
+## Quick start
 
 ### main.py
 
@@ -12,7 +23,7 @@ All methods are called from a central script **main.py**. This script accepts CL
 
 User prompts will take care of any other parameters required for a method, for example CSVs for well maps.
 
-VENUS sometimes includes non-existent labware which are parsed by **deck.py** and cause errors in list assigments at runtime. PyHamilton functions to extract labware from layout files also don't always differentiate between stack identifiers and labware identifiers, which causes the same issue. ~~Make sure to verify layout file using **layout.py** before running a script.~~
+VENUS sometimes includes non-existent labware which are parsed by **deck.py** and cause errors in list assigments at runtime. PyHamilton functions to extract labware from layout files also don't always differentiate between stack identifiers and labware identifiers, which causes the same issue.
 
 A new method to clean parsed layout files removes any non-existent labware automatically!
 
@@ -29,48 +40,22 @@ Make sure the provided layout file is compatible with the automated labware assi
 
 A default state file from the **states** directory is also hardcoded for each script, allowing error recovery and tracking of method steps.
 
-## TODO
+## PARSEQ pipeline
 
-- [x] migrate cherry-picking to new format
-- [x] automated error recovery
-- [x] add more user facing prompts
-- [x] notifications
-  - [x] script exit (fail | success)
-  - [x] capture error msg
-- [x] more output/logging
-  - [ ] get VENUS log files
-  - [x] save log to file not just stdout
-- [ ] comments
+### Culture plate merging
 
-## Protocols
+### bPCR
 
-### 1. Plate-merging
+### Pooling
 
-- emptying and transferring separated into 2 scripts
-- requires CSV for wells to empty and wells to transfer
-  - sorted_well_map.csv from b.sight script
+### DNA bead purification
 
-### 2. PCR
+### Library preparation for NGS
 
-- colony and barcoding pcrs separated into 2 scripts as usually run consecutively not concurrently
-- 4 plates max per run
-- master mix from 96-well plate as 300 mL reservoir results in significant waste
+### Cherry-picking
 
-### 3. Pooling
+## Other protocols
 
-- 8 plates max per run
-- intermediate pooling in 96-well plate
+### Plate filling
 
-### 4. Cherry-picking
-
-- \> 24 plates max per run
-- slight modification of pm_filling.py script
-- requires CSV for wells to pick
-  - cherry.csv from pNGS analysis
-
-## Scripts
-
-- state management (error recovery and tracking)
-- deck & sequence management (layout file parsing)
-- wrappers for pyhamilton basic commands
-- helper functions (user prompts, csv processing)
+### Plate passaging
