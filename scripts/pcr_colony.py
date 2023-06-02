@@ -22,7 +22,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "pcr_colony_state.json")
+    state_file_path = os.path.join(run_dir_path, "pcr_colony.json")
 
     # Plate information and variables
     plates = hp.prompt_int("Plates to process", 4)

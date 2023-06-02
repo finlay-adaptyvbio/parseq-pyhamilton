@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 # Liquid classes
-ETHANOL = "StandardVolume_EtOH_DispenseJet_Part"
+ETHANOL = "50ulTip_conductive_384COREHead_EtOH_DispenseJet_Part"
 ALIQUOT_300 = "StandardVolume_Water_DispenseJet_Part"
 MIX_300 = "StandardVolume_Water_DispenseSurface_Empty"
 EMPTY_50 = "Tip_50ul_Water_DispenseJet_Empty"
@@ -28,7 +28,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "lib_nanopore_state.json")
+    state_file_path = os.path.join(run_dir_path, "lib_nanopore.json")
     csv_path = hp.prompt_file_path("Input CSV file (lib_nanopore_concentrations.csv)")
 
     # Sample info
@@ -40,7 +40,7 @@ def run(
     sample_c["bp"] = fragment_size
     sample_c["MW [Da]"] = sample_c["bp"] * 617.96 + 36.04
     sample_c["C [nM]"] = sample_c["C [ng/uL]"] / sample_c["MW [Da]"] * 1e6
-    sample_c["moles [fmol]"] = sample_moles  # TODO: User # input
+    sample_c["moles [fmol]"] = sample_moles  # TODO: User # # input
     sample_c["Sample V [uL]"] = sample_c["moles [fmol]"] / sample_c["C [nM]"]
     sample_c["Water V [uL]"] = 12.5 - sample_c["Sample V [uL]"]
 
@@ -55,7 +55,7 @@ def run(
     carrier = shelf["C"][0]["frame"][0]
     c3 = shelf["C"][2]["frame"][0]  # no magnet cooled to 4C
     d3 = shelf["D"][2]["frame"][0]  # magnet
-    d1 = shelf["D"][0]["frame"][0]  # no magnet room temperature
+    e4 = shelf["E"][3]["frame"][0]  # no magnet room temperature
 
     tips_96_300 = shelf["F"][0]["frame"][0]
     tips_96_50 = shelf["F"][1]["frame"][0]
@@ -79,11 +79,11 @@ def run(
 
     # Static positions
     ethanol = shelf["C"][4]["frame"][0].static(ethanol_index)
-    waste = shelf["E"][4]["frame"][0].static(waste_index)
+    waste = shelf["D"][0]["frame"][0].static(waste_index)
 
     c3_pool = c3.static(["A12"])
     d3_pool = d3.static(["A12"])
-    d1_pool = d1.static(["A12"])
+    e4_pool = e4.static(["A12"])
 
     water = carrier.static(["A4"])
     beads = carrier.static(["B4"])
@@ -122,7 +122,7 @@ def run(
         tips_holder_96in384_50.reset()
 
     # Start method!
-    input(f"Press enter to start method!")
+    # input(f"Press enter to start method!")
 
     # Main script starts here
     with HamiltonInterface(simulate=True) as hammy:
@@ -174,7 +174,7 @@ def run(
             f"*User action required:* Remove end-prep reagents & add sample tubes"
             f" to carrier."
         )
-        input(f"{hp.color.BOLD}Press enter to continue: {hp.color.END}")
+        # input(f"Press enter to continue: ")
 
         # Add samples to end prep master mix
         if not state["end_prep_add_samples"]:
@@ -183,7 +183,7 @@ def run(
                 cmd.aspirate(
                     hammy,
                     carrier.ch2(1),
-                    sample_volumes[0],
+                    [sample_volumes[0]],
                     liquidClass=MIX_50,
                     mixCycles=3,
                     mixVolume=10.0,
@@ -192,7 +192,7 @@ def run(
                 cmd.dispense(
                     hammy,
                     c3.ch2(1),
-                    sample_volumes[0],
+                    [sample_volumes[0]],
                     liquidClass=MIX_50,
                     mixCycles=5,
                     mixVolume=7.5,
@@ -210,7 +210,7 @@ def run(
             f"*User action required:* Incubate end-prep plate in thermocycler, "
             f" remove sample tubes, and add end-prep clean-up reagents."
         )
-        input(f"{hp.color.BOLD}Press enter to continue: {hp.color.END}")
+        # input(f"Press enter to continue: ")
 
         # Add beads to samples
         if not state["end_prep_add_beads"]:
@@ -238,16 +238,16 @@ def run(
             c3.reset()
 
             cmd.grip_get(hammy, c3.plate)
-            cmd.grip_place(hammy, d1.plate)
+            cmd.grip_place(hammy, e4.plate)
 
             st.set_state(state, state_file_path, "end_prep_add_beads", 1)
 
         # Incubate for 3 minutes at room temperature
-        time.sleep(60 * 3)
+        # time.sleep(60 * 3)
 
         # Move to magnet & remove supernatant
         if not state["end_prep_cleanup_supernatant"]:
-            cmd.grip_get(hammy, d1.plate)
+            cmd.grip_get(hammy, e4.plate)
             cmd.grip_place(hammy, d3.plate)
 
             check_tip_holder()
@@ -271,7 +271,7 @@ def run(
                         hammy, d3.static(end_prep_index), 50.0, liquidClass=ETHANOL
                     )
 
-                time.sleep(60)
+                # time.sleep(60)
 
                 for _ in range(3):
                     cmd.aspirate_384(
@@ -283,7 +283,7 @@ def run(
             st.set_state(state, state_file_path, "end_prep_cleanup_wash", 1)
 
         # Dry samples
-        time.sleep(30)
+        # time.sleep(30)
 
         # Elute samples
         if not state["end_prep_cleanup_elute"]:
@@ -307,7 +307,7 @@ def run(
                     liquidHeight=5.0,
                 )
 
-            cmd.tip_eject(hammy, waste=False)
+            cmd.tip_eject(hammy, waste=True)
 
             c3.reset()
 
@@ -342,7 +342,7 @@ def run(
             f"*User action required:* Remove end-prep clean-up reagents & add"
             f" barcodes to carrier."
         )
-        input(f"{hp.color.BOLD}Press enter to continue: {hp.color.END}")
+        # input(f"Press enter to continue: ")
 
         # Add barcodes to samples
         if not state["barcode_ligation_add_barcodes"]:
@@ -377,7 +377,7 @@ def run(
             f"*User action required:* Remove barcodes & add ligation reagents to"
             f" carrier."
         )
-        input(f"{hp.color.BOLD}Press enter to continue: {hp.color.END}")
+        # input(f"Press enter to continue: ")
 
         # Add ligation master mix to samples
         if not state["barcode_ligation_add_mm"]:
@@ -401,17 +401,17 @@ def run(
                 cmd.tip_eject(hammy, waste=True)
 
             cmd.grip_get(hammy, c3.plate)
-            cmd.grip_place(hammy, d1.plate)
+            cmd.grip_place(hammy, e4.plate)
 
             c3.reset()
             st.set_state(state, state_file_path, "barcode_ligation_add_mm", 1)
 
         # Incubate samples for 20 minutes at room temperature
-        time.sleep(60 * 20)
+        # time.sleep(60 * 20)
 
         # Add EDTA to samples
         if not state["barcode_ligation_add_edta"]:
-            cmd.grip_get(hammy, d1.plate)
+            cmd.grip_get(hammy, e4.plate)
             cmd.grip_place(hammy, c3.plate)
 
             while c3.total() > 0:
@@ -442,12 +442,10 @@ def run(
                     cmd.aspirate(
                         hammy,
                         c3.ch2(1),
-                        [10.0],
-                        liquidClass=ALIQUOT_300,
+                        [20.0],
                         liquidHeight=0.1,
                     )
-                cmd.dispense(hammy, pool, [aspirations * 20.0], liquidClass=ALIQUOT_300)
-            cmd.dispense(hammy, pool, [20.0], liquidClass=ALIQUOT_300)
+                cmd.dispense(hammy, pool, [aspirations * 20.0])
             cmd.tip_eject(hammy, waste=True)
 
             st.set_state(state, state_file_path, "barcode_ligation_pool_samples", 1)
@@ -464,7 +462,7 @@ def run(
 
         # User takes over from here to finish clean-up
         hp.notify("*User action required:* Finish clean-up of barcode ligation.")
-        input(f"{hp.color.BOLD}Press enter to continue: {hp.color.END}")
+        # input(f"Press enter to continue: ")
 
         # Add adapter reagents to pool
         if not state["adapter_ligation_add_reagents"]:
@@ -478,24 +476,24 @@ def run(
                 mixVolume=5.0,
                 liquidHeight=0.1,
             )
-            cmd.dispense(hammy, d1_pool, [5.0], liquidClass=MIX_50)
-            cmd.tip_eject(hammy, tips_96_50.ch2(1), waste=False)
-            cmd.tip_pick_up(hammy, tips_96_50.ch2(1, remove=False))
+            cmd.dispense(hammy, e4_pool, [5.0], liquidClass=MIX_50)
+            cmd.tip_eject(hammy, waste=True)
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
             cmd.aspirate(
                 hammy,
-                quick_t4_ligase_buffer.ch2(1, remove=False),
+                quick_t4_ligase_buffer,
                 [10.0],
                 liquidClass=MIX_50,
                 mixCycles=3,
                 mixVolume=10.0,
                 liquidHeight=0.1,
             )
-            cmd.dispense(hammy, d1_pool, [10.0], liquidClass=MIX_50)
-            cmd.tip_eject(hammy, tips_96_50.ch2(1), waste=False)
-            cmd.tip_pick_up(hammy, tips_96_50.ch2(1, remove=False))
+            cmd.dispense(hammy, e4_pool, [10.0], liquidClass=MIX_50)
+            cmd.tip_eject(hammy, waste=True)
+            cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
             cmd.aspirate(
                 hammy,
-                quick_t4_ligase_enzyme.ch2(1, remove=False),
+                quick_t4_ligase_enzyme,
                 [5.0],
                 liquidClass=MIX_50,
                 mixCycles=3,
@@ -504,7 +502,7 @@ def run(
             )
             cmd.dispense(
                 hammy,
-                d1_pool,
+                e4_pool,
                 [5.0],
                 liquidClass=MIX_50,
                 mixCycles=3,
@@ -515,7 +513,7 @@ def run(
             st.set_state(state, state_file_path, "adapter_ligation_add_reagents", 1)
 
         # Incubate for 20 minutes at room temperature
-        time.sleep(60 * 20)
+        # time.sleep(60 * 20)
 
         # Add beads to library
         if not state["adapter_ligation_add_beads"]:
@@ -530,7 +528,7 @@ def run(
             )
             cmd.dispense(
                 hammy,
-                d1_pool,
+                e4_pool,
                 [20.0],
                 liquidClass=MIX_50,
                 mixCycles=3,
@@ -541,11 +539,11 @@ def run(
             st.set_state(state, state_file_path, "adapter_ligation_add_beads", 1)
 
         # Incubate for 10 minutes at room temperature
-        time.sleep(60 * 10)
+        # time.sleep(60 * 10)
 
         # Move to magnet & remove supernatant
         if not state["adapter_ligation_cleanup_supernatant"]:
-            cmd.grip_get(hammy, d1.plate)
+            cmd.grip_get(hammy, e4.plate)
             cmd.grip_place(hammy, d3.plate)
 
             cmd.tip_pick_up(hammy, tips_96_50.ch2(1))
@@ -583,7 +581,7 @@ def run(
                     mixVolume=50.0,
                 )
 
-                time.sleep(60)
+                # time.sleep(60)
 
                 cmd.aspirate(hammy, d3_pool, [150.0])
                 cmd.tip_eject(hammy, waste=True)
@@ -591,7 +589,7 @@ def run(
             st.set_state(state, state_file_path, "adapter_ligation_cleanup_wash", 1)
 
         # Dry pool
-        time.sleep(30)
+        # time.sleep(30)
 
         # Remove from magnet & add elution buffer
         if not state["adapter_ligation_cleanup_elute"]:

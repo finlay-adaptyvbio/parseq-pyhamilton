@@ -23,7 +23,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "cherry_state.json")
+    state_file_path = os.path.join(run_dir_path, "cherry_picking.json")
     csv_path = hp.prompt_file_path("Input CSV file (cherry.csv)")
 
     # Get plates and well map from csv files

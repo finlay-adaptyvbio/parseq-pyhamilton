@@ -24,7 +24,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "purification_state.json")
+    state_file_path = os.path.join(run_dir_path, "purification.json")
 
     # Pool information and variables
     pools = hp.prompt_int("Pools to purify", 24)

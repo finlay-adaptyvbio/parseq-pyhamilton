@@ -19,16 +19,16 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "plate_filling_state.json")
+    state_file_path = os.path.join(run_dir_path, "plate_filling.json")
 
     # Get plate and volume info from prompt
     plates = hp.prompt_int("Plates to fill", 18)
     volume = hp.prompt_int("Volume to add", 100)
 
     cycles = math.ceil(volume / 50)
+    reservoir_volume = volume * plates * 384 / 1000 * 1.2
 
     volume = volume / cycles
-    reservoir_volume = volume * plates * 384 / 1000 * 1.2
 
     if reservoir_volume > 300:
         logger.warn(

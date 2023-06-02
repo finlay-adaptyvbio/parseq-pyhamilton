@@ -23,7 +23,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "pm_filling_state.json")
+    state_file_path = os.path.join(run_dir_path, "pm_filling.json")
     csv_path = hp.prompt_file_path("Input CSV file (sorted_well_map.csv)")
 
     # Get plates and well map from csv files

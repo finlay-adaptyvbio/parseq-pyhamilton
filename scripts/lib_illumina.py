@@ -46,8 +46,8 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
     bead_volume = math.ceil(ratio * sample * pools) + 50
     if bead_volume > TUBE_VOLUME:
         logger.warn(
-            f"{hp.color.BOLD}{hp.color.RED}More than {TUBE_VOLUME} uL of beads"
-            f" required, you will be prompted to add more beads!{hp.color.END}"
+            f"More than {TUBE_VOLUME} uL of beads"
+            " required, you will be prompted to add more beads!"
         )
     bead_sample_volume = sample * ratio
 
@@ -84,9 +84,6 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
     no_mag_plate = dk.get_labware_list(deck, ["C3"], Plate96)[0]
     no_mag_pools = [(no_mag_plate, i) for i in dk.pos_96_2row_2ch(96)[:24]]
 
-
-    
-
     # Tip tracking
 
     def check_tips():
@@ -109,11 +106,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
     hp.place_labware(racks, "Hamilton NTR 96_300 µL Tip Rack")
     hp.place_labware([eppicarrier], "Eppendorf Carrier 24")
 
-    logger.info(
-        f"{hp.color.DARKCYAN}Make sure {hp.color.BOLD}Alpaqua Magnum"
-        f" EX{hp.color.END}{hp.color.DARKCYAN} (magnetic plate) is in position"
-        f" {hp.color.BOLD}D3{hp.color.END}."
-    )
+    logger.info(f"Make sure Alpaqua Magnum EX (magnetic plate) is in position D3.")
 
     input(f"Press enter to start method!")
 
@@ -139,7 +132,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     " eppendorf carrier. "
                 )
                 input(
-                    f"{hp.color.BOLD}Add 1 tube filled with {TUBE_VOLUME} uL"
+                    f"Add 1 tube filled with {TUBE_VOLUME} uL"
                     " beads to eppendorf carrier position 23. Press enter to continue:"
                     f" {hp.color.END  }"
                 )
@@ -176,13 +169,11 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                             " to bead tube."
                         )
                         input(
-                            f"{hp.color.BOLD}Refill bead tube with {TUBE_VOLUME} uL of"
-                            f" beads. Press enter to continue: {hp.color.END}"
+                            f"Refill bead tube with {TUBE_VOLUME} uL of"
+                            " beads. Press enter to continue: "
                         )
 
-                        st.set_state(
-                            state, state_file_path, "bead_volume", TUBE_VOLUME
-                        )
+                        st.set_state(state, state_file_path, "bead_volume", TUBE_VOLUME)
 
                     cmd.aspirate(
                         hammy,
@@ -225,9 +216,9 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                     " eppendorf carrier."
                 )
                 input(
-                    f"\n{hp.color.BOLD}Remove beads from eppendorf carrier and add"
+                    "\nRemove beads from eppendorf carrier and add"
                     f" {pools} pooled sample tubes. Press enter to continue:"
-                    f" {hp.color.END}"
+                    " "
                 )
 
                 hp.place_eppies("2 mL Eppendorf", eppies)
@@ -346,9 +337,9 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                 logger.debug("Adding ethanol to pools for wash 1...")
 
                 input(
-                    f"{hp.color.BOLD}Add {ethanol_tubes} tube(s) filled with"
+                    f"Add {ethanol_tubes} tube(s) filled with"
                     f" {ethanol_volume} uL 70% ethanol to eppendorf carrier. Press"
-                    f" enter to continue: {hp.color.END}"
+                    " enter to continue: "
                 )
 
                 check_tips()
@@ -366,9 +357,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                             state, state_file_path, "current_ethanol_tube", 1
                         )
                         ethanol_tube = [ethanol[state["current_ethanol_tube"]]]
-                        st.set_state(
-                            state, state_file_path, "current_ethanol_step", 0
-                        )
+                        st.set_state(state, state_file_path, "current_ethanol_step", 0)
 
                     cmd.aspirate(
                         hammy,
@@ -465,9 +454,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
                             state, state_file_path, "current_ethanol_tube", 1
                         )
                         ethanol_tube = [ethanol[state["current_ethanol_tube"]]]
-                        st.set_state(
-                            state, state_file_path, "current_ethanol_step", 0
-                        )
+                        st.set_state(state, state_file_path, "current_ethanol_step", 0)
 
                     cmd.aspirate(
                         hammy,
@@ -566,7 +553,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
 
             # Add 21 uL of elution buffer to each pool
             input(
-                f"{hp.color.BOLD}Add 1 tube filled with {teb_volume} uL TE Buffer"
+                f"Add 1 tube filled with {teb_volume} uL TE Buffer"
                 " to eppendorf carrier position 24. Press enter to"
                 f" continue: {hp.color.END  }"
             )
@@ -645,7 +632,7 @@ def run(shelf: shelve.Shelf, state: dict, state_file_path: str, run_dir_path: st
             # Prompt user to add sample tubes to eppendorf carrier
 
             input(
-                f"{hp.color.BOLD}Add {pools} sample collection tubes to eppendorf"
+                f"Add {pools} sample collection tubes to eppendorf"
                 f" carrier. Press enter to continue: {hp.color.END  }"
             )
 

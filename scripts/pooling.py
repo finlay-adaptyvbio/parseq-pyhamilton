@@ -19,7 +19,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "pooling_state.json")
+    state_file_path = os.path.join(run_dir_path, "pooling.json")
 
     # Plate information and variables
     plates = hp.prompt_int("Plates to pool", 8)
