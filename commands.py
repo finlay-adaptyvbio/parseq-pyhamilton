@@ -293,11 +293,17 @@ def aspirate(
     if "liquidClass" not in kw_args:
         kw_args.update({"liquidClass": DEFAULT_LIQUID_CLASS_2CH})
 
+    if len(positions) == 1:
+        channelVariable = "10"
+    else:
+        channelVariable = "11"
+
     labwarePositions = compound_pos_str(positions)
 
     cid = ham.send_command(
         commands["ASPIRATE"],
         labwarePositions=labwarePositions,
+        channelVariable=channelVariable,
         volumes=volumes,
         **kw_args,
     )
@@ -324,7 +330,7 @@ def dispense(
 
     Keyword Args:
         - liquidClass (string): Liquid class to use. Defaults to DEFAULT_LIQUID_CLASS_2CH (300 uL tips with water).
-        - dispenseMode (integer): 0=Jet Part, 1=Jet Empty, 2=Surface Part, 3=Surface Empty, 4=Jet Drain tip, 8=From liquid class, 9=Blowout tip. Defaults to 0.
+        - dispenseMode (integer): 0=Jet Part, 1=Jet Empty, 2=Surface Part, 3=Surface Empty, 4=Jet Drain tip, 8=From liquid class, 9=Blowout tip. Defaults to 8.
         - capacitiveLLD (integer): 0=Off, 1=Max, 2=High, 3=Mid, 4=Low, 5=From labware definition. Defaults to 0.
         - liquidFollowing (integer): 0=Off , 1=On. Defaults to 0.
         - submergeDepth (float): mm of immersion below liquid's surface to start dispense when using LLD. Defaults to 2.0.
@@ -356,12 +362,18 @@ def dispense(
     if "liquidClass" not in kw_args:
         kw_args.update({"liquidClass": DEFAULT_LIQUID_CLASS_2CH})
 
+    if len(positions) == 1:
+        channelVariable = "10"
+    else:
+        channelVariable = "11"
+
     labwarePositions = compound_pos_str(positions)
 
     cid = ham.send_command(
         commands["DISPENSE"],
         labwarePositions=labwarePositions,
         volumes=volumes,
+        channelVariable=channelVariable,
         **kw_args,
     )
 
