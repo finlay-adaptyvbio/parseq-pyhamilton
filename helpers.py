@@ -190,14 +190,18 @@ def notify(text) -> dict:
         "https://i.ibb.co/L59D5KZ/Group-2164.png"
     )
     slack_user_name = "Hamilton"
-    # return requests.post(
-    #     "https://slack.com/api/chat.postMessage",
-    #     {
-    #         "token": slack_api_token,
-    #         "channel": slack_channel,
-    #         "text": text,
-    #         "icon_url": slack_icon_url,
-    #         "username": slack_user_name,
-    #         "blocks": None,
-    #     },
-    # ).json()
+
+    text.replace("*", "")  # remove markdown bold formatting
+    print(text)
+
+    return requests.post(
+        "https://slack.com/api/chat.postMessage",
+        {
+            "token": slack_api_token,
+            "channel": slack_channel,
+            "text": text,
+            "icon_url": slack_icon_url,
+            "username": slack_user_name,
+            "blocks": None,
+        },
+    ).json()
