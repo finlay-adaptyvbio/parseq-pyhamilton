@@ -66,7 +66,7 @@ def run(
 
     # Static positions
     ethanol = shelf["C"][4]["frame"][0].static(["A24", "E24"])
-    waste = shelf["C"][4]["frame"][0].static(["G12", "L12"])
+    waste = shelf["D"][0]["frame"][0].static(["G12", "L12"])
     ethanol_tips = shelf["F"][4]["frame"][0].static(["A1", "C1"])
     waste_tips = shelf["F"][4]["frame"][0].static(["B1", "D1"])
 
@@ -92,6 +92,9 @@ def run(
                 del plates[-1]
                 dk.delete_labware(shelf, bact_plates.pop().plate)
                 st.set_state(state, state_file_path, "active_plate", 1)
+                st.set_state(state, state_file_path, "remove_media", 0)
+                st.set_state(state, state_file_path, "add_ethanol", 0)
+                st.set_state(state, state_file_path, "remove_ethanol", 0)
 
             # Remove media from wells
             if not state["remove_media"]:
@@ -99,30 +102,21 @@ def run(
 
                 # Loop through wells
                 while active_plate.total() > 0:
-                    # Calculate cycles to perform depending on number of wells left
-                    remaining = active_plate.total()
-                    cycles = min(2, math.ceil(remaining / 2))
-
                     # Remove media
-                    for _ in range(cycles):
-                        channels = min(
-                            2, active_plate.total()
-                        )  # Channels to use for each cycle
-                        cmd.aspirate(
-                            hammy,
-                            active_plate.ch2(channels),
-                            [140.0],
-                            mixCycles=3,
-                            mixVolume=50.0,
-                        )
+                    # Channels to use for each cycle
+                    channels = min(2, active_plate.total())
+                    cmd.aspirate(
+                        hammy,
+                        active_plate.ch2(channels),
+                        [140.0],
+                        mixCycles=3,
+                        mixVolume=50.0,
+                    )
 
                     # Calculate how much volume needs to be dispensed based on number of aspirations
-                    dispense_volume = [
-                        140.0 * math.ceil(min(4, remaining) / 2),
-                        140.0 * math.floor(min(4, remaining) / 2),
-                    ]
+                    dispense_volume = [140.0, 140.0 * (channels - 1)]
 
-                    cmd.dispense(hammy, waste, dispense_volume, dispenseMode=9)
+                    cmd.dispense(hammy, waste, dispense_volume)
 
                 cmd.tip_eject(hammy, waste_tips)
 
@@ -169,30 +163,21 @@ def run(
 
                 # Loop through wells
                 while active_plate.total() > 0:
-                    # Calculate cycles to perform depending on number of wells left
-                    remaining = active_plate.total()
-                    cycles = min(2, math.ceil(remaining / 2))
-
                     # Remove ethanol
-                    for _ in range(cycles):
-                        channels = min(
-                            2, active_plate.total()
-                        )  # Channels to use for each cycle
-                        cmd.aspirate(
-                            hammy,
-                            active_plate.ch2(channels),
-                            [140.0],
-                            mixCycles=3,
-                            mixVolume=50.0,
-                        )
+                    # Channels to use for each cycle
+                    channels = min(2, active_plate.total())
+                    cmd.aspirate(
+                        hammy,
+                        active_plate.ch2(channels),
+                        [140.0],
+                        mixCycles=3,
+                        mixVolume=50.0,
+                    )
 
                     # Calculate how much volume needs to be dispensed based on number of aspirations
-                    dispense_volume = [
-                        140.0 * math.ceil(min(4, remaining) / 2),
-                        140.0 * math.floor(min(4, remaining) / 2),
-                    ]
+                    dispense_volume = [140.0, 140.0 * (channels - 1)]
 
-                    cmd.dispense(hammy, waste, dispense_volume, dispenseMode=9)
+                    cmd.dispense(hammy, waste, dispense_volume)
 
                 cmd.tip_eject(hammy, waste_tips)
 

@@ -90,7 +90,7 @@ def prompt_float(message: str, max: float, min: float = 0) -> float:
     return value
 
 
-def process_cherry_csv(csv_path: str, output_dir: str) -> None:
+def process_cherry_csv(csv_path: str, output_dir: str):
     """Get plate names and wells from input CSV file. Save as CSV file.
     Sort wells by name and then plate.
 
@@ -100,28 +100,17 @@ def process_cherry_csv(csv_path: str, output_dir: str) -> None:
     """
     logger.debug(f"Processing CSV at {csv_path}.")
 
-    with open(csv_path, "r") as f:
-        reader = csv.reader(f)
-        rows = [row[0].split(" ") for row in reader]
-        wells = [row[0].split(".") for row in rows]
+    df = pd.read_csv(csv_path)
 
-    df = pd.DataFrame(wells, columns=["source_plate", "source_well"])
+    l = [t for t in df.itertuples(index=False, name=None)]
 
-    df.sort_values(by=["source_plate", "source_well"], inplace=True)
+    p = df["plate"].unique().tolist()
 
-    df[["source_well", "source_plate"]].to_csv(
-        os.path.join(output_dir, "cherry_wells.csv"), index=False, header=False
-    )
+    df.to_csv(os.path.join(output_dir, "cherry.csv"), index=False, header=False)
 
-    plates = pd.DataFrame([df.source_plate.unique()], index=["source"]).T
+    logger.debug(f"Saved output CSV to {output_dir}.")
 
-    plates.to_csv(
-        os.path.join(output_dir, "cherry_plates.csv"),
-        index=False,
-        header=False,
-    )
-
-    logger.debug(f"Saved output CSVs to {output_dir}.")
+    return l, p
 
 
 def process_pm_csv(csv_path: str, output_dir: str, prefix: str) -> None:
@@ -191,8 +180,8 @@ def notify(text) -> dict:
     )
     slack_user_name = "Hamilton"
 
-    text.replace("*", "")  # remove markdown bold formatting
-    print(text)
+    console = text.replace("*", "")  # remove markdown bold formatting
+    print(console)
 
     return requests.post(
         "https://slack.com/api/chat.postMessage",

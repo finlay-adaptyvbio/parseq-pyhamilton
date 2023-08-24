@@ -1,10 +1,4 @@
 {
-    "current_source_plate": 0,
-    "current_target_plate": 0,
-    "current_source_well": 0,
-    "current_target_well": 0,
-    "current_tip": 0,
-    "current_rack": 0,
-    "active_source_plate": 0,
-    "active_target_plate": 0
+    "active_src_plate": 0,
+    "active_tgt_plate": 0
 }

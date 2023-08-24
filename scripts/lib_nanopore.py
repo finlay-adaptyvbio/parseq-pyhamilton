@@ -126,6 +126,11 @@ def run(
         # Initialize Hamilton
         cmd.initialize(hammy)
 
+        # Add tips to tip holder
+        cmd.tip_pick_up_384(hammy, tips_96in384_50.full())
+        cmd.tip_eject_384(hammy, tips_holder_96in384_50.full())
+        tips_holder_96in384_50.reset()
+
         # Add water for normalization
         if not state["end_prep_add_water"]:
             cmd.tip_pick_up(hammy, tips_96_300.ch2(1))
@@ -239,19 +244,22 @@ def run(
             st.set_state(state, state_file_path, "end_prep_add_beads", 1)
 
         # Incubate for 3 minutes at room temperature
-        # time.sleep(60 * 3)
+        time.sleep(60 * 3)
 
         # Move to magnet & remove supernatant
         if not state["end_prep_cleanup_supernatant"]:
             cmd.grip_get(hammy, e4.plate)
             cmd.grip_place(hammy, d3.plate)
 
+            # Incubate for 3 minutes at room temperature
+            time.sleep(60 * 3)
+
             check_tip_holder()
 
             cmd.tip_pick_up_384(hammy, tips_holder_96in384_50.mph384(rows, columns))
             cmd.aspirate_384(hammy, d3.static(end_prep_index), 30.0, liquidHeight=0.1)
             cmd.dispense_384(hammy, waste, 30.0, liquidHeight=12.0)
-            cmd.tip_eject_384(hammy, mode=1)
+            cmd.tip_eject_384(hammy, mode=2)
 
             st.set_state(state, state_file_path, "end_prep_cleanup_supernatant", 1)
 
@@ -271,7 +279,7 @@ def run(
                         liquidHeight=9.0,
                     )
 
-                # time.sleep(60)
+                time.sleep(60)
 
                 for _ in range(3):
                     cmd.aspirate_384(
@@ -287,7 +295,7 @@ def run(
             st.set_state(state, state_file_path, "end_prep_cleanup_wash", 1)
 
         # Dry samples
-        # time.sleep(30)
+        time.sleep(30)
 
         # Elute samples
         if not state["end_prep_cleanup_elute"]:
@@ -300,6 +308,7 @@ def run(
                 water,
                 [10.0 * samples * 1.2],
                 liquidClass=ALIQUOT_300,
+                liquidHeight=2.0,
             )
 
             while c3.total() > 0:
@@ -328,8 +337,16 @@ def run(
             )
             cmd.tip_eject_384(hammy, mode=2)
 
+            hp.notify(
+                f"*User action required:* Check if elution buffer is mixed with beads."
+            )
+            input(f"Press enter to continue: ")
+
             cmd.grip_get(hammy, c3.plate)
             cmd.grip_place(hammy, d3.plate)
+
+            # Incubate for 2 minutes at room temperature
+            time.sleep(60 * 2)
 
             check_tip_holder()
 
@@ -412,7 +429,7 @@ def run(
             st.set_state(state, state_file_path, "barcode_ligation_add_mm", 1)
 
         # Incubate samples for 20 minutes at room temperature
-        # time.sleep(60 * 20)
+        time.sleep(60 * 20)
 
         # Add EDTA to samples
         if not state["barcode_ligation_add_edta"]:
@@ -516,7 +533,7 @@ def run(
             st.set_state(state, state_file_path, "adapter_ligation_add_reagents", 1)
 
         # Incubate for 20 minutes at room temperature
-        # time.sleep(60 * 20)
+        time.sleep(60 * 20)
 
         # Add beads to library
         if not state["adapter_ligation_add_beads"]:
@@ -542,7 +559,7 @@ def run(
             st.set_state(state, state_file_path, "adapter_ligation_add_beads", 1)
 
         # Incubate for 10 minutes at room temperature
-        # time.sleep(60 * 10)
+        time.sleep(60 * 10)
 
         # Move to magnet & remove supernatant
         if not state["adapter_ligation_cleanup_supernatant"]:
@@ -583,7 +600,7 @@ def run(
                     mixVolume=75.0,
                 )
 
-                # time.sleep(60)
+                time.sleep(60)
 
                 cmd.aspirate(hammy, d3_pool, [150.0], liquidHeight=0.1)
                 cmd.tip_eject(hammy, waste=True)
@@ -591,7 +608,7 @@ def run(
             st.set_state(state, state_file_path, "adapter_ligation_cleanup_wash", 1)
 
         # Dry pool
-        # time.sleep(30)
+        time.sleep(30)
 
         # Remove from magnet & add elution buffer
         if not state["adapter_ligation_cleanup_elute"]:
@@ -620,3 +637,5 @@ def run(
 
         # User takes over from here to finish clean-up
         hp.notify("*User action required:* Finish clean-up of adapter ligation.")
+
+        cmd.grip_eject(hammy)

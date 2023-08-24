@@ -13,9 +13,6 @@ from pyhamilton import HamiltonInterface
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-# Liquid classes
-WATER = "Tip_50ul_Water_DispenseJet_Empty"
-
 
 def run(
     shelf: shelve.Shelf[list[dict[str, list]]],
@@ -50,7 +47,7 @@ def run(
     for p in ["E1", "E2", "E3", "F1", "F2", "F3"]:
         dk.delete_lids(shelf, p)
 
-    n = 6 - len(target_plates)
+    n = 6 - len(source_plates)
     dk.delete_unused(shelf, "E1", n)
     dk.delete_unused(shelf, "F1", n)
 
@@ -66,8 +63,10 @@ def run(
     src_plates = shelf["F"][0]["frame"]
     src_plates_done = shelf["E"][0]["frame"]
 
-    tgt_plates = [l for i in range(len(tgt_pos)) for l in shelf["F"][i]["frame"]]
-    tgt_plates_done = [l for i in range(len(tgt_pos)) for l in shelf["E"][i]["frame"]]
+    tgt_plates = [l for i in range(len(tgt_pos)) for l in shelf["F"][i + 1]["frame"]]
+    tgt_plates_done = [
+        l for i in range(len(tgt_pos)) for l in shelf["E"][i + 1]["frame"]
+    ]
 
     active_src_lid, active_src_plate = shelf["E"][4]["frame"]
     active_tgt_lid, active_tgt_plate = shelf["E"][3]["frame"]
@@ -92,7 +91,7 @@ def run(
         cmd.initialize(hammy)
 
         # Loop over plates as long as there are still plates (source or target) to process
-        while source_plates and target_plates:
+        while src_plates_done or tgt_plates_done:
             # Get next source plate if not already done
             if not state["active_src_plate"]:
                 cmd.grip_get(hammy, src_plates[-1].plate, gripWidth=82.0)
@@ -100,7 +99,7 @@ def run(
                 cmd.grip_get(
                     hammy, active_src_lid.lid, mode=1, gripWidth=85.2, gripHeight=5.0
                 )
-                cmd.grip_place(hammy, tmp_src_lid, mode=1)
+                cmd.grip_place(hammy, tmp_src_lid.lid, mode=1)
 
                 # Build list source wells for current plate
                 active_src_plate.fill(
@@ -142,8 +141,8 @@ def run(
                 cmd.grip_place(hammy, src_plates_done[0].plate)
 
                 del src_plates_done[0]
-                st.set_state(state, state_file_path, "active_source_plate", 0)
-                break
+                st.set_state(state, state_file_path, "active_src_plate", 0)
+                continue
 
             # Check if there are still wells available in the current target plate
             # Swich to next target plate if current one is full
@@ -158,8 +157,8 @@ def run(
                 cmd.grip_place(hammy, tgt_plates_done[0].plate)
 
                 dk.delete_labware(shelf, tgt_plates_done.pop(0).plate)
-                st.set_state(state, state_file_path, "active_target_plate", 0)
-                break
+                st.set_state(state, state_file_path, "active_tgt_plate", 0)
+                continue
 
             # Check if there are still tips in the active rack
             # Discard rack and get new one from stacked racks if current one is done
@@ -189,14 +188,12 @@ def run(
                 [100.0],
                 mixCycles=3,
                 mixVolume=50.0,
-                liquidClass=WATER,
             )
             cmd.dispense(
                 hammy,
                 active_tgt_plate.ch2(channels),
                 [100.0],
                 dispenseMode=9,
-                liquidClass=WATER,
             )
             cmd.tip_eject(hammy, waste=True)
 
