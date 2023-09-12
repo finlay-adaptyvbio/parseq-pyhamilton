@@ -22,7 +22,7 @@ def run(
     run_dir_path: str,
 ):
     # File paths
-    state_file_path = os.path.join(run_dir_path, "pcr_colony.json")
+    state_file_path = os.path.join(run_dir_path, "bpcr.json")
 
     # Plate information and variables
     plates = hp.prompt_int("Plates to process", 4)
@@ -48,7 +48,9 @@ def run(
     master_mix = shelf["C"][4]["frame"][0].full()
     master_mix_tips = shelf["B"][4]["frame"][0].full()
 
-    racks_384_50 = shelf["B"][0]["frame"]
+    barcodes = shelf["D"][0]["frame"][0].full()
+
+    racks_384_50 = [l for i in range(2) for l in shelf["B"][i]["frame"]]
     active_rack_384_50, transport_rack_384_50 = shelf["D"][1]["frame"]
 
     # Main script starts here
@@ -57,7 +59,7 @@ def run(
         cmd.initialize(hammy)
 
         # Loop over plates as long as there are still plates to process
-        while pcr_plates and bact_plates:
+        while pcr_plates_done or bact_plates_done:
             # Get next bact plate if not already done
             if not state["active_bact_plate"]:
                 cmd.grip_get(hammy, bact_plates[-1].plate, gripWidth=82.0)
@@ -83,15 +85,16 @@ def run(
 
                 st.set_state(state, state_file_path, "active_pcr_plate", 1)
                 st.set_state(state, state_file_path, "add_mm", 0)
+                st.set_state(state, state_file_path, "add_oligos", 0)
 
             # Add master mix to pcr plate if not already done
             if not state["add_mm"]:
                 cmd.tip_pick_up_384(hammy, master_mix_tips)
-                cmd.aspirate_384(hammy, master_mix, 18.5, liquidHeight=2.0)
+                cmd.aspirate_384(hammy, master_mix, 9.0, liquidHeight=1.0)
                 cmd.dispense_384(
                     hammy,
                     active_pcr_plate.full(),
-                    18.5,
+                    9.0,
                     liquidHeight=8.0,
                     dispenseMode=9,
                 )
@@ -99,8 +102,42 @@ def run(
 
                 st.set_state(state, state_file_path, "add_mm", 1)
 
-            # Get new tip rack if no current active tip rack
+            # Check if there is an active rack, get a new rack if needed
             if not state["active_rack"]:
+                cmd.grip_get_tip_rack(hammy, racks_384_50[-1].rack)
+                cmd.grip_place_tip_rack(hammy, transport_rack_384_50.rack)
+
+                dk.delete_labware(shelf, racks_384_50.pop().rack)
+                st.set_state(state, state_file_path, "active_rack", 1)
+
+            # Add oligos from barcoding plate to active pcr plate
+            if not state["add_oligos"]:
+                cmd.tip_pick_up_384(hammy, active_rack_384_50.full())
+                cmd.aspirate_384(
+                    hammy,
+                    barcodes,
+                    0.5,
+                    liquidHeight=1.5,
+                    mixCycles=3,
+                    mixVolume=5.0,
+                    liquidClass=MIXING,
+                )
+                cmd.dispense_384(
+                    hammy,
+                    active_pcr_plate.full(),
+                    0.5,
+                    mixCycles=3,
+                    mixVolume=5.0,
+                    liquidClass=MIXING,
+                )
+                cmd.tip_eject_384(hammy, mode=2)
+
+                st.set_state(state, state_file_path, "add_oligos", 1)
+
+            # Discard and get new tip rack
+            if state["active_rack"]:
+                cmd.grip_get_tip_rack(hammy, active_rack_384_50.rack)
+                cmd.grip_place_tip_rack(hammy, active_rack_384_50.rack, waste=True)
                 cmd.grip_get_tip_rack(hammy, racks_384_50[-1].rack)
                 cmd.grip_place_tip_rack(hammy, transport_rack_384_50.rack)
 
@@ -113,8 +150,8 @@ def run(
                 cmd.aspirate_384(
                     hammy,
                     active_bact_plate.full(),
-                    1.0,
-                    liquidHeight=3.0,
+                    0.5,
+                    liquidHeight=1.5,
                     mixCycles=3,
                     mixVolume=5.0,
                     liquidClass=MIXING,
@@ -122,7 +159,7 @@ def run(
                 cmd.dispense_384(
                     hammy,
                     active_pcr_plate.full(),
-                    1.0,
+                    0.5,
                     mixCycles=3,
                     mixVolume=5.0,
                     liquidClass=MIXING,
@@ -131,10 +168,17 @@ def run(
 
                 st.set_state(state, state_file_path, "add_bact", 1)
 
+            # Discard current active rack to waste if not already done
+            if state["active_rack"]:
+                cmd.grip_get_tip_rack(hammy, active_rack_384_50.rack)
+                cmd.grip_place_tip_rack(hammy, active_rack_384_50.rack, waste=True)
+
+                st.set_state(state, state_file_path, "active_rack", 0)
+
             # Place current active bact plate in dest bact plate stack if not already done
             if state["active_bact_plate"]:
                 cmd.grip_get(
-                    hammy, tmp_bact_lid.lid, mode=1, gripWidth=85.0, gripHeight=5.0
+                    hammy, tmp_bact_lid.lid, mode=1, gripWidth=84.0, gripHeight=5.0
                 )
                 cmd.grip_place(hammy, active_bact_lid.lid, mode=1)
                 cmd.grip_get(hammy, active_bact_plate.plate, gripWidth=82.0)
@@ -156,14 +200,7 @@ def run(
                 cmd.grip_place(hammy, pcr_plates_done[0].plate)
 
                 dk.delete_labware(shelf, pcr_plates_done.pop(0).plate)
-                st.set_state(state, state_file_path, "active_pcr_plate", 1)
-
-            # Discard current active rack to waste if not already done
-            if state["active_rack"]:
-                logger.debug("Discarding tip rack...")
-                cmd.grip_get_tip_rack(hammy, active_rack_384_50.rack)
-                cmd.grip_place_tip_rack(hammy, active_rack_384_50.rack, waste=True)
-
-                st.set_state(state, state_file_path, "active_rack", 0)
+                dk.delete_labware(shelf, pcr_lids.pop(0).lid)
+                st.set_state(state, state_file_path, "active_pcr_plate", 0)
 
         cmd.grip_eject(hammy)

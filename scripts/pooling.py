@@ -46,6 +46,7 @@ def run(
 
     # Eppendorf carrier
     carrier = shelf["C"][0]["frame"][0]
+    carrier.fill(lw.pos_row_24(plates))
 
     # Other tips and racks
     tips_96in384_50 = shelf["A"][2]["frame"][0]
@@ -110,12 +111,12 @@ def run(
             # Add EDTA to pcr plate if not already done
             if not state["add_edta"]:
                 cmd.tip_pick_up_384(hammy, edta_tips)
-                cmd.aspirate_384(hammy, edta_reservoir, 20.0, liquidHeight=2.0)
+                cmd.aspirate_384(hammy, edta_reservoir, 5.0, liquidHeight=1.0)
                 cmd.dispense_384(
                     hammy,
                     active_pcr_plate.full(),
-                    20.0,
-                    liquidHeight=11.0,
+                    5.0,
+                    liquidHeight=9.0,
                     dispenseMode=9,
                 )
                 cmd.tip_eject_384(hammy, mode=1)
@@ -126,7 +127,9 @@ def run(
             if not state["active_rack"]:
                 cmd.grip_get_tip_rack(hammy, racks_384_50[-1].rack)
                 cmd.grip_place_tip_rack(hammy, transport_rack_384_50.rack)
-                dk.delete_labware(shelf, racks_384_50[-1].rack)
+
+                dk.delete_labware(shelf, racks_384_50.pop().rack)
+                st.set_state(state, state_file_path, "active_rack", 1)
 
             # Transfer 384 wells in pcr plate to 96 in pooling plate if not already done
             if not state["384_to_96"]:
@@ -173,7 +176,7 @@ def run(
                     )
                     cmd.dispense_384(
                         hammy,
-                        active_pooling_plate.static(lw.pos_row_96(8, 8)),
+                        active_pooling_plate.static(lw.pos_row_96(8)),
                         16.0,
                         dispenseMode=9,
                         liquidHeight=10.0,
@@ -187,7 +190,8 @@ def run(
             if not state["8_to_1"]:
                 cmd.tip_pick_up(hammy, tips_96_300.ch2(2))
                 active_pooling_plate.fill(lw.pos_row_96(8))
-                carrier.fill(lw.pos_row_24(plates))
+
+                tube = carrier.ch2(1) * 2
 
                 while active_pooling_plate.total() > 0:
                     cmd.aspirate(
@@ -198,7 +202,7 @@ def run(
                     )
                     cmd.dispense(
                         hammy,
-                        carrier.ch2(1) * 2,
+                        tube,
                         [192],
                         dispenseMode=9,
                         liquidHeight=35.0,
