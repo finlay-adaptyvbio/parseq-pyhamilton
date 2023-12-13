@@ -1,0 +1,14 @@
+{
+    "add_beads": 0,
+    "add_samples": 0,
+    "mix_beads": 0,
+    "move_beads": 0,
+    "remove_supernatant": 0,
+    "wash1": 0,
+    "wash2": 0,
+    "move_wash": 0,
+    "add_buffer": 0,
+    "mix_buffer": 0,
+    "move_elute": 0,
+    "elute_samples": 0
+}

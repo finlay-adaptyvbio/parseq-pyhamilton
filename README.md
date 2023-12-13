@@ -40,7 +40,7 @@ Make sure the provided layout file is compatible with the automated labware assi
 
 A default state file from the **states** directory is also hardcoded for each script, allowing error recovery and tracking of method steps.
 
-## PparSEQ pipeline
+## parSEQ pipeline
 
 ### Culture plate merging
 
