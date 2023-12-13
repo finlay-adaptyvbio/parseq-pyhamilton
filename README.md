@@ -1,6 +1,6 @@
-# Adaptyv-PyHamilton
+# parSEQ-PyHamilton
 
-Source code for automation of PARSEQ pipeline and other protocols developed using [PyHamilton](https://github.com/dgretton/pyhamilton), the python library for Hamilton robots.
+Source code for automation of parSEQ pipeline and other protocols developed using [PyHamilton](https://github.com/dgretton/pyhamilton), the python library for Hamilton robots.
 
 ## Features
 
@@ -40,7 +40,7 @@ Make sure the provided layout file is compatible with the automated labware assi
 
 A default state file from the **states** directory is also hardcoded for each script, allowing error recovery and tracking of method steps.
 
-## PARSEQ pipeline
+## PparSEQ pipeline
 
 ### Culture plate merging
 
